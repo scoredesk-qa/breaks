@@ -35,9 +35,7 @@
     .fl{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
     .fi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;font-family:var(--font);outline:none;width:100%;transition:border .18s,box-shadow .18s}
     .fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--acc-ring)}
-    .fi::placeholder{color:#333}
-    .fi.mono{font-family:'Courier New',monospace;font-size:12px}
-    .fi option{background:var(--card)}
+    .fi::placeholder{color:#444}
     .iw{position:relative}
     .eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;display:flex;padding:4px;transition:color .15s}
     .eye-btn:hover{color:var(--text)}
@@ -52,13 +50,6 @@
     .ib.danger:hover{color:var(--danger)}
     .ib.muted{opacity:.45}.ib.muted:hover{opacity:1}
     .aerr{display:flex;align-items:center;gap:7px;color:var(--danger);font-size:13px;background:var(--danger-dim);border:1px solid rgba(240,82,82,.2);border-radius:8px;padding:9px 12px;margin-bottom:12px}
-    .ainfo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.7;margin-top:16px}
-    .steps-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
-    .step-row{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--muted);line-height:1.5}
-    .step-n{background:var(--acc-dim);color:var(--accent);border:1px solid var(--acc-ring);border-radius:50%;width:22px;height:22px;min-width:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-top:1px}
-    .tab-bar{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px}
-    .tab-btn{background:none;border:none;border-bottom:2px solid transparent;padding:10px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px;font-family:var(--font);transition:color .15s}
-    .tab-btn.on{color:var(--accent);border-bottom-color:var(--accent)}
     .ag-root{min-height:100vh;display:flex;flex-direction:column}
     .ag-hd{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
     .ag-body{flex:1;max-width:680px;margin:0 auto;width:100%;padding:32px 20px;display:flex;flex-direction:column;gap:20px}
@@ -131,7 +122,7 @@
     .mfoot{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
     .si{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-family:var(--font);outline:none;width:180px;transition:border .18s}
     .si:focus{border-color:var(--accent)}
-    .si::placeholder{color:#333}
+    .si::placeholder{color:#444}
     .es{padding:48px 24px;text-align:center;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:12px;font-size:13px}
     .es-ic{opacity:.25;display:flex}
     .sblock{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
@@ -156,11 +147,13 @@
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
-const { createClient } = supabase;
 
 // Pre-configured Supabase credentials
 const SUPABASE_URL = "https://bmfwgyruomldxebinwcr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw";
+
+// Initialize Supabase client
+const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ── Icons ── */
 const P = {
@@ -186,8 +179,6 @@ const P = {
   activity:"M22 12h-4l-3 9L9 3l-3 9H2",
   trending:["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
   refresh: ["M23 4v6h-6","M1 20v-6h6","M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"],
-  copy:    ["M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2z","M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"],
-  db:      ["M12 2a9 3 0 1 0 0 6A9 3 0 0 0 12 2z","M3 5v4a9 3 0 0 0 18 0V5","M3 9v4a9 3 0 0 0 18 0V9","M3 13v4a9 3 0 0 0 18 0v-4"],
 };
 const Ic = ({ n, size=16, sw=1.8 }) => {
   const d = P[n];
@@ -223,9 +214,6 @@ function exportCSV(logs) {
   a.click();
 }
 
-/* ── Supabase singleton ── */
-let SB = null;
-
 /* ══════════════════════════════════════════════════════════════════════════════
    ROOT
 ══════════════════════════════════════════════════════════════════════════════ */
@@ -234,9 +222,6 @@ function App() {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
-    // Initialize Supabase with hardcoded credentials
-    SB = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
     // Check if we were previously logged in
     const savedSession = localStorage.getItem('bt_session');
     if (savedSession) {
@@ -248,18 +233,32 @@ function App() {
         localStorage.removeItem('bt_session');
       }
     }
-    
     setPhase('login');
   }, []);
 
   const login = async (email, pass) => {
-    const { data, error } = await SB.from('bt_users')
-      .select('*').eq('email', email.toLowerCase().trim()).eq('password', pass).single();
-    if (error || !data) return 'Invalid email or password.';
-    setSession(data);
-    localStorage.setItem('bt_session', JSON.stringify(data));
-    setPhase('app'); 
-    return null;
+    try {
+      const { data, error } = await SB
+        .from('bt_users')
+        .select('*')
+        .eq('email', email.toLowerCase().trim())
+        .eq('password', pass)
+        .single();
+      
+      if (error) {
+        console.error('Login error:', error);
+        return 'Invalid email or password.';
+      }
+      if (!data) return 'Invalid email or password.';
+      
+      setSession(data);
+      localStorage.setItem('bt_session', JSON.stringify(data));
+      setPhase('app'); 
+      return null;
+    } catch (e) {
+      console.error('Login exception:', e);
+      return 'Connection error. Check your Supabase setup.';
+    }
   };
 
   const logout = () => { 
@@ -300,6 +299,7 @@ function Login({ onLogin }) {
   const submit = async () => {
     if(!email||!pass) return;
     setBusy(true);
+    setErr('');
     const e = await onLogin(email,pass);
     if(e){setErr(e);setBusy(false);}
   };
@@ -330,6 +330,9 @@ function Login({ onLogin }) {
         <button className="bp full" onClick={submit} disabled={busy||!email||!pass}>
           {busy?<span className="spinner-sm"/>:'Sign in'}
         </button>
+        <p style={{marginTop:16,fontSize:12,color:'var(--muted)',textAlign:'center'}}>
+          Default: yassin.aitlehcen@market-wave.com
+        </p>
       </div>
     </div>
   );
@@ -348,7 +351,7 @@ function Agent({ session, onLogout }) {
     SB.from('bt_logs').select('*').eq('agent_id',session.id)
       .order('start_time',{ascending:false})
       .then(({data})=>{ if(data) setLogs(data); });
-  },[]);
+  },[session.id]);
 
   useEffect(()=>{
     if(active){ timerRef.current=setInterval(()=>setElapsed(Date.now()-active.start),1000); }
@@ -625,7 +628,7 @@ function AUsers({ session }) {
 }
 
 function ASettings() {
-  const reset=()=>{if(confirm('Disconnect this device? Your Supabase data is safe.')){localStorage.removeItem('bt_session');window.location.reload();}};
+  const reset=()=>{if(confirm('Sign out of all devices?')){localStorage.removeItem('bt_session');window.location.reload();}};
   return (
     <div className="panel">
       <div className="phd"><div><h1 className="ptitle">Settings</h1><p className="psub">Database and account</p></div></div>
@@ -636,13 +639,13 @@ function ASettings() {
       </div>
       <div className="sblock">
         <h2 className="sh">Sharing with your team</h2>
-        <p className="sd">Each team member can use this same HTML file. After setup they log in with their personal email and password — which you set up via the Users tab.</p>
+        <p className="sd">Share this HTML file with your team. They can log in with the credentials you create in the Users tab.</p>
       </div>
       <div className="sblock">
         <h2 className="sh">Admin account</h2>
-        <p className="sd">Default admin created by the SQL script.</p>
+        <p className="sd">Default admin credentials:</p>
         <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:13,color:'var(--muted)'}}>
-          yassin.aitlehcen@market-wave.com
+          yassin.aitlehcen@market-wave.com / @Yassine_AL230920
         </div>
       </div>
     </div>
