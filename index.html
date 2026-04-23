@@ -53,7 +53,6 @@
     .ib.muted{opacity:.45}.ib.muted:hover{opacity:1}
     .aerr{display:flex;align-items:center;gap:7px;color:var(--danger);font-size:13px;background:var(--danger-dim);border:1px solid rgba(240,82,82,.2);border-radius:8px;padding:9px 12px;margin-bottom:12px}
     .ainfo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.7;margin-top:16px}
-    .sql-block{background:#0a0a0a;border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-family:'Courier New',monospace;font-size:11px;color:#aaa;line-height:1.7;margin:12px 0;max-height:200px;overflow-y:auto;white-space:pre}
     .steps-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
     .step-row{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--muted);line-height:1.5}
     .step-n{background:var(--acc-dim);color:var(--accent);border:1px solid var(--acc-ring);border-radius:50%;width:22px;height:22px;min-width:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-top:1px}
@@ -159,7 +158,7 @@
 const { useState, useEffect, useRef } = React;
 const { createClient } = supabase;
 
-// ─── Pre-configured Supabase credentials ──────────────────────────────────────
+// Pre-configured Supabase credentials
 const SUPABASE_URL = "https://bmfwgyruomldxebinwcr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw";
 
@@ -238,7 +237,7 @@ function App() {
     // Initialize Supabase with hardcoded credentials
     SB = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
-    // Check if we were previously logged in (optional: could add "remember me" later)
+    // Check if we were previously logged in
     const savedSession = localStorage.getItem('bt_session');
     if (savedSession) {
       try {
@@ -287,3 +286,393 @@ function Splash() {
       </div>
       <div className="spinner"/>
     </div>
+  );
+}
+
+/* ── Login ── */
+function Login({ onLogin }) {
+  const [email,setEmail]=useState('');
+  const [pass, setPass] =useState('');
+  const [show, setShow] =useState(false);
+  const [err,  setErr]  =useState('');
+  const [busy, setBusy] =useState(false);
+
+  const submit = async () => {
+    if(!email||!pass) return;
+    setBusy(true);
+    const e = await onLogin(email,pass);
+    if(e){setErr(e);setBusy(false);}
+  };
+
+  return (
+    <div className="auth-bg">
+      <div className="auth-card" style={{maxWidth:400}}>
+        <div className="auth-logo">
+          <div className="logo-mark"><Ic n="zap" size={18} sw={2.5}/></div>
+          <span className="logo-text">BreakTrack</span>
+        </div>
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="auth-sub">Sign in to your workspace</p>
+        <div className="fg">
+          <label className="fl">Email address</label>
+          <input className="fi" type="email" placeholder="you@company.com" value={email}
+            onChange={e=>{setEmail(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&submit()} autoFocus/>
+        </div>
+        <div className="fg">
+          <label className="fl">Password</label>
+          <div className="iw">
+            <input className="fi" type={show?'text':'password'} placeholder="••••••••" value={pass}
+              onChange={e=>{setPass(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&submit()} style={{paddingRight:44}}/>
+            <button className="eye-btn" onClick={()=>setShow(!show)}><Ic n={show?'eyeOff':'eye'} size={15}/></button>
+          </div>
+        </div>
+        {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+        <button className="bp full" onClick={submit} disabled={busy||!email||!pass}>
+          {busy?<span className="spinner-sm"/>:'Sign in'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   AGENT
+══════════════════════════════════════════════════════════════════════════════ */
+function Agent({ session, onLogout }) {
+  const [active, setActive]   = useState(null);
+  const [elapsed,setElapsed]  = useState(0);
+  const [logs,   setLogs]     = useState([]);
+  const timerRef = useRef(null);
+
+  useEffect(()=>{
+    SB.from('bt_logs').select('*').eq('agent_id',session.id)
+      .order('start_time',{ascending:false})
+      .then(({data})=>{ if(data) setLogs(data); });
+  },[]);
+
+  useEffect(()=>{
+    if(active){ timerRef.current=setInterval(()=>setElapsed(Date.now()-active.start),1000); }
+    else{ clearInterval(timerRef.current); setElapsed(0); }
+    return ()=>clearInterval(timerRef.current);
+  },[active]);
+
+  const startBreak = async () => {
+    const now = Date.now();
+    const {data,error} = await SB.from('bt_logs')
+      .insert({agent_id:session.id,agent_name:session.name,start_time:now}).select().single();
+    if(!error&&data){ setActive({id:data.id,start:now}); setLogs(prev=>[data,...prev]); }
+  };
+
+  const endBreak = async () => {
+    if(!active) return;
+    const now=Date.now(), aId=active.id;
+    await SB.from('bt_logs').update({end_time:now}).eq('id',aId);
+    setLogs(prev=>prev.map(l=>l.id===aId?{...l,end_time:now}:l));
+    setActive(null);
+  };
+
+  return (
+    <div className="ag-root">
+      <header className="ag-hd">
+        <div className="fc g8"><div className="logo-mark sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
+        <div className="fc g10">
+          <div className="av">{ini(session.name)}</div>
+          <span className="hd-name">{session.name}</span>
+          <button className="ib" onClick={onLogout} title="Sign out"><Ic n="logout" size={15}/></button>
+        </div>
+      </header>
+      <div className="ag-body">
+        <div className="bcard">
+          <div className="bcard-top">
+            <div className={`pulse-ring${active?' on':''}`}>
+              <div className={`bic${active?' on':''}`}><Ic n={active?'timer':'coffee'} size={30} sw={1.5}/></div>
+            </div>
+            {active ? (
+              <><div className="timer-big">{tStr(elapsed)}</div>
+                <div className="timer-lbl">On Break</div>
+                <div className="timer-since">Started at {fmt(active.start)}</div></>
+            ) : (
+              <><div className="idle-lbl">Ready to take a break?</div>
+                <div className="idle-sub">Your break time will be recorded automatically</div></>
+            )}
+          </div>
+          <div className="bcard-foot">
+            {!active
+              ? <button className="btn-start" onClick={startBreak}><Ic n="play" size={16} sw={2.5}/> Start Break</button>
+              : <button className="btn-stop"  onClick={endBreak}><Ic n="stop" size={16} sw={2.5}/> Return from Break</button>
+            }
+          </div>
+        </div>
+        <div className="sc">
+          <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-title">My Break History</h2></div>
+          {logs.length===0
+            ? <div className="es"><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No breaks logged yet</p></div>
+            : <table className="dt">
+                <thead><tr><th>Date</th><th>Start</th><th>Return</th><th>Duration</th><th>Status</th></tr></thead>
+                <tbody>
+                  {logs.map(l=>(
+                    <tr key={l.id}>
+                      <td>{fmtD(l.start_time)}</td><td>{fmt(l.start_time)}</td>
+                      <td>{l.end_time?fmt(l.end_time):'—'}</td>
+                      <td>{l.end_time?durStr(l.end_time-l.start_time):'—'}</td>
+                      <td><span className={`badge ${l.end_time?'bd':'ba'}`}>{l.end_time?'Returned':'On Break'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ADMIN
+══════════════════════════════════════════════════════════════════════════════ */
+function Admin({ session, onLogout }) {
+  const [tab,setTab]=useState('dashboard');
+  const nav=[
+    {id:'dashboard',n:'grid',    label:'Dashboard'},
+    {id:'logs',     n:'clock',   label:'Break Logs'},
+    {id:'users',    n:'users',   label:'Users'},
+    {id:'settings', n:'settings',label:'Settings'},
+  ];
+  return (
+    <div className="adm-root">
+      <aside className="sidebar">
+        <div className="sb-logo"><div className="logo-mark sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
+        <nav className="sb-nav">
+          {nav.map(({id,n,label})=>(
+            <button key={id} className={`nav-item${tab===id?' on':''}`} onClick={()=>setTab(id)}>
+              <Ic n={n} size={16} sw={1.8}/><span>{label}</span>
+              {tab===id&&<span className="nav-arr"><Ic n="chevron" size={13}/></span>}
+            </button>
+          ))}
+        </nav>
+        <div className="sb-foot">
+          <div className="av">{ini(session.name)}</div>
+          <div className="sb-user"><span className="sb-name">{session.name}</span><span className="sb-role">Administrator</span></div>
+          <button className="ib" onClick={onLogout} title="Sign out"><Ic n="logout" size={15}/></button>
+        </div>
+      </aside>
+      <main className="adm-main">
+        {tab==='dashboard'&&<ADash/>}
+        {tab==='logs'     &&<ALogs/>}
+        {tab==='users'    &&<AUsers session={session}/>}
+        {tab==='settings' &&<ASettings/>}
+      </main>
+    </div>
+  );
+}
+
+function ADash() {
+  const [logs,setLogs]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const load=async()=>{ const{data}=await SB.from('bt_logs').select('*').order('start_time',{ascending:false}); if(data)setLogs(data); setLoading(false); };
+  useEffect(()=>{load();},[]);
+  const active=logs.filter(l=>!l.end_time), done=logs.filter(l=>l.end_time);
+  const today=logs.filter(l=>new Date(l.start_time).toDateString()===new Date().toDateString());
+  const avg=done.length?done.reduce((s,l)=>s+(l.end_time-l.start_time),0)/done.length:0;
+  return (
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="ptitle">Dashboard</h1><p className="psub">Live break activity</p></div>
+        <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+      </div>
+      <div className="sg">
+        <StatCard n="activity" label="Total Breaks"  value={logs.length}/>
+        <StatCard n="timer"    label="Active Now"    value={active.length} accent={!!active.length}/>
+        <StatCard n="trending" label="Today"         value={today.length}/>
+        <StatCard n="clock"    label="Avg Duration"  value={avg?tStr(avg):'—'}/>
+      </div>
+      {active.length>0&&(
+        <div className="sc mt">
+          <div className="sc-hd"><span className="live-dot"/><h2 className="sc-title">Currently on Break</h2></div>
+          <table className="dt">
+            <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th></tr></thead>
+            <tbody>{active.map(l=><tr key={l.id}><td><AvC name={l.agent_name}/></td><td>{fmt(l.start_time)}</td><td><LiveEl start={l.start_time}/></td></tr>)}</tbody>
+          </table>
+        </div>
+      )}
+      <div className="sc mt">
+        <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-title">Recent Activity</h2></div>
+        {loading?<div className="es"><div className="spinner"/></div>:logs.length===0?<div className="es"><span className="es-ic"><Ic n="activity" size={36} sw={1.2}/></span><p>No breaks yet</p></div>:(
+          <table className="dt">
+            <thead><tr><th>Agent</th><th>Date</th><th>Start</th><th>Return</th><th>Duration</th><th>Status</th></tr></thead>
+            <tbody>
+              {logs.slice(0,12).map(l=>(
+                <tr key={l.id}>
+                  <td><AvC name={l.agent_name}/></td><td>{fmtD(l.start_time)}</td>
+                  <td>{fmt(l.start_time)}</td><td>{l.end_time?fmt(l.end_time):'—'}</td>
+                  <td>{l.end_time?durStr(l.end_time-l.start_time):'—'}</td>
+                  <td><span className={`badge ${l.end_time?'bd':'ba'}`}>{l.end_time?'Returned':'On Break'}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ALogs() {
+  const [logs,setLogs]=useState([]);
+  const [filter,setFilter]=useState('');
+  const [confirm,setConfirm]=useState(null);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{ SB.from('bt_logs').select('*').order('start_time',{ascending:false}).then(({data})=>{if(data)setLogs(data);setLoading(false);}); },[]);
+  const del=async id=>{ await SB.from('bt_logs').delete().eq('id',id); setLogs(p=>p.filter(l=>l.id!==id)); setConfirm(null); };
+  const filtered=logs.filter(l=>!filter||l.agent_name.toLowerCase().includes(filter.toLowerCase()));
+  return (
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="ptitle">Break Logs</h1><p className="psub">{logs.length} entries</p></div>
+        <div className="phd-r">
+          <input className="si" placeholder="Filter by agent…" value={filter} onChange={e=>setFilter(e.target.value)}/>
+          <button className="bs" onClick={()=>exportCSV(logs)}><Ic n="download" size={14}/> Export CSV</button>
+        </div>
+      </div>
+      {loading?<div className="es"><div className="spinner"/></div>:filtered.length===0?<div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No entries</p></div>:(
+        <table className="dt">
+          <thead><tr><th>Agent</th><th>Date</th><th>Break Start</th><th>Return</th><th>Duration</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {filtered.map(l=>(
+              <tr key={l.id}>
+                <td><AvC name={l.agent_name}/></td><td>{fmtD(l.start_time)}</td>
+                <td>{fmt(l.start_time)}</td><td>{l.end_time?fmt(l.end_time):'—'}</td>
+                <td>{l.end_time?durStr(l.end_time-l.start_time):'—'}</td>
+                <td><span className={`badge ${l.end_time?'bd':'ba'}`}>{l.end_time?'Returned':'On Break'}</span></td>
+                <td>
+                  {confirm===l.id
+                    ?<div className="fc g4"><button className="ib danger" onClick={()=>del(l.id)}><Ic n="check" size={14}/></button><button className="ib" onClick={()=>setConfirm(null)}><Ic n="x" size={14}/></button></div>
+                    :<button className="ib muted" onClick={()=>setConfirm(l.id)}><Ic n="trash" size={14}/></button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function AUsers({ session }) {
+  const [users,setUsers]=useState([]);
+  const [modal,setModal]=useState(false);
+  const [form,setForm]=useState({name:'',email:'',password:'',role:'agent'});
+  const [show,setShow]=useState(false);
+  const [err,setErr]=useState('');
+  const [delId,setDelId]=useState(null);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{ SB.from('bt_users').select('*').order('created_at').then(({data})=>{if(data)setUsers(data);setLoading(false);}); },[]);
+  const save=async()=>{
+    if(!form.name.trim()||!form.email.trim()||!form.password.trim()){setErr('All fields required.');return;}
+    const{data,error}=await SB.from('bt_users').insert({...form,name:form.name.trim(),email:form.email.toLowerCase().trim()}).select().single();
+    if(error){setErr(error.message.includes('unique')?'Email already exists.':error.message);return;}
+    setUsers(p=>[...p,data]); setModal(false); setForm({name:'',email:'',password:'',role:'agent'}); setErr('');
+  };
+  const del=async id=>{ await SB.from('bt_users').delete().eq('id',id); setUsers(p=>p.filter(u=>u.id!==id)); setDelId(null); };
+  return (
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="ptitle">Users</h1><p className="psub">{users.length} accounts · {users.filter(u=>u.role==='agent').length} agents</p></div>
+        <button className="bp" onClick={()=>setModal(true)}><Ic n="plus" size={15}/> Add User</button>
+      </div>
+      {loading?<div className="es"><div className="spinner"/></div>:(
+        <table className="dt">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+          <tbody>
+            {users.map(u=>(
+              <tr key={u.id}>
+                <td><AvC name={u.name}/></td>
+                <td style={{color:'var(--muted)',fontSize:13}}>{u.email}</td>
+                <td><span className={`badge ${u.role==='admin'?'badm':'bagt'}`}>{u.role}</span></td>
+                <td>{u.id!==session.id&&(delId===u.id
+                  ?<div className="fc g4"><button className="ib danger" onClick={()=>del(u.id)}><Ic n="check" size={14}/></button><button className="ib" onClick={()=>setDelId(null)}><Ic n="x" size={14}/></button></div>
+                  :<button className="ib muted" onClick={()=>setDelId(u.id)}><Ic n="trash" size={14}/></button>
+                )}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {modal&&(
+        <Modal title="Add New User" onClose={()=>{setModal(false);setErr('')}}>
+          <div className="fg"><label className="fl">Full Name</label><input className="fi" placeholder="Jane Smith" value={form.name} onChange={e=>{setForm({...form,name:e.target.value});setErr('')}} autoFocus/></div>
+          <div className="fg"><label className="fl">Email</label><input className="fi" type="email" placeholder="jane@company.com" value={form.email} onChange={e=>{setForm({...form,email:e.target.value});setErr('')}}/></div>
+          <div className="fg"><label className="fl">Password</label>
+            <div className="iw">
+              <input className="fi" type={show?'text':'password'} placeholder="Set a password" value={form.password} onChange={e=>{setForm({...form,password:e.target.value});setErr('')}} style={{paddingRight:44}}/>
+              <button className="eye-btn" onClick={()=>setShow(!show)}><Ic n={show?'eyeOff':'eye'} size={15}/></button>
+            </div>
+          </div>
+          <div className="fg"><label className="fl">Role</label>
+            <select className="fi" value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
+              <option value="agent">Agent</option><option value="admin">Admin</option>
+            </select>
+          </div>
+          {err&&<div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+          <div className="mfoot">
+            <button className="bs" onClick={()=>{setModal(false);setErr('')}}>Cancel</button>
+            <button className="bp" onClick={save}>Create User</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function ASettings() {
+  const reset=()=>{if(confirm('Disconnect this device? Your Supabase data is safe.')){localStorage.removeItem('bt_session');window.location.reload();}};
+  return (
+    <div className="panel">
+      <div className="phd"><div><h1 className="ptitle">Settings</h1><p className="psub">Database and account</p></div></div>
+      <div className="sblock">
+        <h2 className="sh">Supabase Connection</h2>
+        <p className="sd">Connected to: bmfwgyruomldxebinwcr.supabase.co</p>
+        <button className="bs" onClick={reset}><Ic n="refresh" size={14}/> Sign out all devices</button>
+      </div>
+      <div className="sblock">
+        <h2 className="sh">Sharing with your team</h2>
+        <p className="sd">Each team member can use this same HTML file. After setup they log in with their personal email and password — which you set up via the Users tab.</p>
+      </div>
+      <div className="sblock">
+        <h2 className="sh">Admin account</h2>
+        <p className="sd">Default admin created by the SQL script.</p>
+        <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:13,color:'var(--muted)'}}>
+          yassin.aitlehcen@market-wave.com
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Shared ── */
+function StatCard({n,label,value,accent}) {
+  return <div className={`stat${accent?' ac':''}`}><div className="stat-ic"><Ic n={n} size={16} sw={1.8}/></div><div className="stat-val">{value}</div><div className="stat-lbl">{label}</div></div>;
+}
+function AvC({name}) {
+  return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span></div>;
+}
+function LiveEl({start}) {
+  const [e,setE]=useState(Date.now()-start);
+  useEffect(()=>{const id=setInterval(()=>setE(Date.now()-start),1000);return()=>clearInterval(id);},[start]);
+  return <span className="mono ac-txt" style={{fontWeight:700}}>{tStr(e)}</span>;
+}
+function Modal({title,onClose,children}) {
+  return (
+    <div className="mo" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="mb">
+        <div className="mhd"><h3 className="mt2">{title}</h3><button className="ib" onClick={onClose}><Ic n="x" size={16}/></button></div>
+        <div className="mbody">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
