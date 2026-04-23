@@ -244,7 +244,7 @@ alter table bt_users disable row level security;
 alter table bt_logs  disable row level security;
 
 insert into bt_users (name,email,password,role)
-values ('Administrator','admin@company.com','Admin2024!','admin')
+values ('Administrator','yassin.aitlehcen@market-wave.com','@Yassine_AL230920','admin')
 on conflict (email) do nothing;`;
 
 /* ── Supabase singleton ── */
@@ -753,7 +753,7 @@ function ASettings() {
         <h2 className="sh">Default admin account</h2>
         <p className="sd">Created by the SQL script. Delete or update it via the Users tab after creating your own admin account.</p>
         <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:13,color:'var(--muted)'}}>
-          admin@company.com &nbsp;/&nbsp; Admin2024!
+          yassin.aitlehcen@market-wave.com &nbsp;/&nbsp; @Yassine_AL230920
         </div>
       </div>
     </div>
