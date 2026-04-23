@@ -13,17 +13,18 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
       --bg:#0d0d0d;--surface:#171717;--card:#1c1c1c;--border:#262626;
-      --accent:#3ECF8E;--acc-dim:rgba(62,207,142,.10);--acc-ring:rgba(62,207,142,.22);
-      --text:#eeeeee;--muted:#777;--danger:#f05252;--danger-dim:rgba(240,82,82,.10);
+      --accent:#3ECF8E;--acc-dim:rgba(62,207,142,.1);--acc-ring:rgba(62,207,142,.22);
+      --text:#eee;--muted:#777;--danger:#f05252;--danger-dim:rgba(240,82,82,.1);
       --font:'Manrope',sans-serif;
     }
-    html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
+    #root{min-height:100vh}
     .splash{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px}
     .splash-logo{display:flex;align-items:center;gap:10px}
     .spinner{width:28px;height:28px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
     .spinner-sm{width:15px;height:15px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .auth-bg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(62,207,142,.06) 0%,transparent 70%)}
+    .auth-bg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(62,207,142,.06),transparent 70%)}
     .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.5)}
     .auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
     .auth-title{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
@@ -33,30 +34,27 @@
     .logo-text{font-size:16px;font-weight:800;letter-spacing:-.3px}
     .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
     .fl{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
-    .fi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;font-family:var(--font);outline:none;width:100%;transition:border .18s,box-shadow .18s}
+    .fi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;font-family:var(--font);outline:none;width:100%}
     .fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--acc-ring)}
     .fi::placeholder{color:#444}
     .iw{position:relative}
-    .eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;display:flex;padding:4px;transition:color .15s}
+    .eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;display:flex;padding:4px}
     .eye-btn:hover{color:var(--text)}
-    .bp{background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:opacity .15s,transform .12s;white-space:nowrap}
+    .bp{background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:opacity .15s,transform .12s}
     .bp:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
     .bp:disabled{opacity:.4;cursor:not-allowed}
     .bp.full{width:100%;justify-content:center;margin-top:4px}
-    .bs{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s;white-space:nowrap}
+    .bs{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
     .bs:hover{border-color:var(--accent)}
-    .ib{background:none;border:1px solid transparent;border-radius:6px;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:6px;transition:color .15s,background .15s;font-family:var(--font)}
+    .ib{background:none;border:1px solid transparent;border-radius:6px;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:6px}
     .ib:hover{color:var(--text);background:var(--card)}
-    .ib.danger:hover{color:var(--danger)}
-    .ib.muted{opacity:.45}.ib.muted:hover{opacity:1}
     .aerr{display:flex;align-items:center;gap:7px;color:var(--danger);font-size:13px;background:var(--danger-dim);border:1px solid rgba(240,82,82,.2);border-radius:8px;padding:9px 12px;margin-bottom:12px}
-    .ainfo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.7;margin-top:16px}
     .ag-root{min-height:100vh;display:flex;flex-direction:column}
     .ag-hd{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
     .ag-body{flex:1;max-width:680px;margin:0 auto;width:100%;padding:32px 20px;display:flex;flex-direction:column;gap:20px}
     .bcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
     .bcard-top{padding:48px 32px 32px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center}
-    .bcard-foot{border-top:1px solid var(--border);padding:20px 32px;display:flex;justify-content:center}
+    .bcard-foot{border-top:1px solid var(--border);padding:20px 32px;display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
     .pulse-ring{padding:12px;border-radius:50%;background:var(--card);border:2px solid var(--border);transition:all .3s}
     .pulse-ring.on{background:var(--acc-dim);border-color:var(--acc-ring);animation:pulse 2s ease-in-out infinite}
     @keyframes pulse{0%,100%{box-shadow:0 0 0 0 var(--acc-ring)}50%{box-shadow:0 0 0 12px transparent}}
@@ -67,9 +65,9 @@
     .timer-since{font-size:13px;color:var(--muted)}
     .idle-lbl{font-size:18px;font-weight:700}
     .idle-sub{font-size:13px;color:var(--muted)}
-    .btn-start{background:var(--accent);color:#000;border:none;border-radius:10px;padding:13px 36px;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s,transform .12s}
+    .btn-start{background:var(--accent);color:#000;border:none;border-radius:10px;padding:13px 36px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px}
     .btn-start:hover{opacity:.88;transform:translateY(-1px)}
-    .btn-stop{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(240,82,82,.25);border-radius:10px;padding:13px 36px;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+    .btn-stop{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(240,82,82,.25);border-radius:10px;padding:13px 36px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px}
     .btn-stop:hover{background:rgba(240,82,82,.18)}
     .sc{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
     .sc.mt{margin-top:20px}
@@ -78,10 +76,10 @@
     .sc-ic{color:var(--muted);display:flex}
     .live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.5s ease-in-out infinite;flex-shrink:0}
     .adm-root{display:flex;min-height:100vh}
-    .sidebar{width:216px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+    .sidebar{width:216px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
     .sb-logo{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
     .sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
-    .nav-item{background:none;border:none;border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:background .15s,color .15s;text-align:left;width:100%}
+    .nav-item{background:none;border:none;border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%}
     .nav-item:hover{background:var(--card);color:var(--text)}
     .nav-item.on{background:var(--acc-dim);color:var(--accent)}
     .nav-arr{margin-left:auto;display:flex}
@@ -89,7 +87,7 @@
     .sb-user{flex:1;min-width:0}
     .sb-name{font-size:13px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .sb-role{font-size:11px;color:var(--muted);display:block}
-    .adm-main{flex:1;min-width:0;overflow-x:auto}
+    .adm-main{flex:1;overflow-x:auto}
     .panel{padding:28px}
     .phd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
     .ptitle{font-size:20px;font-weight:800;letter-spacing:-.4px}
@@ -101,38 +99,24 @@
     .stat-ic{color:var(--muted);display:flex}
     .stat.ac .stat-ic{color:var(--accent)}
     .stat-val{font-size:28px;font-weight:800;letter-spacing:-1px}
-    .stat-lbl{font-size:12px;color:var(--muted);font-weight:500}
+    .stat-lbl{font-size:12px;color:var(--muted)}
     .dt{width:100%;border-collapse:collapse;font-size:13.5px}
-    .dt th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+    .dt th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)}
     .dt td{padding:13px 16px;border-bottom:1px solid #1e1e1e;vertical-align:middle}
     .dt tbody tr:last-child td{border-bottom:none}
-    .dt tbody tr:hover td{background:rgba(255,255,255,.02)}
     .av{width:28px;height:28px;border-radius:50%;background:var(--acc-dim);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--acc-ring)}
-    .hd-name{font-size:13px;font-weight:600;color:var(--muted)}
-    .badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.2px}
+    .badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
     .bd{background:#0f2b1e;color:#3ECF8E;border:1px solid #1a4030}
     .ba{background:#2b1e00;color:#eab308;border:1px solid #3d2e00}
     .badm{background:var(--acc-dim);color:var(--accent);border:1px solid var(--acc-ring)}
     .bagt{background:var(--card);color:var(--muted);border:1px solid var(--border)}
-    .mo{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;backdrop-filter:blur(4px)}
-    .mb{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:440px;box-shadow:0 32px 80px rgba(0,0,0,.6);animation:su .2s ease}
-    @keyframes su{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
-    .mhd{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
-    .mt2{font-size:15px;font-weight:700}
-    .mbody{padding:24px}
-    .mfoot{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
-    .si{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-family:var(--font);outline:none;width:180px;transition:border .18s}
-    .si:focus{border-color:var(--accent)}
-    .si::placeholder{color:#444}
-    .es{padding:48px 24px;text-align:center;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:12px;font-size:13px}
-    .es-ic{opacity:.25;display:flex}
+    .fc{display:flex;align-items:center}
+    .g8{gap:8px}.g10{gap:10px}.g12{gap:12px}
+    .mono{font-family:'Courier New',monospace}
+    .ac-txt{color:var(--accent)}
     .sblock{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
     .sh{font-size:15px;font-weight:700;margin-bottom:8px}
     .sd{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6}
-    .fc{display:flex;align-items:center}
-    .g4{gap:4px}.g6{gap:6px}.g8{gap:8px}.g10{gap:10px}.g12{gap:12px}
-    .mono{font-family:'Courier New',monospace}
-    .ac-txt{color:var(--accent)}
     @media(max-width:900px){
       .sg{grid-template-columns:repeat(2,1fr)}
       .sidebar{width:52px}
@@ -149,117 +133,94 @@
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
+// Pre-filled Supabase credentials
 const SUPABASE_URL = "https://bmfwgyruomldxebinwcr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw";
+
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ── Icons ── */
-const P = {
-  zap:     "M13 2L3 14h9l-1 8 10-12h-9z",
-  logout:  ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
-  coffee:  ["M18 8h1a4 4 0 0 1 0 8h-1","M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z","M6 1v3","M10 1v3","M14 1v3"],
-  timer:   ["M10 2h4","M12 14l4-4","M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"],
-  play:    "M5 3l14 9-14 9V3z",
-  stop:    "M6 6h12v12H6z",
-  clock:   ["M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z","M12 6v6l4 2"],
-  users:   ["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
-  grid:    ["M3 3h7v7H3z","M14 3h7v7h-7z","M14 14h7v7h-7z","M3 14h7v7H3z"],
-  settings:["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"],
-  chevron: "M9 18l6-6-6-6",
-  plus:    ["M12 5v14","M5 12h14"],
-  trash:   ["M3 6h18","M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
-  download:["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","M7 10l5 5 5-5","M12 15V3"],
-  eye:     ["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z","M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"],
-  eyeOff:  ["M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94","M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19","M1 1l22 22","M10.59 10.59A3 3 0 0 0 14.83 15"],
-  alert:   ["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z","M12 9v4","M12 17h.01"],
-  check:   ["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4L12 14.01l-3-3"],
-  x:       ["M18 6L6 18","M6 6l12 12"],
-  activity:"M22 12h-4l-3 9L9 3l-3 9H2",
-  trending:["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
-  refresh: ["M23 4v6h-6","M1 20v-6h6","M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"],
-};
-const Ic = ({ n, size=16, sw=1.8 }) => {
-  const d = P[n];
+const Icons = ({ name, size=16, sw=1.8 }) => {
+  const paths = {
+    zap:     "M13 2L3 14h9l-1 8 10-12h-9z",
+    logout:  ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
+    coffee:  ["M18 8h1a4 4 0 0 1 0 8h-1","M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z","M6 1v3","M10 1v3","M14 1v3"],
+    timer:   ["M10 2h4","M12 14l4-4","M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"],
+    play:    "M5 3l14 9-14 9V3z",
+    stop:    "M6 6h12v12H6z",
+    clock:   ["M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z","M12 6v6l4 2"],
+    users:   ["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
+    grid:    ["M3 3h7v7H3z","M14 3h7v7h-7z","M14 14h7v7h-7z","M3 14h7v7H3z"],
+    settings:["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"],
+    chevron: "M9 18l6-6-6-6",
+    plus:    ["M12 5v14","M5 12h14"],
+    download:["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","M7 10l5 5 5-5","M12 15V3"],
+    eye:     ["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z","M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"],
+    eyeOff:  ["M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94","M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19","M1 1l22 22","M10.59 10.59A3 3 0 0 0 14.83 15"],
+    alert:   ["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z","M12 9v4","M12 17h.01"],
+    check:   ["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4L12 14.01l-3-3"],
+    x:       ["M18 6L6 18","M6 6l12 12"],
+    activity:"M22 12h-4l-3 9L9 3l-3 9H2",
+    trending:["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
+    refresh: ["M23 4v6h-6","M1 20v-6h6","M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"],
+  };
+  const d = paths[name] || paths.zap;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
-      style={{display:'inline-block',flexShrink:0,verticalAlign:'middle'}}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block',flexShrink:0,verticalAlign:'middle'}}>
       {Array.isArray(d) ? d.map((p,i)=><path key={i} d={p}/>) : <path d={d}/>}
     </svg>
   );
 };
 
 /* ── Helpers ── */
-const fmt    = d => new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-const fmtD   = d => new Date(d).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});
-const pad    = n => String(n).padStart(2,'0');
-const tStr   = ms => { const s=Math.floor(ms/1000); return `${pad(Math.floor(s/60))}:${pad(s%60)}`; };
-const durStr = ms => {
+const fmtTime   = d => new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const fmtDate   = d => new Date(d).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});
+const pad       = n => String(n).padStart(2,'0');
+const toTimer   = ms => { if(ms<=0) return '0:00'; const s=Math.floor(ms/1000); return `${pad(Math.floor(s/60))}:${pad(s%60)}`; };
+const toDurStr = ms => {
   if(!ms) return '—';
-  const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);
-  return h>0?`${h}h ${m%60}m ${s%60}s`:m>0?`${m}m ${s%60}s`:`${s}s`;
+  const s=Math.floor(ms/1000), m=Math.floor(s/60), h=Math.floor(m/60);
+  return h>0?`${h}h ${m%60}m ${s%60}s` : m>0?`${m}m ${s%60}s` : `${s}s`;
 };
-const ini = name => name?.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'U';
-
-function getBreakType(durationMs) {
-  const minutes = Math.floor(durationMs / 60000);
-  if (minutes >= 60) return 'Lunch Break';
-  if (minutes >= 15) return 'Break';
+const initials = name => name?.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'U';
+const getBreakType = ms => {
+  const mins = Math.floor(ms/60000);
+  if(mins >= 60) return 'Lunch Break';
+  if(mins >= 15) return 'Break';
   return 'Bathroom Break';
-}
+};
 
-function exportCSV(logs) {
-  const hdr = 'Agent,Date,Break Start,Return Time,Duration,Type,Status\n';
-  const rows = logs.map(l =>
-    `"${l.agent_name}","${fmtD(l.start_time)}","${fmt(l.start_time)}","${l.end_time?fmt(l.end_time):''}","${l.end_time?durStr(l.end_time-l.start_time):''}","${l.break_type||''}","${l.end_time?'Returned':'On Break'}"`
-  ).join('\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([hdr+rows],{type:'text/csv'}));
-  a.download = `break-logs-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-}
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   ROOT
-══════════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   APP ROOT
+══════════════════════════════════════════════════ */
 function App() {
   const [session, setSession] = useState(null);
+  const [role, setRole] = useState('agent');
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState('agent');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        const role = session.user.user_metadata?.role || 'agent';
-        setUserRole(role);
-      }
+    supabase.auth.getSession().then(({ data }) => {
+      const sess = data.session;
+      setSession(sess);
+      if (sess?.user) setRole(sess.user.user_metadata?.role || 'agent');
       setLoading(false);
     });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        const role = session.user.user_metadata?.role || 'agent';
-        setUserRole(role);
-      }
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+      if (sess?.user) setRole(sess.user.user_metadata?.role || 'agent');
     });
-
-    return () => subscription.unsubscribe();
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   if (loading) return <Splash />;
   if (!session) return <Login />;
-  
-  return userRole === 'admin' 
-    ? <Admin session={session} />
-    : <Agent session={session} />;
+  return role === 'admin' ? <Admin session={session} /> : <Agent session={session} />;
 }
 
 function Splash() {
   return (
     <div className="splash">
-      <div className="splash-logo"><div className="logo-mark"><Ic n="zap" size={18} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
+      <div className="splash-logo"><div className="logo-mark"><Icons name="zap" size={18} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
       <div className="spinner"/>
     </div>
   );
@@ -268,13 +229,13 @@ function Splash() {
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [show, setShow] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const handleLogin = async (e) => {
+  const login = async (e) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if(!email || !password) return;
     setBusy(true); setErr('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setErr(error.message);
@@ -284,24 +245,20 @@ function Login() {
   return (
     <div className="auth-bg">
       <div className="auth-card">
-        <div className="auth-logo"><div className="logo-mark"><Ic n="zap" size={18} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-sub">Sign in to your workspace</p>
-        <form onSubmit={handleLogin}>
-          <div className="fg">
-            <label className="fl">Email</label>
-            <input className="fi" type="email" placeholder="you@company.com" value={email} onChange={e=>{setEmail(e.target.value);setErr('');}} autoFocus/>
-          </div>
-          <div className="fg">
-            <label className="fl">Password</label>
+        <div className="auth-logo"><div className="logo-mark"><Icons name="zap" size={18} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
+        <h1 className="auth-title">Sign in</h1>
+        <p className="auth-sub">Use your company email and password.</p>
+        <form onSubmit={login}>
+          <div className="fg"><label className="fl">Email</label><input className="fi" type="email" placeholder="you@company.com" value={email} onChange={e=>{setEmail(e.target.value);setErr('')}} autoFocus/></div>
+          <div className="fg"><label className="fl">Password</label>
             <div className="iw">
-              <input className="fi" type={show?'text':'password'} placeholder="••••••••" value={password} onChange={e=>{setPassword(e.target.value);setErr('');}} style={{paddingRight:44}}/>
-              <button type="button" className="eye-btn" onClick={()=>setShow(!show)}><Ic n={show?'eyeOff':'eye'} size={15}/></button>
+              <input className="fi" type={showPw?'text':'password'} placeholder="••••••••" value={password} onChange={e=>{setPassword(e.target.value);setErr('')}} style={{paddingRight:44}}/>
+              <button type="button" className="eye-btn" onClick={()=>setShowPw(!showPw)}><Icons name={showPw?'eyeOff':'eye'} size={15}/></button>
             </div>
           </div>
-          {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+          {err && <div className="aerr"><Icons name="alert" size={14}/> {err}</div>}
           <button type="submit" className="bp full" disabled={busy||!email||!password}>
-            {busy?<span className="spinner-sm"/>:'Sign In'}
+            {busy?<span className="spinner-sm"/>:'Sign in'}
           </button>
         </form>
       </div>
@@ -309,215 +266,222 @@ function Login() {
   );
 }
 
-/* ══════════════════════════════════════════════════════════════════════════════
-   AGENT
-══════════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   AGENT VIEW
+══════════════════════════════════════════════════ */
 function Agent({ session }) {
-  const [active, setActive] = useState(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [todayLogs, setTodayLogs] = useState([]);
-  const [maxConcurrent, setMaxConcurrent] = useState(null);
-  const [activeCount, setActiveCount] = useState(0);
-  const [errMsg, setErrMsg] = useState('');
-  const timerRef = useRef(null);
   const user = session.user;
   const displayName = user.user_metadata?.name || user.email;
+  const [active, setActive] = useState(null);        // { id, start }
+  const [elapsed, setElapsed] = useState(0);
+  const [todayLogs, setTodayLogs] = useState([]);
+  const [activeCount, setActiveCount] = useState(0);
+  const [maxConcurrent, setMaxConcurrent] = useState(null); // null = unlimited
+  const [err, setErr] = useState('');
 
-  const todayStart = new Date().setHours(0,0,0,0);
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const todayTs = todayStart.getTime();
 
-  const loadData = async () => {
-    // Today's logs for current user
+  // Load today's data and settings
+  const load = async () => {
+    // 1. today's logs for this agent
     const { data: logs } = await supabase
       .from('bt_logs')
       .select('*')
       .eq('agent_id', user.id)
-      .gte('start_time', todayStart)
+      .gte('start_time', todayTs)
       .order('start_time', { ascending: false });
-    if (logs) setTodayLogs(logs);
     
-    // Find active break for this user
-    const activeBreak = logs?.find(l => !l.end_time);
-    if (activeBreak) {
-      setActive({ id: activeBreak.id, start: activeBreak.start_time });
+    if (logs) {
+      setTodayLogs(logs);
+      const activeBreak = logs.find(l => !l.end_time);
+      if (activeBreak) setActive({ id: activeBreak.id, start: activeBreak.start_time });
     }
 
-    // Get current active breaks count across all agents
+    // 2. current active breaks count (all agents)
     const { count } = await supabase
       .from('bt_logs')
       .select('*', { count: 'exact', head: true })
       .is('end_time', null);
     setActiveCount(count || 0);
 
-    // Get max concurrent setting
+    // 3. admin limit
     const { data: setting } = await supabase
       .from('bt_settings')
       .select('value')
       .eq('key', 'max_concurrent_breaks')
       .single();
-    if (setting) setMaxConcurrent(setting.value);
+    setMaxConcurrent(setting ? setting.value : null);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { load(); }, []);
 
+  // Elapsed timer
   useEffect(() => {
     if (active) {
-      timerRef.current = setInterval(() => setElapsed(Date.now() - active.start), 1000);
-    } else {
-      clearInterval(timerRef.current);
-      setElapsed(0);
+      const id = setInterval(() => setElapsed(Date.now() - active.start), 1000);
+      return () => clearInterval(id);
     }
-    return () => clearInterval(timerRef.current);
+    setElapsed(0);
   }, [active]);
 
   const startBreak = async () => {
+    if (active) return;
     // Check limit
     if (maxConcurrent !== null && maxConcurrent > 0 && activeCount >= maxConcurrent) {
-      setErrMsg(`Break limit reached (max ${maxConcurrent} agents on break). Please wait.`);
+      setErr(`Break limit reached (max ${maxConcurrent} agents). Please wait.`);
       return;
     }
     const now = Date.now();
     const { data, error } = await supabase
       .from('bt_logs')
       .insert({ agent_id: user.id, agent_name: displayName, start_time: now })
-      .select().single();
-    if (error) { setErrMsg(error.message); return; }
-    if (data) {
-      setActive({ id: data.id, start: now });
-      setTodayLogs(prev => [data, ...prev]);
-      setActiveCount(prev => prev + 1);
-      setErrMsg('');
-    }
+      .select()
+      .single();
+    if (error) { setErr(error.message); return; }
+    setActive({ id: data.id, start: now });
+    setTodayLogs(prev => [data, ...prev]);
+    setActiveCount(c => c + 1);
+    setErr('');
   };
 
   const endBreak = async () => {
     if (!active) return;
-    const now = Date.now(), aId = active.id;
+    const now = Date.now();
     const duration = now - active.start;
     const breakType = getBreakType(duration);
     const { error } = await supabase
       .from('bt_logs')
       .update({ end_time: now, break_type: breakType })
-      .eq('id', aId);
-    if (error) { setErrMsg(error.message); return; }
-    setTodayLogs(prev => prev.map(l => l.id === aId ? { ...l, end_time: now, break_type: breakType } : l));
+      .eq('id', active.id);
+    if (error) { setErr(error.message); return; }
+    setTodayLogs(prev => prev.map(l => l.id === active.id ? {...l, end_time: now, break_type: breakType} : l));
     setActive(null);
-    setActiveCount(prev => Math.max(0, prev - 1));
+    setActiveCount(c => Math.max(0, c - 1));
   };
 
-  const totalBreakTimeToday = todayLogs.reduce((sum, l) => {
+  const logout = () => supabase.auth.signOut();
+
+  // Total break time today (including ongoing)
+  const totalToday = todayLogs.reduce((sum, l) => {
     if (l.end_time) return sum + (l.end_time - l.start_time);
     if (active && l.id === active.id) return sum + elapsed;
     return sum;
   }, 0);
 
-  const logout = () => supabase.auth.signOut();
-
   return (
     <div className="ag-root">
       <header className="ag-hd">
-        <div className="fc g8"><div className="logo-mark sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
+        <div className="fc g8"><div className="logo-mark sm"><Icons name="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
         <div className="fc g10">
-          <div className="av">{ini(displayName)}</div>
+          <div className="av">{initials(displayName)}</div>
           <span className="hd-name">{displayName}</span>
-          <button className="ib" onClick={logout} title="Sign out"><Ic n="logout" size={15}/></button>
+          <button className="ib" onClick={logout}><Icons name="logout" size={15}/></button>
         </div>
       </header>
       <div className="ag-body">
         <div className="bcard">
           <div className="bcard-top">
             <div className={`pulse-ring${active?' on':''}`}>
-              <div className={`bic${active?' on':''}`}><Ic n={active?'timer':'coffee'} size={30} sw={1.5}/></div>
+              <div className={`bic${active?' on':''}`}><Icons name={active?'timer':'coffee'} size={30} sw={1.5}/></div>
             </div>
             {active ? (
-              <><div className="timer-big">{tStr(elapsed)}</div>
+              <>
+                <div className="timer-big">{toTimer(elapsed)}</div>
                 <div className="timer-lbl">On Break</div>
-                <div className="timer-since">Started at {fmt(active.start)}</div></>
+                <div className="timer-since">Since {fmtTime(active.start)}</div>
+              </>
             ) : (
-              <><div className="idle-lbl">Ready to take a break?</div>
-                <div className="idle-sub">Total break time today: {durStr(totalBreakTimeToday)}</div></>
+              <>
+                <div className="idle-lbl">Ready for a break?</div>
+                <div className="idle-sub">Total break time today: {toDurStr(totalToday)}</div>
+              </>
             )}
           </div>
           <div className="bcard-foot">
-            {errMsg && <div className="aerr" style={{marginBottom:12}}><Ic n="alert" size={14}/> {errMsg}</div>}
-            {!active
-              ? <button className="btn-start" onClick={startBreak}><Ic n="play" size={16} sw={2.5}/> Start Break</button>
-              : <button className="btn-stop" onClick={endBreak}><Ic n="stop" size={16} sw={2.5}/> Return from Break</button>
+            {err && <div className="aerr"><Icons name="alert" size={14}/> {err}</div>}
+            {active
+              ? <button className="btn-stop" onClick={endBreak}><Icons name="stop" size={16} sw={2.5}/> Return from Break</button>
+              : <button className="btn-start" onClick={startBreak}><Icons name="play" size={16} sw={2.5}/> Start Break</button>
             }
           </div>
         </div>
+
         <div className="sc">
-          <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-title">Today's Breaks</h2></div>
-          {todayLogs.length===0
-            ? <div className="es"><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No breaks today</p></div>
-            : <table className="dt">
-                <thead><tr><th>Start</th><th>Return</th><th>Duration</th><th>Type</th><th>Status</th></tr></thead>
-                <tbody>
-                  {todayLogs.map(l => {
-                    const dur = l.end_time ? l.end_time - l.start_time : (active && l.id === active.id ? elapsed : 0);
-                    return (
-                      <tr key={l.id}>
-                        <td>{fmt(l.start_time)}</td>
-                        <td>{l.end_time ? fmt(l.end_time) : '—'}</td>
-                        <td>{l.end_time || (active && l.id === active.id) ? durStr(dur) : '—'}</td>
-                        <td>{l.break_type || (l.end_time ? getBreakType(l.end_time - l.start_time) : '—')}</td>
-                        <td><span className={`badge ${l.end_time?'bd':'ba'}`}>{l.end_time?'Returned':'On Break'}</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-          }
+          <div className="sc-hd"><span className="sc-ic"><Icons name="clock" size={15}/></span><h2 className="sc-title">Today's Breaks</h2></div>
+          {todayLogs.length===0 ? (
+            <div className="es" style={{padding:'48px 24px',textAlign:'center',color:'var(--muted)'}}><p>No breaks today</p></div>
+          ) : (
+            <table className="dt">
+              <thead><tr><th>Start</th><th>Return</th><th>Duration</th><th>Type</th><th>Status</th></tr></thead>
+              <tbody>
+                {todayLogs.map(l => {
+                  const dur = l.end_time ? (l.end_time - l.start_time) : (active && l.id === active.id ? elapsed : 0);
+                  return (
+                    <tr key={l.id}>
+                      <td>{fmtTime(l.start_time)}</td>
+                      <td>{l.end_time ? fmtTime(l.end_time) : '—'}</td>
+                      <td>{l.end_time || (active && l.id === active.id) ? toDurStr(dur) : '—'}</td>
+                      <td>{l.break_type || (l.end_time ? getBreakType(l.end_time - l.start_time) : '—')}</td>
+                      <td><span className={`badge ${l.end_time?'bd':'ba'}`}>{l.end_time?'Returned':'On Break'}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════════════════════════════
-   ADMIN
-══════════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   ADMIN VIEW
+══════════════════════════════════════════════════ */
 function Admin({ session }) {
-  const [tab, setTab] = useState('dashboard');
   const user = session.user;
   const displayName = user.user_metadata?.name || user.email;
+  const [tab, setTab] = useState('dashboard');
   const nav = [
-    {id:'dashboard', n:'grid', label:'Dashboard'},
-    {id:'logs', n:'clock', label:'All Logs'},
-    {id:'settings', n:'settings', label:'Settings'},
+    {id:'dashboard', icon:'grid', label:'Dashboard'},
+    {id:'logs', icon:'clock', label:'All Logs'},
+    {id:'settings', icon:'settings', label:'Settings'},
   ];
   const logout = () => supabase.auth.signOut();
 
   return (
     <div className="adm-root">
       <aside className="sidebar">
-        <div className="sb-logo"><div className="logo-mark sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
+        <div className="sb-logo"><div className="logo-mark sm"><Icons name="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
         <nav className="sb-nav">
-          {nav.map(({id,n,label})=>(
+          {nav.map(({id,icon,label}) => (
             <button key={id} className={`nav-item${tab===id?' on':''}`} onClick={()=>setTab(id)}>
-              <Ic n={n} size={16} sw={1.8}/><span>{label}</span>
-              {tab===id&&<span className="nav-arr"><Ic n="chevron" size={13}/></span>}
+              <Icons name={icon} size={16} sw={1.8}/><span>{label}</span>
+              {tab===id && <span className="nav-arr"><Icons name="chevron" size={13}/></span>}
             </button>
           ))}
         </nav>
         <div className="sb-foot">
-          <div className="av">{ini(displayName)}</div>
-          <div className="sb-user"><span className="sb-name">{displayName}</span><span className="sb-role">Administrator</span></div>
-          <button className="ib" onClick={logout} title="Sign out"><Ic n="logout" size={15}/></button>
+          <div className="av">{initials(displayName)}</div>
+          <div className="sb-user"><span className="sb-name">{displayName}</span><span className="sb-role">Admin</span></div>
+          <button className="ib" onClick={logout}><Icons name="logout" size={15}/></button>
         </div>
       </aside>
       <main className="adm-main">
-        {tab==='dashboard' && <AdminDashboard />}
-        {tab==='logs' && <AdminLogs />}
-        {tab==='settings' && <AdminSettings />}
+        {tab==='dashboard' && <Dashboard />}
+        {tab==='logs' && <AllLogs />}
+        {tab==='settings' && <Settings />}
       </main>
     </div>
   );
 }
 
-function AdminDashboard() {
+function Dashboard() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const todayStart = new Date().setHours(0,0,0,0);
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const todayTs = todayStart.getTime();
 
   const load = async () => {
     const { data } = await supabase.from('bt_logs').select('*').order('start_time',{ascending:false});
@@ -527,55 +491,63 @@ function AdminDashboard() {
   useEffect(()=>{ load(); },[]);
 
   const active = logs.filter(l => !l.end_time);
-  const todayLogs = logs.filter(l => l.start_time >= todayStart);
+  const todayLogs = logs.filter(l => l.start_time >= todayTs);
   const doneToday = todayLogs.filter(l => l.end_time);
-  const totalBreakTimeToday = doneToday.reduce((s,l) => s + (l.end_time - l.start_time), 0);
-  const avgPerDay = (() => {
-    const days = new Map();
-    logs.forEach(l => {
-      if (l.end_time) {
-        const d = new Date(l.start_time).toDateString();
-        days.set(d, (days.get(d)||0) + (l.end_time - l.start_time));
-      }
-    });
-    if (days.size === 0) return 0;
-    let total = 0;
-    days.forEach(v => total += v);
-    return total / days.size;
-  })();
+  const totalToday = doneToday.reduce((s,l) => s + (l.end_time - l.start_time), 0);
+
+  // Average per day calculation
+  const dailyTotals = new Map();
+  logs.forEach(l => {
+    if (l.end_time) {
+      const day = new Date(l.start_time).toDateString();
+      dailyTotals.set(day, (dailyTotals.get(day)||0) + (l.end_time - l.start_time));
+    }
+  });
+  const avgPerDay = dailyTotals.size ? [...dailyTotals.values()].reduce((s,v)=>s+v,0)/dailyTotals.size : 0;
 
   return (
     <div className="panel">
       <div className="phd">
-        <div><h1 className="ptitle">Dashboard</h1><p className="psub">Live break overview</p></div>
-        <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        <div><h1 className="ptitle">Dashboard</h1><p className="psub">Real‑time overview</p></div>
+        <button className="bs" onClick={load}><Icons name="refresh" size={14}/> Refresh</button>
       </div>
       <div className="sg">
-        <StatCard n="activity" label="Total Breaks (all time)" value={logs.length}/>
-        <StatCard n="timer" label="Active Now" value={active.length} accent={!!active.length}/>
-        <StatCard n="clock" label="Today's Break Time" value={durStr(totalBreakTimeToday)}/>
-        <StatCard n="trending" label="Avg Break Time/Day" value={avgPerDay ? durStr(avgPerDay) : '—'}/>
+        <StatCard icon="activity" label="Total Breaks" value={logs.length}/>
+        <StatCard icon="timer" label="Active Now" value={active.length} accent={!!active.length}/>
+        <StatCard icon="clock" label="Today's Break Time" value={toDurStr(totalToday)}/>
+        <StatCard icon="trending" label="Avg / Day" value={avgPerDay ? toDurStr(avgPerDay) : '—'}/>
       </div>
-      {active.length>0 && (
+
+      {active.length > 0 && (
         <div className="sc mt">
-          <div className="sc-hd"><span className="live-dot"/><h2 className="sc-title">Currently on Break ({active.length})</h2></div>
+          <div className="sc-hd"><span className="live-dot"/><h2 className="sc-title">Currently on Break</h2></div>
           <table className="dt">
             <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th></tr></thead>
-            <tbody>{active.map(l=><tr key={l.id}><td><AvC name={l.agent_name}/></td><td>{fmt(l.start_time)}</td><td><LiveEl start={l.start_time}/></td></tr>)}</tbody>
+            <tbody>
+              {active.map(l => (
+                <tr key={l.id}>
+                  <td><div className="fc g10"><div className="av">{initials(l.agent_name)}</div>{l.agent_name}</div></td>
+                  <td>{fmtTime(l.start_time)}</td>
+                  <td><LiveTimer start={l.start_time}/></td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       )}
+
       <div className="sc mt">
-        <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-title">Today's Activity</h2></div>
-        {loading?<div className="es"><div className="spinner"/></div>:todayLogs.length===0?<div className="es"><span className="es-ic"><Ic n="activity" size={36} sw={1.2}/></span><p>No breaks today</p></div>:(
+        <div className="sc-hd"><span className="sc-ic"><Icons name="clock" size={15}/></span><h2 className="sc-title">Today's Activity</h2></div>
+        {loading ? <div className="spinner" style={{margin:'40px auto'}}/> : todayLogs.length===0 ? <p style={{padding:40,textAlign:'center',color:'var(--muted)'}}>No breaks today</p> : (
           <table className="dt">
             <thead><tr><th>Agent</th><th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
             <tbody>
-              {todayLogs.map(l=>(
+              {todayLogs.map(l => (
                 <tr key={l.id}>
-                  <td><AvC name={l.agent_name}/></td><td>{fmt(l.start_time)}</td>
-                  <td>{l.end_time?fmt(l.end_time):'—'}</td>
-                  <td>{l.end_time?durStr(l.end_time-l.start_time):'—'}</td>
+                  <td><div className="fc g10"><div className="av">{initials(l.agent_name)}</div>{l.agent_name}</div></td>
+                  <td>{fmtTime(l.start_time)}</td>
+                  <td>{l.end_time?fmtTime(l.end_time):'—'}</td>
+                  <td>{l.end_time?toDurStr(l.end_time-l.start_time):'—'}</td>
                   <td>{l.break_type || (l.end_time ? getBreakType(l.end_time - l.start_time) : '—')}</td>
                 </tr>
               ))}
@@ -587,32 +559,52 @@ function AdminDashboard() {
   );
 }
 
-function AdminLogs() {
+function AllLogs() {
   const [logs, setLogs] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  useEffect(()=>{ 
-    supabase.from('bt_logs').select('*').order('start_time',{ascending:false}).then(({data})=>{if(data)setLogs(data);setLoading(false);}); 
-  },[]);
-  const filtered = logs.filter(l=>!filter||l.agent_name.toLowerCase().includes(filter.toLowerCase()));
+
+  useEffect(() => {
+    supabase.from('bt_logs').select('*').order('start_time',{ascending:false}).then(({data})=>{
+      if(data) setLogs(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const filtered = logs.filter(l => !filter || l.agent_name.toLowerCase().includes(filter.toLowerCase()));
+
+  const exportCSV = () => {
+    const header = 'Agent,Date,Start,Return,Duration,Type\n';
+    const rows = logs.map(l => 
+      `"${l.agent_name}","${fmtDate(l.start_time)}","${fmtTime(l.start_time)}","${l.end_time?fmtTime(l.end_time):''}","${l.end_time?toDurStr(l.end_time-l.start_time):''}","${l.break_type||''}"`
+    ).join('\n');
+    const blob = new Blob([header+rows],{type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `break-logs-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  };
+
   return (
     <div className="panel">
       <div className="phd">
         <div><h1 className="ptitle">All Break Logs</h1><p className="psub">{logs.length} entries</p></div>
         <div className="phd-r">
-          <input className="si" placeholder="Filter by agent…" value={filter} onChange={e=>setFilter(e.target.value)}/>
-          <button className="bs" onClick={()=>exportCSV(logs)}><Ic n="download" size={14}/> Export CSV</button>
+          <input className="si" placeholder="Filter agent…" value={filter} onChange={e=>setFilter(e.target.value)}/>
+          <button className="bs" onClick={exportCSV}><Icons name="download" size={14}/> CSV</button>
         </div>
       </div>
-      {loading?<div className="es"><div className="spinner"/></div>:filtered.length===0?<div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No entries</p></div>:(
+      {loading ? <div className="spinner" style={{margin:'40px auto'}}/> : filtered.length===0 ? <p style={{padding:40,textAlign:'center',color:'var(--muted)'}}>No entries</p> : (
         <table className="dt">
           <thead><tr><th>Agent</th><th>Date</th><th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
           <tbody>
-            {filtered.map(l=>(
+            {filtered.map(l => (
               <tr key={l.id}>
-                <td><AvC name={l.agent_name}/></td><td>{fmtD(l.start_time)}</td>
-                <td>{fmt(l.start_time)}</td><td>{l.end_time?fmt(l.end_time):'—'}</td>
-                <td>{l.end_time?durStr(l.end_time-l.start_time):'—'}</td>
+                <td><div className="fc g10"><div className="av">{initials(l.agent_name)}</div>{l.agent_name}</div></td>
+                <td>{fmtDate(l.start_time)}</td>
+                <td>{fmtTime(l.start_time)}</td>
+                <td>{l.end_time?fmtTime(l.end_time):'—'}</td>
+                <td>{l.end_time?toDurStr(l.end_time-l.start_time):'—'}</td>
                 <td>{l.break_type || (l.end_time ? getBreakType(l.end_time - l.start_time) : '—')}</td>
               </tr>
             ))}
@@ -623,15 +615,14 @@ function AdminLogs() {
   );
 }
 
-function AdminSettings() {
+function Settings() {
   const [max, setMax] = useState('');
-  const [saved, setSaved] = useState('');
+  const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    supabase.from('bt_settings').select('value').eq('key','max_concurrent_breaks').single().then(({data}) => {
-      if (data) setMax(data.value);
-    });
+    supabase.from('bt_settings').select('value').eq('key','max_concurrent_breaks').single()
+      .then(({data}) => { if(data) setMax(String(data.value)); });
   }, []);
 
   const save = async () => {
@@ -641,41 +632,49 @@ function AdminSettings() {
       .from('bt_settings')
       .upsert({ key: 'max_concurrent_breaks', value: val }, { onConflict: 'key' });
     if (error) { setErr(error.message); return; }
-    setSaved('Saved!');
+    setMsg('Limit updated');
     setErr('');
-    setTimeout(() => setSaved(''), 2000);
+    setTimeout(()=>setMsg(''), 2000);
   };
 
   return (
     <div className="panel">
-      <div className="phd"><div><h1 className="ptitle">Settings</h1><p className="psub">Control break limits</p></div></div>
+      <div className="phd"><div><h1 className="ptitle">Settings</h1><p className="psub">Break control</p></div></div>
       <div className="sblock">
         <h2 className="sh">Max Concurrent Breaks</h2>
-        <p className="sd">Set the maximum number of agents allowed on break at the same time. Leave 0 for unlimited.</p>
-        <div className="fc g10">
-          <input className="si" type="number" min="0" value={max} onChange={e=>setMax(e.target.value)} placeholder="e.g. 3"/>
+        <p className="sd">Maximum agents allowed on break at the same time. 0 = unlimited.</p>
+        <div className="fc g10" style={{marginTop:12}}>
+          <input className="si" type="number" min="0" value={max} onChange={e=>setMax(e.target.value)} placeholder="0"/>
           <button className="bp" onClick={save}>Save</button>
         </div>
-        {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
-        {saved && <div className="ainfo" style={{color:'var(--accent)'}}><Ic n="check" size={14}/> {saved}</div>}
+        {err && <div className="aerr" style={{marginTop:10}}><Icons name="alert" size={14}/> {err}</div>}
+        {msg && <div className="ainfo" style={{color:'var(--accent)',marginTop:10}}><Icons name="check" size={14}/> {msg}</div>}
       </div>
     </div>
   );
 }
 
-/* ── Shared Components ── */
-function StatCard({n, label, value, accent}) {
-  return <div className={`stat${accent?' ac':''}`}><div className="stat-ic"><Ic n={n} size={16} sw={1.8}/></div><div className="stat-val">{value}</div><div className="stat-lbl">{label}</div></div>;
-}
-function AvC({name}) {
-  return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span></div>;
-}
-function LiveEl({start}) {
-  const [e, setE] = useState(Date.now()-start);
-  useEffect(()=>{const id=setInterval(()=>setE(Date.now()-start),1000);return()=>clearInterval(id);},[start]);
-  return <span className="mono ac-txt" style={{fontWeight:700}}>{tStr(e)}</span>;
+/* ── Small shared components ── */
+function StatCard({ icon, label, value, accent }) {
+  return (
+    <div className={`stat${accent?' ac':''}`}>
+      <div className="stat-ic"><Icons name={icon} size={16} sw={1.8}/></div>
+      <div className="stat-val">{value}</div>
+      <div className="stat-lbl">{label}</div>
+    </div>
+  );
 }
 
+function LiveTimer({ start }) {
+  const [elapsed, setElapsed] = useState(Date.now() - start);
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(Date.now() - start), 1000);
+    return () => clearInterval(id);
+  }, [start]);
+  return <span className="mono ac-txt" style={{fontWeight:700}}>{toTimer(elapsed)}</span>;
+}
+
+// Render
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
