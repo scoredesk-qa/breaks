@@ -50,6 +50,7 @@
     .ib.danger:hover{color:var(--danger)}
     .ib.muted{opacity:.45}.ib.muted:hover{opacity:1}
     .aerr{display:flex;align-items:center;gap:7px;color:var(--danger);font-size:13px;background:var(--danger-dim);border:1px solid rgba(240,82,82,.2);border-radius:8px;padding:9px 12px;margin-bottom:12px}
+    .ainfo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.7;margin-top:16px}
     .ag-root{min-height:100vh;display:flex;flex-direction:column}
     .ag-hd{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
     .ag-body{flex:1;max-width:680px;margin:0 auto;width:100%;padding:32px 20px;display:flex;flex-direction:column;gap:20px}
@@ -132,6 +133,9 @@
     .g4{gap:4px}.g6{gap:6px}.g8{gap:8px}.g10{gap:10px}.g12{gap:12px}
     .mono{font-family:'Courier New',monospace}
     .ac-txt{color:var(--accent)}
+    .tabs{display:flex;gap:4px;margin-bottom:20px}
+    .tab{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;text-align:center}
+    .tab.on{background:var(--accent);color:#000;border-color:var(--accent)}
     @media(max-width:900px){
       .sg{grid-template-columns:repeat(2,1fr)}
       .sidebar{width:52px}
@@ -148,12 +152,12 @@
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
-// Pre-configured Supabase credentials
+// Supabase configuration
 const SUPABASE_URL = "https://bmfwgyruomldxebinwcr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw";
 
 // Initialize Supabase client
-const SB = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ── Icons ── */
 const P = {
@@ -201,7 +205,7 @@ const durStr = ms => {
   const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);
   return h>0?`${h}h ${m%60}m ${s%60}s`:m>0?`${m}m ${s%60}s`:`${s}s`;
 };
-const ini = name => name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+const ini = name => name?.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'U';
 
 function exportCSV(logs) {
   const hdr = 'Agent,Date,Break Start,Return Time,Duration,Status\n';
@@ -218,61 +222,37 @@ function exportCSV(logs) {
    ROOT
 ══════════════════════════════════════════════════════════════════════════════ */
 function App() {
-  const [phase,   setPhase]   = useState('boot');
   const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Check if we were previously logged in
-    const savedSession = localStorage.getItem('bt_session');
-    if (savedSession) {
-      try {
-        setSession(JSON.parse(savedSession));
-        setPhase('app');
-        return;
-      } catch (e) {
-        localStorage.removeItem('bt_session');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        const role = session.user.user_metadata?.role || 'agent';
+        setIsAdmin(role === 'admin');
       }
-    }
-    setPhase('login');
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        const role = session.user.user_metadata?.role || 'agent';
+        setIsAdmin(role === 'admin');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email, pass) => {
-    try {
-      const { data, error } = await SB
-        .from('bt_users')
-        .select('*')
-        .eq('email', email.toLowerCase().trim())
-        .eq('password', pass)
-        .single();
-      
-      if (error) {
-        console.error('Login error:', error);
-        return 'Invalid email or password.';
-      }
-      if (!data) return 'Invalid email or password.';
-      
-      setSession(data);
-      localStorage.setItem('bt_session', JSON.stringify(data));
-      setPhase('app'); 
-      return null;
-    } catch (e) {
-      console.error('Login exception:', e);
-      return 'Connection error. Check your Supabase setup.';
-    }
-  };
-
-  const logout = () => { 
-    setSession(null); 
-    localStorage.removeItem('bt_session');
-    setPhase('login'); 
-  };
-
-  if (phase==='boot')  return <Splash />;
-  if (phase==='login') return <Login onLogin={login} />;
-  if (!session)        return <Splash />;
-  return session.role==='admin'
-    ? <Admin session={session} onLogout={logout}/>
-    : <Agent session={session} onLogout={logout}/>;
+  if (loading) return <Splash />;
+  if (!session) return <Login />;
+  
+  return isAdmin 
+    ? <Admin session={session} />
+    : <Agent session={session} />;
 }
 
 /* ── Splash ── */
@@ -289,19 +269,58 @@ function Splash() {
 }
 
 /* ── Login ── */
-function Login({ onLogin }) {
-  const [email,setEmail]=useState('');
-  const [pass, setPass] =useState('');
-  const [show, setShow] =useState(false);
-  const [err,  setErr]  =useState('');
-  const [busy, setBusy] =useState(false);
+function Login() {
+  const [mode, setMode] = useState('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [show, setShow] = useState(false);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
 
-  const submit = async () => {
-    if(!email||!pass) return;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) return;
     setBusy(true);
     setErr('');
-    const e = await onLogin(email,pass);
-    if(e){setErr(e);setBusy(false);}
+    
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (error) {
+      setErr(error.message);
+    }
+    setBusy(false);
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    if (!email || !password || !name) {
+      setErr('All fields are required');
+      return;
+    }
+    setBusy(true);
+    setErr('');
+    setMsg('');
+    
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, role: 'agent' }
+      }
+    });
+    
+    if (error) {
+      setErr(error.message);
+    } else if (data.user) {
+      setMsg('Account created! You can now sign in.');
+      setMode('login');
+      setEmail('');
+      setPassword('');
+      setName('');
+    }
+    setBusy(false);
   };
 
   return (
@@ -311,27 +330,69 @@ function Login({ onLogin }) {
           <div className="logo-mark"><Ic n="zap" size={18} sw={2.5}/></div>
           <span className="logo-text">BreakTrack</span>
         </div>
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-sub">Sign in to your workspace</p>
-        <div className="fg">
-          <label className="fl">Email address</label>
-          <input className="fi" type="email" placeholder="you@company.com" value={email}
-            onChange={e=>{setEmail(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&submit()} autoFocus/>
+        <h1 className="auth-title">Welcome</h1>
+        <p className="auth-sub">Track your breaks efficiently</p>
+        
+        <div className="tabs">
+          <button className={`tab ${mode==='login'?'on':''}`} onClick={()=>{setMode('login');setErr('');setMsg('');}}>Sign In</button>
+          <button className={`tab ${mode==='signup'?'on':''}`} onClick={()=>{setMode('signup');setErr('');setMsg('');}}>Sign Up</button>
         </div>
-        <div className="fg">
-          <label className="fl">Password</label>
-          <div className="iw">
-            <input className="fi" type={show?'text':'password'} placeholder="••••••••" value={pass}
-              onChange={e=>{setPass(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&submit()} style={{paddingRight:44}}/>
-            <button className="eye-btn" onClick={()=>setShow(!show)}><Ic n={show?'eyeOff':'eye'} size={15}/></button>
-          </div>
-        </div>
-        {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
-        <button className="bp full" onClick={submit} disabled={busy||!email||!pass}>
-          {busy?<span className="spinner-sm"/>:'Sign in'}
-        </button>
+
+        {mode === 'login' ? (
+          <form onSubmit={handleLogin}>
+            <div className="fg">
+              <label className="fl">Email</label>
+              <input className="fi" type="email" placeholder="you@company.com" value={email}
+                onChange={e=>{setEmail(e.target.value);setErr('');}} autoFocus/>
+            </div>
+            <div className="fg">
+              <label className="fl">Password</label>
+              <div className="iw">
+                <input className="fi" type={show?'text':'password'} placeholder="••••••••" value={password}
+                  onChange={e=>{setPassword(e.target.value);setErr('');}} style={{paddingRight:44}}/>
+                <button type="button" className="eye-btn" onClick={()=>setShow(!show)}><Ic n={show?'eyeOff':'eye'} size={15}/></button>
+              </div>
+            </div>
+            {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+            {msg && <div className="ainfo" style={{color:'var(--accent)'}}><Ic n="check" size={14}/> {msg}</div>}
+            <button type="submit" className="bp full" disabled={busy||!email||!password}>
+              {busy?<span className="spinner-sm"/>:'Sign In'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSignup}>
+            <div className="fg">
+              <label className="fl">Full Name</label>
+              <input className="fi" type="text" placeholder="John Doe" value={name}
+                onChange={e=>{setName(e.target.value);setErr('');}} autoFocus/>
+            </div>
+            <div className="fg">
+              <label className="fl">Email</label>
+              <input className="fi" type="email" placeholder="you@company.com" value={email}
+                onChange={e=>{setEmail(e.target.value);setErr('');}}/>
+            </div>
+            <div className="fg">
+              <label className="fl">Password</label>
+              <div className="iw">
+                <input className="fi" type={show?'text':'password'} placeholder="••••••••" value={password}
+                  onChange={e=>{setPassword(e.target.value);setErr('');}} style={{paddingRight:44}}/>
+                <button type="button" className="eye-btn" onClick={()=>setShow(!show)}><Ic n={show?'eyeOff':'eye'} size={15}/></button>
+              </div>
+            </div>
+            {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+            {msg && <div className="ainfo" style={{color:'var(--accent)'}}><Ic n="check" size={14}/> {msg}</div>}
+            <button type="submit" className="bp full" disabled={busy||!email||!password||!name}>
+              {busy?<span className="spinner-sm"/>:'Create Account'}
+            </button>
+          </form>
+        )}
+        
         <p style={{marginTop:16,fontSize:12,color:'var(--muted)',textAlign:'center'}}>
-          Default: yassin.aitlehcen@market-wave.com
+          {mode==='login' ? "Don't have an account? " : "Already have an account? "}
+          <button style={{background:'none',border:'none',color:'var(--accent)',cursor:'pointer',fontWeight:600}}
+            onClick={()=>{setMode(mode==='login'?'signup':'login');setErr('');setMsg('');}}>
+            {mode==='login'?'Sign Up':'Sign In'}
+          </button>
         </p>
       </div>
     </div>
@@ -341,17 +402,19 @@ function Login({ onLogin }) {
 /* ══════════════════════════════════════════════════════════════════════════════
    AGENT
 ══════════════════════════════════════════════════════════════════════════════ */
-function Agent({ session, onLogout }) {
-  const [active, setActive]   = useState(null);
-  const [elapsed,setElapsed]  = useState(0);
-  const [logs,   setLogs]     = useState([]);
+function Agent({ session }) {
+  const [active, setActive] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [logs, setLogs] = useState([]);
   const timerRef = useRef(null);
+  const user = session.user;
 
-  useEffect(()=>{
-    SB.from('bt_logs').select('*').eq('agent_id',session.id)
-      .order('start_time',{ascending:false})
-      .then(({data})=>{ if(data) setLogs(data); });
-  },[session.id]);
+  const loadLogs = async () => {
+    const { data } = await supabase.from('bt_logs').select('*').eq('agent_id', user.id).order('start_time',{ascending:false});
+    if (data) setLogs(data);
+  };
+
+  useEffect(()=>{ loadLogs(); },[]);
 
   useEffect(()=>{
     if(active){ timerRef.current=setInterval(()=>setElapsed(Date.now()-active.start),1000); }
@@ -361,27 +424,31 @@ function Agent({ session, onLogout }) {
 
   const startBreak = async () => {
     const now = Date.now();
-    const {data,error} = await SB.from('bt_logs')
-      .insert({agent_id:session.id,agent_name:session.name,start_time:now}).select().single();
-    if(!error&&data){ setActive({id:data.id,start:now}); setLogs(prev=>[data,...prev]); }
+    const { data, error } = await supabase.from('bt_logs')
+      .insert({agent_id: user.id, agent_name: user.user_metadata?.name || user.email, start_time: now}).select().single();
+    if (!error && data) { setActive({id: data.id, start: now}); setLogs(prev=>[data,...prev]); }
   };
 
   const endBreak = async () => {
     if(!active) return;
-    const now=Date.now(), aId=active.id;
-    await SB.from('bt_logs').update({end_time:now}).eq('id',aId);
+    const now = Date.now(), aId = active.id;
+    await supabase.from('bt_logs').update({end_time: now}).eq('id', aId);
     setLogs(prev=>prev.map(l=>l.id===aId?{...l,end_time:now}:l));
     setActive(null);
   };
+
+  const logout = async () => { await supabase.auth.signOut(); };
+
+  const displayName = user.user_metadata?.name || user.email;
 
   return (
     <div className="ag-root">
       <header className="ag-hd">
         <div className="fc g8"><div className="logo-mark sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
         <div className="fc g10">
-          <div className="av">{ini(session.name)}</div>
-          <span className="hd-name">{session.name}</span>
-          <button className="ib" onClick={onLogout} title="Sign out"><Ic n="logout" size={15}/></button>
+          <div className="av">{ini(displayName)}</div>
+          <span className="hd-name">{displayName}</span>
+          <button className="ib" onClick={logout} title="Sign out"><Ic n="logout" size={15}/></button>
         </div>
       </header>
       <div className="ag-body">
@@ -402,7 +469,7 @@ function Agent({ session, onLogout }) {
           <div className="bcard-foot">
             {!active
               ? <button className="btn-start" onClick={startBreak}><Ic n="play" size={16} sw={2.5}/> Start Break</button>
-              : <button className="btn-stop"  onClick={endBreak}><Ic n="stop" size={16} sw={2.5}/> Return from Break</button>
+              : <button className="btn-stop" onClick={endBreak}><Ic n="stop" size={16} sw={2.5}/> Return from Break</button>
             }
           </div>
         </div>
@@ -433,14 +500,19 @@ function Agent({ session, onLogout }) {
 /* ══════════════════════════════════════════════════════════════════════════════
    ADMIN
 ══════════════════════════════════════════════════════════════════════════════ */
-function Admin({ session, onLogout }) {
-  const [tab,setTab]=useState('dashboard');
-  const nav=[
-    {id:'dashboard',n:'grid',    label:'Dashboard'},
-    {id:'logs',     n:'clock',   label:'Break Logs'},
-    {id:'users',    n:'users',   label:'Users'},
-    {id:'settings', n:'settings',label:'Settings'},
+function Admin({ session }) {
+  const [tab, setTab] = useState('dashboard');
+  const user = session.user;
+  const displayName = user.user_metadata?.name || user.email;
+  
+  const nav = [
+    {id:'dashboard', n:'grid', label:'Dashboard'},
+    {id:'logs', n:'clock', label:'Break Logs'},
+    {id:'settings', n:'settings', label:'Settings'},
   ];
+  
+  const logout = async () => { await supabase.auth.signOut(); };
+  
   return (
     <div className="adm-root">
       <aside className="sidebar">
@@ -454,29 +526,37 @@ function Admin({ session, onLogout }) {
           ))}
         </nav>
         <div className="sb-foot">
-          <div className="av">{ini(session.name)}</div>
-          <div className="sb-user"><span className="sb-name">{session.name}</span><span className="sb-role">Administrator</span></div>
-          <button className="ib" onClick={onLogout} title="Sign out"><Ic n="logout" size={15}/></button>
+          <div className="av">{ini(displayName)}</div>
+          <div className="sb-user"><span className="sb-name">{displayName}</span><span className="sb-role">Administrator</span></div>
+          <button className="ib" onClick={logout} title="Sign out"><Ic n="logout" size={15}/></button>
         </div>
       </aside>
       <main className="adm-main">
-        {tab==='dashboard'&&<ADash/>}
-        {tab==='logs'     &&<ALogs/>}
-        {tab==='users'    &&<AUsers session={session}/>}
-        {tab==='settings' &&<ASettings/>}
+        {tab==='dashboard'&&<ADash />}
+        {tab==='logs'&&<ALogs />}
+        {tab==='settings'&&<ASettings />}
       </main>
     </div>
   );
 }
 
 function ADash() {
-  const [logs,setLogs]=useState([]);
-  const [loading,setLoading]=useState(true);
-  const load=async()=>{ const{data}=await SB.from('bt_logs').select('*').order('start_time',{ascending:false}); if(data)setLogs(data); setLoading(false); };
-  useEffect(()=>{load();},[]);
-  const active=logs.filter(l=>!l.end_time), done=logs.filter(l=>l.end_time);
-  const today=logs.filter(l=>new Date(l.start_time).toDateString()===new Date().toDateString());
-  const avg=done.length?done.reduce((s,l)=>s+(l.end_time-l.start_time),0)/done.length:0;
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const load = async () => {
+    const { data } = await supabase.from('bt_logs').select('*').order('start_time',{ascending:false});
+    if (data) setLogs(data);
+    setLoading(false);
+  };
+  
+  useEffect(()=>{ load(); },[]);
+  
+  const active = logs.filter(l=>!l.end_time);
+  const done = logs.filter(l=>l.end_time);
+  const today = logs.filter(l=>new Date(l.start_time).toDateString()===new Date().toDateString());
+  const avg = done.length ? done.reduce((s,l)=>s+(l.end_time-l.start_time),0)/done.length : 0;
+  
   return (
     <div className="panel">
       <div className="phd">
@@ -484,10 +564,10 @@ function ADash() {
         <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
       </div>
       <div className="sg">
-        <StatCard n="activity" label="Total Breaks"  value={logs.length}/>
-        <StatCard n="timer"    label="Active Now"    value={active.length} accent={!!active.length}/>
-        <StatCard n="trending" label="Today"         value={today.length}/>
-        <StatCard n="clock"    label="Avg Duration"  value={avg?tStr(avg):'—'}/>
+        <StatCard n="activity" label="Total Breaks" value={logs.length}/>
+        <StatCard n="timer" label="Active Now" value={active.length} accent={!!active.length}/>
+        <StatCard n="trending" label="Today" value={today.length}/>
+        <StatCard n="clock" label="Avg Duration" value={avg?tStr(avg):'—'}/>
       </div>
       {active.length>0&&(
         <div className="sc mt">
@@ -521,13 +601,16 @@ function ADash() {
 }
 
 function ALogs() {
-  const [logs,setLogs]=useState([]);
-  const [filter,setFilter]=useState('');
-  const [confirm,setConfirm]=useState(null);
-  const [loading,setLoading]=useState(true);
-  useEffect(()=>{ SB.from('bt_logs').select('*').order('start_time',{ascending:false}).then(({data})=>{if(data)setLogs(data);setLoading(false);}); },[]);
-  const del=async id=>{ await SB.from('bt_logs').delete().eq('id',id); setLogs(p=>p.filter(l=>l.id!==id)); setConfirm(null); };
-  const filtered=logs.filter(l=>!filter||l.agent_name.toLowerCase().includes(filter.toLowerCase()));
+  const [logs, setLogs] = useState([]);
+  const [filter, setFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(()=>{ 
+    supabase.from('bt_logs').select('*').order('start_time',{ascending:false}).then(({data})=>{if(data)setLogs(data);setLoading(false);}); 
+  },[]);
+  
+  const filtered = logs.filter(l=>!filter||l.agent_name.toLowerCase().includes(filter.toLowerCase()));
+  
   return (
     <div className="panel">
       <div className="phd">
@@ -539,7 +622,7 @@ function ALogs() {
       </div>
       {loading?<div className="es"><div className="spinner"/></div>:filtered.length===0?<div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No entries</p></div>:(
         <table className="dt">
-          <thead><tr><th>Agent</th><th>Date</th><th>Break Start</th><th>Return</th><th>Duration</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Agent</th><th>Date</th><th>Break Start</th><th>Return</th><th>Duration</th><th>Status</th></tr></thead>
           <tbody>
             {filtered.map(l=>(
               <tr key={l.id}>
@@ -547,105 +630,28 @@ function ALogs() {
                 <td>{fmt(l.start_time)}</td><td>{l.end_time?fmt(l.end_time):'—'}</td>
                 <td>{l.end_time?durStr(l.end_time-l.start_time):'—'}</td>
                 <td><span className={`badge ${l.end_time?'bd':'ba'}`}>{l.end_time?'Returned':'On Break'}</span></td>
-                <td>
-                  {confirm===l.id
-                    ?<div className="fc g4"><button className="ib danger" onClick={()=>del(l.id)}><Ic n="check" size={14}/></button><button className="ib" onClick={()=>setConfirm(null)}><Ic n="x" size={14}/></button></div>
-                    :<button className="ib muted" onClick={()=>setConfirm(l.id)}><Ic n="trash" size={14}/></button>}
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
-      )}
-    </div>
-  );
-}
-
-function AUsers({ session }) {
-  const [users,setUsers]=useState([]);
-  const [modal,setModal]=useState(false);
-  const [form,setForm]=useState({name:'',email:'',password:'',role:'agent'});
-  const [show,setShow]=useState(false);
-  const [err,setErr]=useState('');
-  const [delId,setDelId]=useState(null);
-  const [loading,setLoading]=useState(true);
-  useEffect(()=>{ SB.from('bt_users').select('*').order('created_at').then(({data})=>{if(data)setUsers(data);setLoading(false);}); },[]);
-  const save=async()=>{
-    if(!form.name.trim()||!form.email.trim()||!form.password.trim()){setErr('All fields required.');return;}
-    const{data,error}=await SB.from('bt_users').insert({...form,name:form.name.trim(),email:form.email.toLowerCase().trim()}).select().single();
-    if(error){setErr(error.message.includes('unique')?'Email already exists.':error.message);return;}
-    setUsers(p=>[...p,data]); setModal(false); setForm({name:'',email:'',password:'',role:'agent'}); setErr('');
-  };
-  const del=async id=>{ await SB.from('bt_users').delete().eq('id',id); setUsers(p=>p.filter(u=>u.id!==id)); setDelId(null); };
-  return (
-    <div className="panel">
-      <div className="phd">
-        <div><h1 className="ptitle">Users</h1><p className="psub">{users.length} accounts · {users.filter(u=>u.role==='agent').length} agents</p></div>
-        <button className="bp" onClick={()=>setModal(true)}><Ic n="plus" size={15}/> Add User</button>
-      </div>
-      {loading?<div className="es"><div className="spinner"/></div>:(
-        <table className="dt">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
-          <tbody>
-            {users.map(u=>(
-              <tr key={u.id}>
-                <td><AvC name={u.name}/></td>
-                <td style={{color:'var(--muted)',fontSize:13}}>{u.email}</td>
-                <td><span className={`badge ${u.role==='admin'?'badm':'bagt'}`}>{u.role}</span></td>
-                <td>{u.id!==session.id&&(delId===u.id
-                  ?<div className="fc g4"><button className="ib danger" onClick={()=>del(u.id)}><Ic n="check" size={14}/></button><button className="ib" onClick={()=>setDelId(null)}><Ic n="x" size={14}/></button></div>
-                  :<button className="ib muted" onClick={()=>setDelId(u.id)}><Ic n="trash" size={14}/></button>
-                )}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {modal&&(
-        <Modal title="Add New User" onClose={()=>{setModal(false);setErr('')}}>
-          <div className="fg"><label className="fl">Full Name</label><input className="fi" placeholder="Jane Smith" value={form.name} onChange={e=>{setForm({...form,name:e.target.value});setErr('')}} autoFocus/></div>
-          <div className="fg"><label className="fl">Email</label><input className="fi" type="email" placeholder="jane@company.com" value={form.email} onChange={e=>{setForm({...form,email:e.target.value});setErr('')}}/></div>
-          <div className="fg"><label className="fl">Password</label>
-            <div className="iw">
-              <input className="fi" type={show?'text':'password'} placeholder="Set a password" value={form.password} onChange={e=>{setForm({...form,password:e.target.value});setErr('')}} style={{paddingRight:44}}/>
-              <button className="eye-btn" onClick={()=>setShow(!show)}><Ic n={show?'eyeOff':'eye'} size={15}/></button>
-            </div>
-          </div>
-          <div className="fg"><label className="fl">Role</label>
-            <select className="fi" value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
-              <option value="agent">Agent</option><option value="admin">Admin</option>
-            </select>
-          </div>
-          {err&&<div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
-          <div className="mfoot">
-            <button className="bs" onClick={()=>{setModal(false);setErr('')}}>Cancel</button>
-            <button className="bp" onClick={save}>Create User</button>
-          </div>
-        </Modal>
       )}
     </div>
   );
 }
 
 function ASettings() {
-  const reset=()=>{if(confirm('Sign out of all devices?')){localStorage.removeItem('bt_session');window.location.reload();}};
   return (
     <div className="panel">
       <div className="phd"><div><h1 className="ptitle">Settings</h1><p className="psub">Database and account</p></div></div>
       <div className="sblock">
         <h2 className="sh">Supabase Connection</h2>
         <p className="sd">Connected to: bmfwgyruomldxebinwcr.supabase.co</p>
-        <button className="bs" onClick={reset}><Ic n="refresh" size={14}/> Sign out all devices</button>
       </div>
       <div className="sblock">
-        <h2 className="sh">Sharing with your team</h2>
-        <p className="sd">Share this HTML file with your team. They can log in with the credentials you create in the Users tab.</p>
-      </div>
-      <div className="sblock">
-        <h2 className="sh">Admin account</h2>
-        <p className="sd">Default admin credentials:</p>
-        <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:13,color:'var(--muted)'}}>
-          yassin.aitlehcen@market-wave.com / @Yassine_AL230920
+        <h2 className="sh">Admin Setup</h2>
+        <p className="sd">To make a user an admin, go to Supabase Dashboard → Authentication → Users → Edit User → Raw User Meta Data and add:</p>
+        <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 14px',fontFamily:'monospace',fontSize:13,color:'var(--accent)'}}>
+          {`{ "role": "admin" }`}
         </div>
       </div>
     </div>
@@ -653,26 +659,16 @@ function ASettings() {
 }
 
 /* ── Shared ── */
-function StatCard({n,label,value,accent}) {
+function StatCard({n, label, value, accent}) {
   return <div className={`stat${accent?' ac':''}`}><div className="stat-ic"><Ic n={n} size={16} sw={1.8}/></div><div className="stat-val">{value}</div><div className="stat-lbl">{label}</div></div>;
 }
 function AvC({name}) {
   return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span></div>;
 }
 function LiveEl({start}) {
-  const [e,setE]=useState(Date.now()-start);
+  const [e, setE] = useState(Date.now()-start);
   useEffect(()=>{const id=setInterval(()=>setE(Date.now()-start),1000);return()=>clearInterval(id);},[start]);
   return <span className="mono ac-txt" style={{fontWeight:700}}>{tStr(e)}</span>;
-}
-function Modal({title,onClose,children}) {
-  return (
-    <div className="mo" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="mb">
-        <div className="mhd"><h3 className="mt2">{title}</h3><button className="ib" onClick={onClose}><Ic n="x" size={16}/></button></div>
-        <div className="mbody">{children}</div>
-      </div>
-    </div>
-  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
