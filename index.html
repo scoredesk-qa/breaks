@@ -10,7 +10,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
-/* ── Reset & tokens ──────────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0d0d0d;--surface:#141414;--card:#1a1a1a;--border:#252525;
@@ -20,80 +19,41 @@
   --font:'Manrope',sans-serif;
 }
 html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px}
-
-/* ── Spinner / Splash ───────────────────────────────────────────────────── */
 .splash{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px}
 .spin{width:28px;height:28px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:rot .7s linear infinite}
 .spin-sm{width:15px;height:15px;border:2px solid rgba(0,0,0,.25);border-top-color:#000;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
 @keyframes rot{to{transform:rotate(360deg)}}
-
-/* ── Auth ───────────────────────────────────────────────────────────────── */
-.auth-bg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
-  background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(62,207,142,.06) 0%,transparent 70%)}
-.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;
-  padding:40px 36px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+.auth-bg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(62,207,142,.06) 0%,transparent 70%)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.6)}
 .auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
 .auth-title{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
 .auth-sub{color:var(--muted);font-size:13px;margin-bottom:28px;line-height:1.6}
-
-/* ── Logo ───────────────────────────────────────────────────────────────── */
-.logo-mark{background:var(--accent);color:#000;border-radius:8px;
-  display:flex;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0}
+.logo-mark{background:var(--accent);color:#000;border-radius:8px;display:flex;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0}
 .logo-mark.sm{width:24px;height:24px;border-radius:6px}
 .logo-text{font-size:16px;font-weight:800;letter-spacing:-.3px}
-
-/* ── Form ───────────────────────────────────────────────────────────────── */
 .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
 .fl{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
-.fi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;
-  color:var(--text);font-size:14px;font-family:var(--font);outline:none;width:100%;
-  transition:border .18s,box-shadow .18s}
+.fi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;font-family:var(--font);outline:none;width:100%;transition:border .18s,box-shadow .18s}
 .fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--acc-ring)}
 .fi::placeholder{color:#333}
 .fi option{background:var(--card)}
 .iw{position:relative}
-.eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);
-  background:none;border:none;color:var(--muted);cursor:pointer;display:flex;padding:4px}
+.eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;display:flex;padding:4px}
 .eye-btn:hover{color:var(--text)}
-
-/* ── Buttons ────────────────────────────────────────────────────────────── */
-.bp{background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 18px;
-  font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;
-  display:inline-flex;align-items:center;gap:7px;transition:opacity .15s,transform .12s;white-space:nowrap}
+.bp{background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:opacity .15s,transform .12s;white-space:nowrap}
 .bp:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
 .bp:disabled{opacity:.4;cursor:not-allowed}
 .bp.full{width:100%;justify-content:center;margin-top:4px}
-.bs{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;
-  padding:9px 16px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;
-  display:inline-flex;align-items:center;gap:7px;transition:border-color .15s;white-space:nowrap}
+.bs{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s;white-space:nowrap}
 .bs:hover{border-color:var(--accent)}
-.ib{background:none;border:1px solid transparent;border-radius:6px;color:var(--muted);
-  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
-  padding:6px;transition:color .15s,background .15s;font-family:var(--font)}
+.ib{background:none;border:1px solid transparent;border-radius:6px;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:6px;transition:color .15s,background .15s}
 .ib:hover{color:var(--text);background:var(--card)}
-.ib.danger:hover{color:var(--danger)}
-.ib.muted{opacity:.45}.ib.muted:hover{opacity:1}
-
-/* ── Alerts ─────────────────────────────────────────────────────────────── */
-.aerr{display:flex;align-items:center;gap:7px;color:var(--danger);font-size:13px;
-  background:var(--danger-dim);border:1px solid rgba(240,82,82,.2);border-radius:8px;
-  padding:9px 12px;margin-bottom:12px}
-.awarn{display:flex;align-items:center;gap:8px;color:var(--warn);font-size:13px;
-  background:var(--warn-dim);border:1px solid rgba(234,179,8,.25);border-radius:10px;
-  padding:12px 16px;margin-bottom:16px;font-weight:600}
-
-/* ── Setup config ───────────────────────────────────────────────────────── */
-.cfg-note{font-size:12px;color:var(--muted);line-height:1.7;margin-top:12px;
-  background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
-
-/* ── Agent Layout ───────────────────────────────────────────────────────── */
+.aerr{display:flex;align-items:center;gap:7px;color:var(--danger);font-size:13px;background:var(--danger-dim);border:1px solid rgba(240,82,82,.2);border-radius:8px;padding:9px 12px;margin-bottom:12px}
+.awarn{display:flex;align-items:center;gap:8px;color:var(--warn);font-size:13px;background:var(--warn-dim);border:1px solid rgba(234,179,8,.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-weight:600}
+/* Agent */
 .ag-root{min-height:100vh;display:flex;flex-direction:column}
-.ag-hd{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:54px;
-  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
-.ag-body{flex:1;max-width:700px;margin:0 auto;width:100%;padding:32px 20px;
-  display:flex;flex-direction:column;gap:20px}
-
-/* ── Break control card ─────────────────────────────────────────────────── */
+.ag-hd{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.ag-body{flex:1;max-width:700px;margin:0 auto;width:100%;padding:32px 20px;display:flex;flex-direction:column;gap:20px}
 .bcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
 .bcard-top{padding:44px 32px 28px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
 .bcard-foot{border-top:1px solid var(--border);padding:20px 32px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
@@ -108,41 +68,27 @@ html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:v
 .timer-since{font-size:13px;color:var(--muted)}
 .idle-lbl{font-size:18px;font-weight:700}
 .idle-sub{font-size:13px;color:var(--muted)}
-.btn-start{background:var(--accent);color:#000;border:none;border-radius:10px;padding:13px 36px;
-  font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;
-  display:flex;align-items:center;gap:8px;transition:opacity .15s,transform .12s}
+.btn-start{background:var(--accent);color:#000;border:none;border-radius:10px;padding:13px 36px;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s,transform .12s}
 .btn-start:hover{opacity:.88;transform:translateY(-1px)}
 .btn-start:disabled{opacity:.4;cursor:not-allowed;transform:none}
-.btn-stop{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(240,82,82,.25);
-  border-radius:10px;padding:13px 36px;font-size:15px;font-weight:700;font-family:var(--font);
-  cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+.btn-stop{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(240,82,82,.25);border-radius:10px;padding:13px 36px;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
 .btn-stop:hover{background:rgba(240,82,82,.18)}
-
-/* ── Daily summary bar ──────────────────────────────────────────────────── */
 .day-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.day-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;
-  padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.day-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
 .day-stat-val{font-size:22px;font-weight:800;letter-spacing:-.5px}
 .day-stat-lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-
-/* ── Section card ───────────────────────────────────────────────────────── */
 .sc{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
 .sc.mt{margin-top:8px}
 .sc-hd{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
 .sc-title{font-size:13px;font-weight:700}
 .sc-ic{color:var(--muted);display:flex}
-.live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);
-  animation:pulse-a 1.5s ease-in-out infinite;flex-shrink:0}
-
-/* ── Admin Layout ───────────────────────────────────────────────────────── */
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse-a 1.5s ease-in-out infinite;flex-shrink:0}
+/* Admin */
 .adm-root{display:flex;min-height:100vh}
-.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
 .sb-logo{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
-.nav-item{background:none;border:none;border-radius:8px;padding:9px 12px;display:flex;align-items:center;
-  gap:10px;color:var(--muted);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;
-  transition:background .15s,color .15s;text-align:left;width:100%}
+.nav-item{background:none;border:none;border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:background .15s,color .15s;text-align:left;width:100%}
 .nav-item:hover{background:var(--card);color:var(--text)}
 .nav-item.on{background:var(--acc-dim);color:var(--accent)}
 .nav-arr{margin-left:auto;display:flex}
@@ -151,39 +97,27 @@ html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:v
 .sb-name{font-size:13px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-role{font-size:11px;color:var(--muted);display:block}
 .adm-main{flex:1;min-width:0;overflow-x:auto}
-
-/* ── Panel ──────────────────────────────────────────────────────────────── */
 .panel{padding:28px}
 .phd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
 .ptitle{font-size:20px;font-weight:800;letter-spacing:-.4px}
 .psub{font-size:13px;color:var(--muted);margin-top:3px}
 .phd-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-
-/* ── Stat grid ──────────────────────────────────────────────────────────── */
 .sg4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
 .sg3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:8px}
 .stat.ac{border-color:var(--acc-ring);background:var(--acc-dim)}
-.stat.warn{border-color:rgba(234,179,8,.3);background:var(--warn-dim)}
+.stat.wn{border-color:rgba(234,179,8,.3);background:var(--warn-dim)}
 .stat-ic{color:var(--muted);display:flex}
 .stat.ac .stat-ic{color:var(--accent)}
-.stat.warn .stat-ic{color:var(--warn)}
+.stat.wn .stat-ic{color:var(--warn)}
 .stat-val{font-size:28px;font-weight:800;letter-spacing:-1px}
 .stat-lbl{font-size:12px;color:var(--muted);font-weight:500}
-.stat-sub{font-size:11px;color:var(--muted)}
-
-/* ── Table ──────────────────────────────────────────────────────────────── */
 .dt{width:100%;border-collapse:collapse;font-size:13.5px}
-.dt th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+.dt th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
 .dt td{padding:12px 16px;border-bottom:1px solid #1c1c1c;vertical-align:middle}
 .dt tbody tr:last-child td{border-bottom:none}
 .dt tbody tr:hover td{background:rgba(255,255,255,.018)}
-
-/* ── Avatar / misc ──────────────────────────────────────────────────────── */
-.av{width:28px;height:28px;border-radius:50%;background:var(--acc-dim);color:var(--accent);
-  font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;border:1px solid var(--acc-ring)}
+.av{width:28px;height:28px;border-radius:50%;background:var(--acc-dim);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--acc-ring)}
 .hd-name{font-size:13px;font-weight:600;color:var(--muted)}
 .fc{display:flex;align-items:center}
 .g4{gap:4px}.g6{gap:6px}.g8{gap:8px}.g10{gap:10px}
@@ -191,71 +125,58 @@ html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:v
 .es-ic{opacity:.2;display:flex}
 .mono{font-family:'Courier New',monospace}
 .ac-txt{color:var(--accent)}
-.si{background:var(--card);border:1px solid var(--border);border-radius:8px;
-  padding:8px 14px;color:var(--text);font-size:13px;font-family:var(--font);
-  outline:none;width:180px;transition:border .18s}
+.si{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-family:var(--font);outline:none;width:180px;transition:border .18s}
 .si:focus{border-color:var(--accent)}
 .si::placeholder{color:#333}
-
-/* ── Badges ─────────────────────────────────────────────────────────────── */
-.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
 .b-done{background:#0f2b1e;color:#3ECF8E;border:1px solid #1a4030}
 .b-active{background:#2b1e00;color:#eab308;border:1px solid #3d2e00}
 .b-lunch{background:#1a0d2b;color:#a78bfa;border:1px solid #2d1a4a}
 .b-bath{background:#0d1f2b;color:#67e8f9;border:1px solid #1a3540}
 .b-break{background:#1e1f0d;color:#86efac;border:1px solid #2b3016}
-
-/* ── Settings block ─────────────────────────────────────────────────────── */
 .sblock{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
 .sh{font-size:15px;font-weight:700;margin-bottom:8px}
 .sd{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6}
-
-/* ── Number input for max breaks ─────────────────────────────────────────── */
-.num-input{display:flex;align-items:center;gap:10px}
-.num-btn{width:34px;height:34px;background:var(--card);border:1px solid var(--border);border-radius:8px;
-  color:var(--text);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;transition:border-color .15s}
-.num-btn:hover{border-color:var(--accent)}
-.num-val{font-size:28px;font-weight:800;color:var(--accent);min-width:50px;text-align:center}
-
-/* ── Day stats table ────────────────────────────────────────────────────── */
-.day-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #1c1c1c}
-.day-row:last-child{border-bottom:none}
-.day-row:hover{background:rgba(255,255,255,.018)}
-
+.num-input{display:flex;align-items:center;gap:12px}
+.num-btn{width:36px;height:36px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s;line-height:1}
+.num-btn:hover{border-color:var(--accent);color:var(--accent)}
+.num-val{font-size:32px;font-weight:800;color:var(--accent);min-width:50px;text-align:center}
+/* Realtime pill */
+.rt-pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--accent);background:var(--acc-dim);border:1px solid var(--acc-ring);border-radius:20px;padding:3px 10px}
+.rt-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse-a 1.2s ease-in-out infinite}
+/* Error box */
+.err-box{background:var(--danger-dim);border:1px solid rgba(240,82,82,.25);border-radius:10px;padding:16px 20px;color:var(--danger);font-size:13px;line-height:1.6;margin-bottom:16px}
 @media(max-width:900px){
   .sg4{grid-template-columns:repeat(2,1fr)}
   .sg3{grid-template-columns:repeat(2,1fr)}
+  .day-bar{grid-template-columns:1fr 1fr}
   .sidebar{width:52px}
   .sb-logo span,.sb-name,.sb-role,.nav-item span,.sb-user,.nav-arr{display:none}
   .nav-item{justify-content:center;padding:12px}
   .sb-foot{justify-content:center;padding:12px}
   .sb-logo{justify-content:center;padding:12px}
   .panel{padding:18px 12px}
-  .day-bar{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
 <body>
 <div id="root"></div>
 
-<!-- ─── IMPORTANT: Replace with your Supabase credentials ─── -->
+<!-- !! Replace these with your actual Supabase credentials !! -->
 <script>
-  window.SB_URL  = 'https://bmfwgyruomldxebinwcr.supabase.co';
-  window.SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw';
+  window.SB_URL = 'https://bmfwgyruomldxebinwcr.supabase.co';
+  window.SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw';
 </script>
 
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-/* ══════════════════════════════════════════════════════════════════════════
-   SUPABASE CLIENT — reads from window globals set above
-══════════════════════════════════════════════════════════════════════════ */
-const sb = supabase.createClient(window.SB_URL, window.SB_KEY);
+/* ── Supabase client ────────────────────────────────────────────────────── */
+const sb = supabase.createClient(window.SB_URL, window.SB_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
 
-/* ══════════════════════════════════════════════════════════════════════════
-   ICON ENGINE (inline SVG paths)
-══════════════════════════════════════════════════════════════════════════ */
+/* ── Icons ──────────────────────────────────────────────────────────────── */
 const P = {
   zap:      "M13 2L3 14h9l-1 8 10-12h-9z",
   logout:   ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
@@ -278,145 +199,99 @@ const P = {
   trending: ["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
   refresh:  ["M23 4v6h-6","M1 20v-6h6","M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"],
   sun:      ["M12 2v2","M12 20v2","M4.93 4.93l1.41 1.41","M17.66 17.66l1.41 1.41","M2 12h2","M20 12h2","M6.34 17.66l-1.41 1.41","M19.07 4.93l-1.41 1.41","M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
-  utensils: ["M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2","M7 2v20","M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"],
+  wifi:     ["M5 12.55a11 11 0 0 1 14.08 0","M1.42 9a16 16 0 0 1 21.16 0","M8.53 16.11a6 6 0 0 1 6.95 0","M12 20h.01"],
 };
-const Ic = ({ n, size=16, sw=1.8, style:s }) => {
+const Ic = ({ n, size=16, sw=1.8 }) => {
   const d = P[n];
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
-      style={{display:'inline-block',flexShrink:0,verticalAlign:'middle',...s}}>
+      style={{display:'inline-block',flexShrink:0,verticalAlign:'middle'}}>
       {Array.isArray(d) ? d.map((p,i)=><path key={i} d={p}/>) : <path d={d}/>}
     </svg>
   );
 };
 
-/* ══════════════════════════════════════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════════════════════════════════════ */
-const pad    = n => String(n).padStart(2,'0');
-const tStr   = s  => `${pad(Math.floor(s/3600)>0?Math.floor(s/3600):'')}${Math.floor(s/3600)>0?':':''}${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;
-const tStrMs = ms => tStr(Math.floor(ms/1000));
+/* ── Helpers ────────────────────────────────────────────────────────────── */
+const pad    = n  => String(n).padStart(2,'0');
+const tStr   = s  => `${pad(Math.floor(s/3600)>0?Math.floor(s/3600):Math.floor(s/60))}:${Math.floor(s/3600)>0?pad(Math.floor((s%3600)/60))+':':''}${pad(s%60)}`.replace(/^0:/,'');
+const tStrMs = ms => tStr(Math.max(0,Math.floor(ms/1000)));
 const fmt    = d  => new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const fmtD   = d  => new Date(d).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
-const todayKey = () => new Date().toISOString().slice(0,10);
+const todayISO = () => new Date().toISOString().slice(0,10);
 const ini    = n  => (n||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
 
 const durStr = secs => {
-  if (!secs && secs !== 0) return '—';
+  if(secs==null) return '—';
   const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60), s=secs%60;
-  if (h>0) return `${h}h ${m}m`;
-  if (m>0) return `${m}m ${s}s`;
+  if(h>0) return `${h}h ${m}m`;
+  if(m>0) return `${m}m ${s}s`;
   return `${s}s`;
 };
 
-/* Break type classification */
 const breakType = secs => {
-  if (secs === null || secs === undefined) return null;
-  if (secs >= 3600) return 'Lunch Break';
-  if (secs >= 900)  return 'Break';
+  if(secs==null) return null;
+  if(secs>=3600) return 'Lunch Break';
+  if(secs>=900)  return 'Break';
   return 'Bathroom Break';
 };
-const breakTypePredicted = ms => breakType(Math.floor(ms/1000));
 
-const TYPE_STYLE = {
-  'Lunch Break':    'b-lunch',
-  'Break':          'b-break',
-  'Bathroom Break': 'b-bath',
-};
-const TYPE_ICON = {
-  'Lunch Break':    'utensils',
-  'Break':          'coffee',
-  'Bathroom Break': 'activity',
-};
+const TYPE_CLS = { 'Lunch Break':'b-lunch','Break':'b-break','Bathroom Break':'b-bath' };
 
-/* CSV export */
 function exportCSV(logs) {
-  const hdr = 'Agent,Date,Start,Return,Duration (s),Type,Status\n';
-  const rows = logs.map(l => {
+  const hdr = 'Agent,Date,Start,Return,Duration (s),Type\n';
+  const rows = logs.map(l=>{
     const dur = l.end_time ? Math.round((new Date(l.end_time)-new Date(l.start_time))/1000) : '';
-    return `"${l.agent_name}","${fmtD(l.start_time)}","${fmt(l.start_time)}","${l.end_time?fmt(l.end_time):''}","${dur}","${l.break_type||''}","${l.end_time?'Returned':'On Break'}"`;
+    return `"${l.agent_name}","${fmtD(l.start_time)}","${fmt(l.start_time)}","${l.end_time?fmt(l.end_time):''}","${dur}","${l.break_type||''}"`;
   }).join('\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([hdr+rows],{type:'text/csv'}));
-  a.download = `breaks-${todayKey()}.csv`;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([hdr+rows],{type:'text/csv'}));
+  a.download=`breaks-${todayISO()}.csv`;
   a.click();
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   SQL SETUP SCRIPT (shown once)
-══════════════════════════════════════════════════════════════════════════ */
-const SQL = `-- Run in Supabase → SQL Editor → New Query
-
-create table if not exists public.bt_logs (
-  id            uuid        default gen_random_uuid() primary key,
-  user_id       uuid        not null references auth.users(id) on delete cascade,
-  agent_name    text        not null,
-  start_time    timestamptz not null default now(),
-  end_time      timestamptz,
-  duration_secs integer,
-  break_type    text        check (break_type in
-                  ('Lunch Break','Break','Bathroom Break')),
-  created_at    timestamptz default now()
-);
-
-create table if not exists public.bt_settings (
-  id                   integer default 1 primary key check (id = 1),
-  max_concurrent_breaks integer not null default 3,
-  updated_at           timestamptz default now()
-);
-
-insert into public.bt_settings (id, max_concurrent_breaks)
-values (1, 3) on conflict (id) do nothing;
-
-alter table public.bt_logs     disable row level security;
-alter table public.bt_settings disable row level security;
-
--- To make a user admin: Supabase Dashboard → Auth → Users
--- → click user → Edit → Raw User Meta Data → add:
---   { "role": "admin", "display_name": "Their Name" }
--- Agents need:
---   { "role": "agent", "display_name": "Their Name" }`;
+/* ── Simple query helper — always returns {data, error} ─────────────────── */
+async function q(builder) {
+  try {
+    const res = await builder;
+    return res;
+  } catch(e) {
+    return { data: null, error: e };
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    ROOT
 ══════════════════════════════════════════════════════════════════════════ */
 function App() {
-  const [user,   setUser]   = useState(null);
-  const [phase,  setPhase]  = useState('boot'); // boot | setup | login | app
+  const [user,  setUser]  = useState(null);
+  const [phase, setPhase] = useState('boot');
 
-  useEffect(() => {
-    /* Check if credentials are placeholders */
-    if (window.SB_URL.includes('YOUR-PROJECT')) { setPhase('setup'); return; }
-
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { setUser(session.user); setPhase('app'); }
+  useEffect(()=>{
+    sb.auth.getSession().then(({ data:{ session } })=>{
+      if(session?.user){ setUser(session.user); setPhase('app'); }
       else setPhase('login');
     });
-
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) { setUser(session.user); setPhase('app'); }
+    const { data:{ subscription } } = sb.auth.onAuthStateChange((_e, session)=>{
+      if(session?.user){ setUser(session.user); setPhase('app'); }
       else { setUser(null); setPhase('login'); }
     });
-    return () => subscription.unsubscribe();
-  }, []);
+    return ()=>subscription.unsubscribe();
+  },[]);
 
-  const logout = async () => { await sb.auth.signOut(); };
+  if(phase==='boot') return <Splash/>;
+  if(phase==='login') return <Login/>;
+  if(!user) return <Splash/>;
 
-  if (phase === 'boot')  return <Splash />;
-  if (phase === 'setup') return <SetupGuide />;
-  if (phase === 'login') return <Login />;
-  if (!user)             return <Splash />;
+  const role = user.user_metadata?.role;
+  const name = user.user_metadata?.display_name || user.email;
+  const logout = ()=> sb.auth.signOut();
 
-  const role        = user.user_metadata?.role;
-  const displayName = user.user_metadata?.display_name || user.email;
-
-  return role === 'admin'
-    ? <AdminApp user={user} name={displayName} onLogout={logout}/>
-    : <AgentApp user={user} name={displayName} onLogout={logout}/>;
+  return role==='admin'
+    ? <AdminApp user={user} name={name} onLogout={logout}/>
+    : <AgentApp user={user} name={name} onLogout={logout}/>;
 }
 
-/* ── Splash ─────────────────────────────────────────────────────────────── */
 function Splash() {
   return (
     <div className="splash">
@@ -426,25 +301,7 @@ function Splash() {
   );
 }
 
-/* ── Setup Guide ─────────────────────────────────────────────────────────── */
-function SetupGuide() {
-  return (
-    <div className="auth-bg">
-      <div className="auth-card" style={{maxWidth:500}}>
-        <div className="auth-logo"><div className="logo-mark"><Ic n="zap" size={18} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
-        <h1 className="auth-title">Supabase credentials needed</h1>
-        <p className="auth-sub">Open <code style={{color:'var(--accent)'}}>index.html</code> in a text editor and replace the two placeholder values near the bottom of the &lt;script&gt; block:</p>
-        <div style={{background:'#0a0a0a',border:'1px solid var(--border)',borderRadius:8,padding:14,fontFamily:'monospace',fontSize:12,color:'#aaa',lineHeight:1.8,marginBottom:16}}>
-          {`window.SB_URL = 'https://xxxx.supabase.co';\nwindow.SB_KEY = 'eyJhbGci...';`}
-        </div>
-        <p style={{fontSize:13,color:'var(--muted)',marginBottom:12,lineHeight:1.6}}>Find these in <strong style={{color:'var(--text)'}}>Supabase → Project Settings → API</strong>. Then run the SQL below in <strong style={{color:'var(--text)'}}>SQL Editor → New Query</strong>.</p>
-        <div style={{background:'#0a0a0a',border:'1px solid var(--border)',borderRadius:8,padding:14,fontFamily:'monospace',fontSize:11,color:'#888',lineHeight:1.7,maxHeight:220,overflowY:'auto',whiteSpace:'pre'}}>{SQL}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Login ───────────────────────────────────────────────────────────────── */
+/* ── Login ──────────────────────────────────────────────────────────────── */
 function Login() {
   const [email,setEmail]=useState('');
   const [pass, setPass] =useState('');
@@ -452,11 +309,11 @@ function Login() {
   const [err,  setErr]  =useState('');
   const [busy, setBusy] =useState(false);
 
-  const submit = async () => {
+  const submit = async()=>{
     if(!email||!pass) return;
     setBusy(true); setErr('');
-    const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password: pass });
-    if (error) { setErr(error.message); setBusy(false); }
+    const { error } = await sb.auth.signInWithPassword({ email:email.trim(), password:pass });
+    if(error){ setErr(error.message); setBusy(false); }
   };
 
   return (
@@ -480,7 +337,7 @@ function Login() {
         </div>
         {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
         <button className="bp full" onClick={submit} disabled={busy||!email||!pass}>
-          {busy ? <span className="spin-sm"/> : 'Sign in'}
+          {busy?<span className="spin-sm"/>:'Sign in'}
         </button>
       </div>
     </div>
@@ -488,104 +345,108 @@ function Login() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   AGENT VIEW
+   AGENT
 ══════════════════════════════════════════════════════════════════════════ */
 function AgentApp({ user, name, onLogout }) {
-  const [logs,       setLogs]      = useState([]);    // today's logs
-  const [active,     setActive]    = useState(null);  // {id, start: Date obj}
-  const [elapsed,    setElapsed]   = useState(0);     // ms
-  const [maxBreaks,  setMaxBreaks] = useState(3);
-  const [onBreakNow, setOnBreakNow]= useState(0);
-  const [loading,    setLoading]   = useState(true);
+  const [logs,      setLogs]     = useState([]);
+  const [activeRow, setActiveRow]= useState(null); // the open bt_logs row
+  const [elapsed,   setElapsed]  = useState(0);
+  const [maxBreaks, setMaxBreaks]= useState(3);
+  const [nowCount,  setNowCount] = useState(0);
+  const [loading,   setLoading]  = useState(true);
+  const [err,       setErr]      = useState('');
   const timerRef = useRef(null);
 
-  /* Load today's logs for this agent */
-  const loadLogs = useCallback(async () => {
-    const today = todayKey();
-    const { data, error } = await sb.from('bt_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('start_time', today + 'T00:00:00+00:00')
-      .order('start_time', { ascending: false });
-    if (!error && data) {
-      setLogs(data);
-      /* Check if there's already an active break */
-      const open = data.find(l => !l.end_time);
-      if (open && !active) {
-        setActive({ id: open.id, start: new Date(open.start_time) });
-      }
-    }
+  const loadData = useCallback(async()=>{
+    setLoading(true); setErr('');
+    const today = todayISO();
+
+    // Today's logs for this agent
+    const { data: myLogs, error: e1 } = await q(
+      sb.from('bt_logs').select('*')
+        .eq('user_id', user.id)
+        .gte('start_time', today+'T00:00:00.000Z')
+        .order('start_time', { ascending:false })
+    );
+    if(e1){ setErr(e1.message); setLoading(false); return; }
+    setLogs(myLogs||[]);
+
+    // Find if there's an open break for this agent
+    const open = (myLogs||[]).find(l=>!l.end_time);
+    if(open) setActiveRow(open);
+    else setActiveRow(null);
+
+    // Max concurrent setting
+    const { data: cfg } = await q(
+      sb.from('bt_settings').select('max_concurrent_breaks').eq('id',1).single()
+    );
+    if(cfg) setMaxBreaks(cfg.max_concurrent_breaks);
+
+    // How many agents on break right now
+    const { data: allActive } = await q(
+      sb.from('bt_logs').select('id').is('end_time', null)
+    );
+    setNowCount((allActive||[]).length);
     setLoading(false);
   }, [user.id]);
 
-  /* Load max_concurrent and current on-break count */
-  const loadMeta = useCallback(async () => {
-    const [{ data: cfg }, { data: active_now }] = await Promise.all([
-      sb.from('bt_settings').select('max_concurrent_breaks').eq('id',1).single(),
-      sb.from('bt_logs').select('id', { count:'exact', head:true }).is('end_time', null),
-    ]);
-    if (cfg) setMaxBreaks(cfg.max_concurrent_breaks);
-    setOnBreakNow(active_now || 0);
-  }, []);
+  useEffect(()=>{ loadData(); },[loadData]);
 
-  useEffect(() => { loadLogs(); loadMeta(); }, []);
-
-  /* Live timer */
-  useEffect(() => {
-    if (active) {
-      timerRef.current = setInterval(() => setElapsed(Date.now() - active.start.getTime()), 250);
+  // Timer
+  useEffect(()=>{
+    if(activeRow){
+      const start = new Date(activeRow.start_time).getTime();
+      timerRef.current = setInterval(()=>setElapsed(Date.now()-start), 250);
     } else {
       clearInterval(timerRef.current);
       setElapsed(0);
     }
-    return () => clearInterval(timerRef.current);
-  }, [active]);
+    return ()=>clearInterval(timerRef.current);
+  },[activeRow]);
 
-  const startBreak = async () => {
-    /* Check capacity */
-    const { count } = await sb.from('bt_logs').select('*', {count:'exact', head:true}).is('end_time', null);
-    if (count >= maxBreaks) {
-      alert(`Maximum breaks reached (${maxBreaks}). Please wait for a colleague to return.`);
+  const startBreak = async()=>{
+    setErr('');
+    // Re-check capacity live
+    const { data: allActive } = await q(sb.from('bt_logs').select('id').is('end_time',null));
+    const cnt = (allActive||[]).length;
+    if(cnt >= maxBreaks){
+      setErr(`Max break slots reached (${maxBreaks}). Wait for a colleague to return.`);
       return;
     }
-    const now = new Date();
-    const { data, error } = await sb.from('bt_logs').insert({
-      user_id:    user.id,
-      agent_name: name,
-      start_time: now.toISOString(),
-    }).select().single();
-    if (!error && data) {
-      setActive({ id: data.id, start: now });
-      setLogs(prev => [data, ...prev]);
-      setOnBreakNow(n => n + 1);
-    }
+    const now = new Date().toISOString();
+    const { data, error } = await q(
+      sb.from('bt_logs').insert({
+        user_id: user.id, agent_name: name, start_time: now
+      }).select().single()
+    );
+    if(error){ setErr('Could not start break: '+error.message); return; }
+    setActiveRow(data);
+    setLogs(prev=>[data,...prev]);
+    setNowCount(c=>c+1);
   };
 
-  const endBreak = async () => {
-    if (!active) return;
-    const now     = new Date();
-    const durSecs = Math.round((now - active.start) / 1000);
+  const endBreak = async()=>{
+    if(!activeRow) return;
+    setErr('');
+    const now     = new Date().toISOString();
+    const durSecs = Math.round((new Date(now)-new Date(activeRow.start_time))/1000);
     const bType   = breakType(durSecs);
-    const { error } = await sb.from('bt_logs').update({
-      end_time:      now.toISOString(),
-      duration_secs: durSecs,
-      break_type:    bType,
-    }).eq('id', active.id);
-    if (!error) {
-      setLogs(prev => prev.map(l => l.id === active.id
-        ? { ...l, end_time: now.toISOString(), duration_secs: durSecs, break_type: bType }
-        : l
-      ));
-      setOnBreakNow(n => Math.max(0, n - 1));
-      setActive(null);
-    }
+    const { error } = await q(
+      sb.from('bt_logs').update({ end_time:now, duration_secs:durSecs, break_type:bType })
+        .eq('id', activeRow.id)
+    );
+    if(error){ setErr('Could not end break: '+error.message); return; }
+    setLogs(prev=>prev.map(l=>l.id===activeRow.id
+      ? {...l, end_time:now, duration_secs:durSecs, break_type:bType} : l
+    ));
+    setActiveRow(null);
+    setNowCount(c=>Math.max(0,c-1));
   };
 
-  /* Daily summary */
-  const completedToday = logs.filter(l => l.end_time);
-  const totalSecToday  = completedToday.reduce((s,l) => s + (l.duration_secs || 0), 0);
-  const predictedType  = active ? breakTypePredicted(elapsed) : null;
-  const atCapacity     = onBreakNow >= maxBreaks;
+  const completed = logs.filter(l=>l.end_time);
+  const totalSec  = completed.reduce((s,l)=>s+(l.duration_secs||0),0);
+  const predType  = activeRow ? breakType(Math.floor(elapsed/1000)) : null;
+  const atCap     = nowCount >= maxBreaks;
 
   return (
     <div className="ag-root">
@@ -599,31 +460,25 @@ function AgentApp({ user, name, onLogout }) {
       </header>
 
       <div className="ag-body">
-        {/* Capacity warning */}
-        {atCapacity && !active && (
-          <div className="awarn">
-            <Ic n="alert" size={16}/>
-            Maximum agents on break ({maxBreaks}). Please wait for a colleague to return.
-          </div>
+        {err && <div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+        {atCap && !activeRow && (
+          <div className="awarn"><Ic n="alert" size={16}/> Max break slots used ({nowCount}/{maxBreaks}). Please wait for a colleague to return.</div>
         )}
 
-        {/* Break control card */}
+        {/* Break card */}
         <div className="bcard">
           <div className="bcard-top">
-            <div className={`pulse-ring${active?' on':''}`}>
-              <div className={`bic${active?' on':''}`}>
-                <Ic n={active ? (predictedType==='Lunch Break'?'utensils':predictedType==='Bathroom Break'?'activity':'coffee') : 'coffee'} size={32} sw={1.5}/>
+            <div className={`pulse-ring${activeRow?' on':''}`}>
+              <div className={`bic${activeRow?' on':''}`}>
+                <Ic n={activeRow ? 'timer' : 'coffee'} size={32} sw={1.5}/>
               </div>
             </div>
-
-            {active ? (
+            {activeRow ? (
               <>
                 <div className="timer-big">{tStrMs(elapsed)}</div>
                 <div className="timer-lbl">On Break</div>
-                {predictedType && (
-                  <span className={`badge ${TYPE_STYLE[predictedType]} timer-type`}>{predictedType}</span>
-                )}
-                <div className="timer-since">Started at {fmt(active.start)}</div>
+                {predType && <span className={`badge ${TYPE_CLS[predType]} timer-type`}>{predType}</span>}
+                <div className="timer-since">Started at {fmt(activeRow.start_time)}</div>
               </>
             ) : (
               <>
@@ -633,8 +488,8 @@ function AgentApp({ user, name, onLogout }) {
             )}
           </div>
           <div className="bcard-foot">
-            {!active
-              ? <button className="btn-start" onClick={startBreak} disabled={atCapacity}>
+            {!activeRow
+              ? <button className="btn-start" onClick={startBreak} disabled={atCap||loading}>
                   <Ic n="play" size={16} sw={2.5}/> Start Break
                 </button>
               : <button className="btn-stop" onClick={endBreak}>
@@ -644,19 +499,21 @@ function AgentApp({ user, name, onLogout }) {
           </div>
         </div>
 
-        {/* Today's summary */}
+        {/* Daily summary */}
         <div className="day-bar">
           <div className="day-stat">
             <div className="day-stat-lbl">Breaks today</div>
-            <div className="day-stat-val">{completedToday.length}</div>
+            <div className="day-stat-val">{completed.length}</div>
           </div>
           <div className="day-stat">
             <div className="day-stat-lbl">Total time</div>
-            <div className="day-stat-val" style={{fontSize:20}}>{durStr(totalSecToday)}</div>
+            <div className="day-stat-val" style={{fontSize:18}}>{durStr(totalSec)}</div>
           </div>
           <div className="day-stat">
             <div className="day-stat-lbl">Team on break</div>
-            <div className="day-stat-val" style={{color: onBreakNow >= maxBreaks ? 'var(--danger)' : 'var(--accent)'}}>{onBreakNow}<span style={{fontSize:14,color:'var(--muted)',fontWeight:500}}>/{maxBreaks}</span></div>
+            <div className="day-stat-val" style={{color:atCap?'var(--danger)':'var(--accent)'}}>
+              {nowCount}<span style={{fontSize:14,color:'var(--muted)',fontWeight:500}}>/{maxBreaks}</span>
+            </div>
           </div>
         </div>
 
@@ -665,31 +522,26 @@ function AgentApp({ user, name, onLogout }) {
           <div className="sc-hd">
             <span className="sc-ic"><Ic n="clock" size={15}/></span>
             <h2 className="sc-title">Today's Breaks</h2>
-            <button className="ib" style={{marginLeft:'auto'}} onClick={loadLogs} title="Refresh"><Ic n="refresh" size={14}/></button>
+            <button className="ib" style={{marginLeft:'auto'}} onClick={loadData} title="Refresh"><Ic n="refresh" size={14}/></button>
           </div>
           {loading ? <div className="es"><div className="spin"/></div>
-            : logs.length === 0 ? (
-              <div className="es"><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No breaks today</p></div>
-            ) : (
-              <table className="dt">
-                <thead><tr><th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
-                <tbody>
-                  {logs.map(l => {
-                    const isActive = !l.end_time;
-                    const dur = l.duration_secs ?? (isActive ? Math.round((Date.now()-new Date(l.start_time))/1000) : null);
-                    const bt  = isActive ? null : l.break_type;
-                    return (
+            : logs.length===0
+              ? <div className="es"><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No breaks yet today</p></div>
+              : (
+                <table className="dt">
+                  <thead><tr><th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
+                  <tbody>
+                    {logs.map(l=>(
                       <tr key={l.id}>
                         <td>{fmt(l.start_time)}</td>
                         <td>{l.end_time ? fmt(l.end_time) : <span className="badge b-active">On Break</span>}</td>
-                        <td>{isActive ? <LiveElSec start={l.start_time}/> : durStr(dur)}</td>
-                        <td>{bt ? <BreakBadge type={bt}/> : '—'}</td>
+                        <td>{l.end_time ? durStr(l.duration_secs) : <LiveSec start={l.start_time}/>}</td>
+                        <td>{l.break_type ? <BBadge type={l.break_type}/> : l.end_time ? '—' : <LiveType start={l.start_time}/>}</td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )
+                    ))}
+                  </tbody>
+                </table>
+              )
           }
         </div>
       </div>
@@ -698,26 +550,26 @@ function AgentApp({ user, name, onLogout }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   ADMIN VIEW
+   ADMIN
 ══════════════════════════════════════════════════════════════════════════ */
 function AdminApp({ user, name, onLogout }) {
   const [tab, setTab] = useState('dashboard');
   const nav = [
-    { id:'dashboard', n:'grid',     label:'Dashboard'   },
-    { id:'live',      n:'activity', label:'Live Breaks'  },
-    { id:'logs',      n:'clock',    label:'All Logs'     },
-    { id:'analytics', n:'trending', label:'Analytics'    },
-    { id:'settings',  n:'settings', label:'Settings'     },
+    { id:'dashboard', n:'grid',     label:'Dashboard'  },
+    { id:'live',      n:'wifi',     label:'Live'        },
+    { id:'logs',      n:'clock',    label:'All Logs'    },
+    { id:'analytics', n:'trending', label:'Analytics'   },
+    { id:'settings',  n:'settings', label:'Settings'    },
   ];
   return (
     <div className="adm-root">
       <aside className="sidebar">
         <div className="sb-logo"><div className="logo-mark sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="logo-text">BreakTrack</span></div>
         <nav className="sb-nav">
-          {nav.map(({id,n,label}) => (
+          {nav.map(({id,n,label})=>(
             <button key={id} className={`nav-item${tab===id?' on':''}`} onClick={()=>setTab(id)}>
               <Ic n={n} size={16} sw={1.8}/><span>{label}</span>
-              {tab===id && <span className="nav-arr"><Ic n="chevron" size={13}/></span>}
+              {tab===id&&<span className="nav-arr"><Ic n="chevron" size={13}/></span>}
             </button>
           ))}
         </nav>
@@ -728,138 +580,202 @@ function AdminApp({ user, name, onLogout }) {
         </div>
       </aside>
       <main className="adm-main">
-        {tab==='dashboard'  && <ADash/>}
-        {tab==='live'       && <ALive/>}
-        {tab==='logs'       && <ALogs/>}
-        {tab==='analytics'  && <AAnalytics/>}
-        {tab==='settings'   && <ASettings/>}
+        {tab==='dashboard' && <ADash/>}
+        {tab==='live'      && <ALive/>}
+        {tab==='logs'      && <ALogs/>}
+        {tab==='analytics' && <AAnalytics/>}
+        {tab==='settings'  && <ASettings/>}
       </main>
     </div>
   );
 }
 
-/* ── Admin Dashboard ────────────────────────────────────────────────────── */
+/* ── Admin Dashboard ─────────────────────────────────────────────────────── */
 function ADash() {
-  const [stats,   setStats]  = useState({ total:0, active:0, today:0, avgSec:0 });
-  const [recent,  setRecent] = useState([]);
-  const [maxB,    setMaxB]   = useState(3);
-  const [loading, setLoad]   = useState(true);
+  const [allLogs,  setAllLogs]  = useState([]);
+  const [maxB,     setMaxB]     = useState(3);
+  const [loading,  setLoading]  = useState(true);
+  const [err,      setErr]      = useState('');
+  const [rtStatus, setRtStatus] = useState('connecting');
 
-  const load = async () => {
-    setLoad(true);
-    const today = todayKey();
-    const [
-      { count: total },
-      { count: active },
-      { data: todayLogs },
-      { data: cfg },
-      { data: recentLogs },
-    ] = await Promise.all([
-      sb.from('bt_logs').select('*', {count:'exact', head:true}),
-      sb.from('bt_logs').select('*', {count:'exact', head:true}).is('end_time', null),
-      sb.from('bt_logs').select('duration_secs').gte('start_time', today+'T00:00:00+00:00').not('duration_secs','is',null),
-      sb.from('bt_settings').select('max_concurrent_breaks').eq('id',1).single(),
-      sb.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(10),
-    ]);
-    const todaySec = (todayLogs||[]).reduce((s,l)=>s+(l.duration_secs||0),0);
-    const done = (recentLogs||[]).filter(l=>l.duration_secs);
-    const avgSec = done.length ? Math.round(done.reduce((s,l)=>s+l.duration_secs,0)/done.length) : 0;
-    setStats({ total: total||0, active: active||0, today: (todayLogs||[]).length, todaySec, avgSec });
-    if (cfg) setMaxB(cfg.max_concurrent_breaks);
-    setRecent(recentLogs||[]);
-    setLoad(false);
-  };
-  useEffect(()=>{load();},[]);
+  const loadAll = useCallback(async()=>{
+    setErr('');
+    // Load settings
+    const { data:cfg, error:e1 } = await q(sb.from('bt_settings').select('*').eq('id',1).single());
+    if(e1 && e1.code!=='PGRST116') { setErr('Settings error: '+e1.message); }
+    if(cfg) setMaxB(cfg.max_concurrent_breaks);
+
+    // Load all logs (last 200)
+    const { data:logs, error:e2 } = await q(
+      sb.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(200)
+    );
+    if(e2){ setErr('Logs error: '+e2.message); setLoading(false); return; }
+    setAllLogs(logs||[]);
+    setLoading(false);
+  },[]);
+
+  useEffect(()=>{
+    loadAll();
+    // Realtime subscription
+    const channel = sb.channel('admin-dash')
+      .on('postgres_changes', { event:'*', schema:'public', table:'bt_logs' }, payload=>{
+        setAllLogs(prev=>{
+          if(payload.eventType==='INSERT') return [payload.new, ...prev];
+          if(payload.eventType==='UPDATE') return prev.map(l=>l.id===payload.new.id ? payload.new : l);
+          if(payload.eventType==='DELETE') return prev.filter(l=>l.id!==payload.old.id);
+          return prev;
+        });
+      })
+      .subscribe(status=>{
+        setRtStatus(status==='SUBSCRIBED' ? 'live' : 'connecting');
+      });
+    return ()=>{ sb.removeChannel(channel); };
+  },[loadAll]);
+
+  const today     = todayISO();
+  const todayLogs = allLogs.filter(l=>l.start_time.startsWith(today));
+  const active    = allLogs.filter(l=>!l.end_time);
+  const done      = allLogs.filter(l=>l.end_time && l.duration_secs);
+  const todaySec  = todayLogs.filter(l=>l.duration_secs).reduce((s,l)=>s+l.duration_secs,0);
+  const avgSec    = done.length ? Math.round(done.reduce((s,l)=>s+l.duration_secs,0)/done.length) : 0;
 
   return (
     <div className="panel">
       <div className="phd">
-        <div><h1 className="ptitle">Dashboard</h1><p className="psub">Today's overview</p></div>
-        <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        <div>
+          <h1 className="ptitle">Dashboard</h1>
+          <p className="psub">All agents · live data</p>
+        </div>
+        <div className="fc g10">
+          <span className={`rt-pill`}>
+            <span className="rt-dot"/>
+            {rtStatus==='live' ? 'Live' : 'Connecting…'}
+          </span>
+          <button className="bs" onClick={loadAll}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
       </div>
-      <div className="sg4">
-        <StatCard n="activity" label="Total All-Time" value={stats.total}/>
-        <StatCard n="timer"    label="On Break Now"   value={stats.active} accent={stats.active>0} warn={stats.active>=maxB}/>
-        <StatCard n="sun"      label="Breaks Today"   value={stats.today}/>
-        <StatCard n="clock"    label="Avg Duration"   value={durStr(stats.avgSec)}/>
-      </div>
-      <div className="sg3">
-        <StatCard n="trending" label="Today's Total Break Time" value={durStr(stats.todaySec)}/>
-        <StatCard n="users"    label="Max Concurrent Allowed"   value={maxB}/>
-        <StatCard n="activity" label="Capacity Used"
-          value={`${stats.active}/${maxB}`}
-          accent={stats.active>0&&stats.active<maxB}
-          warn={stats.active>=maxB}/>
-      </div>
-      <div className="sc">
-        <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-title">Recent Activity</h2></div>
-        {loading ? <div className="es"><div className="spin"/></div>
-          : recent.length===0 ? <div className="es"><span className="es-ic"><Ic n="activity" size={36} sw={1.2}/></span><p>No breaks yet</p></div>
-          : <LogTable logs={recent}/>}
-      </div>
+
+      {err && <div className="err-box"><Ic n="alert" size={14}/> {err}</div>}
+
+      {loading ? <div className="es"><div className="spin"/></div> : (
+        <>
+          <div className="sg4">
+            <StatCard n="activity" label="Total All-Time"      value={allLogs.length}/>
+            <StatCard n="timer"    label="On Break Now"        value={active.length}  ac={active.length>0&&active.length<maxB} wn={active.length>=maxB}/>
+            <StatCard n="sun"      label="Breaks Today"        value={todayLogs.length}/>
+            <StatCard n="clock"    label="Avg Duration"        value={durStr(avgSec)}/>
+          </div>
+          <div className="sg3">
+            <StatCard n="trending" label="Today's Total Time"  value={durStr(todaySec)}/>
+            <StatCard n="users"    label="Max Concurrent"      value={maxB}/>
+            <StatCard n="wifi"     label="Capacity"            value={`${active.length}/${maxB}`} ac={active.length>0&&active.length<maxB} wn={active.length>=maxB}/>
+          </div>
+
+          {active.length>0 && (
+            <div className="sc" style={{marginBottom:16}}>
+              <div className="sc-hd"><span className="live-dot"/><h2 className="sc-title">Currently on Break ({active.length})</h2></div>
+              <LogTable logs={active}/>
+            </div>
+          )}
+
+          <div className="sc">
+            <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-title">Recent Breaks</h2></div>
+            {allLogs.length===0
+              ? <div className="es"><span className="es-ic"><Ic n="activity" size={36} sw={1.2}/></span><p>No breaks logged yet</p></div>
+              : <LogTable logs={allLogs.slice(0,15)} showDate/>
+            }
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-/* ── Admin Live ─────────────────────────────────────────────────────────── */
+/* ── Admin Live ──────────────────────────────────────────────────────────── */
 function ALive() {
-  const [live, setLive]   = useState([]);
-  const [maxB, setMaxB]   = useState(3);
-  const [loading,setLoad] = useState(true);
+  const [live,    setLive]   = useState([]);
+  const [maxB,    setMaxB]   = useState(3);
+  const [loading, setLoading]= useState(true);
+  const [err,     setErr]    = useState('');
+  const [rtStatus,setRtStatus]=useState('connecting');
 
-  const load = async () => {
-    const [{ data }, { data: cfg }] = await Promise.all([
-      sb.from('bt_logs').select('*').is('end_time', null).order('start_time'),
-      sb.from('bt_settings').select('max_concurrent_breaks').eq('id',1).single(),
-    ]);
+  const loadLive = useCallback(async()=>{
+    const { data, error } = await q(sb.from('bt_logs').select('*').is('end_time',null).order('start_time'));
+    if(error){ setErr(error.message); setLoading(false); return; }
     setLive(data||[]);
-    if (cfg) setMaxB(cfg.max_concurrent_breaks);
-    setLoad(false);
-  };
-  useEffect(()=>{ load(); const id=setInterval(load,15000); return()=>clearInterval(id); },[]);
+    const { data:cfg } = await q(sb.from('bt_settings').select('max_concurrent_breaks').eq('id',1).single());
+    if(cfg) setMaxB(cfg.max_concurrent_breaks);
+    setLoading(false);
+  },[]);
+
+  useEffect(()=>{
+    loadLive();
+    const channel = sb.channel('admin-live')
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bt_logs'},payload=>{
+        if(!payload.new.end_time) setLive(prev=>[...prev, payload.new]);
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bt_logs'},payload=>{
+        if(payload.new.end_time){
+          setLive(prev=>prev.filter(l=>l.id!==payload.new.id));
+        } else {
+          setLive(prev=>prev.map(l=>l.id===payload.new.id ? payload.new : l));
+        }
+      })
+      .subscribe(s=>setRtStatus(s==='SUBSCRIBED'?'live':'connecting'));
+    return ()=>sb.removeChannel(channel);
+  },[loadLive]);
 
   return (
     <div className="panel">
       <div className="phd">
-        <div><h1 className="ptitle">Live Breaks</h1><p className="psub">Auto-refreshes every 15 seconds · {live.length}/{maxB} slots used</p></div>
-        <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        <div><h1 className="ptitle">Live Breaks</h1><p className="psub">{live.length}/{maxB} slots in use</p></div>
+        <div className="fc g10">
+          <span className="rt-pill"><span className="rt-dot"/>{rtStatus==='live'?'Live':'Connecting…'}</span>
+          <button className="bs" onClick={loadLive}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
       </div>
+      {err && <div className="err-box"><Ic n="alert" size={14}/> {err}</div>}
       {loading ? <div className="es"><div className="spin"/></div>
-        : live.length===0 ? (
-          <div className="es"><span className="es-ic"><Ic n="coffee" size={40} sw={1.2}/></span><p>No agents currently on break</p></div>
-        ) : (
-          <div className="sc">
-            <div className="sc-hd"><span className="live-dot"/><h2 className="sc-title">Currently on Break ({live.length})</h2></div>
-            <table className="dt">
-              <thead><tr><th>Agent</th><th>Break Started</th><th>Elapsed</th><th>Expected Type</th></tr></thead>
-              <tbody>
-                {live.map(l=>(
-                  <tr key={l.id}>
-                    <td><AvC name={l.agent_name}/></td>
-                    <td>{fmt(l.start_time)}</td>
-                    <td><LiveElSec start={l.start_time}/></td>
-                    <td><LiveType start={l.start_time}/></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
+        : live.length===0
+          ? <div className="es"><span className="es-ic"><Ic n="coffee" size={40} sw={1.2}/></span><p>No agents currently on break</p></div>
+          : (
+            <div className="sc">
+              <div className="sc-hd"><span className="live-dot"/><h2 className="sc-title">On Break Now</h2></div>
+              <table className="dt">
+                <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th><th>Predicted Type</th></tr></thead>
+                <tbody>
+                  {live.map(l=>(
+                    <tr key={l.id}>
+                      <td><AvC name={l.agent_name}/></td>
+                      <td>{fmt(l.start_time)}</td>
+                      <td><LiveSec start={l.start_time}/></td>
+                      <td><LiveType start={l.start_time}/></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
       }
     </div>
   );
 }
 
-/* ── Admin All Logs ─────────────────────────────────────────────────────── */
+/* ── Admin All Logs ───────────────────────────────────────────────────────── */
 function ALogs() {
   const [logs,    setLogs]   = useState([]);
   const [filter,  setFilter] = useState('');
   const [date,    setDate]   = useState('');
-  const [loading, setLoad]   = useState(true);
+  const [loading, setLoading]= useState(true);
+  const [err,     setErr]    = useState('');
 
   useEffect(()=>{
-    sb.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(500)
-      .then(({data})=>{ setLogs(data||[]); setLoad(false); });
+    q(sb.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(500))
+      .then(({data,error})=>{
+        if(error) setErr(error.message);
+        setLogs(data||[]);
+        setLoading(false);
+      });
   },[]);
 
   const filtered = logs.filter(l=>{
@@ -878,69 +794,75 @@ function ALogs() {
           <button className="bs" onClick={()=>exportCSV(filtered)}><Ic n="download" size={14}/> Export CSV</button>
         </div>
       </div>
+      {err && <div className="err-box"><Ic n="alert" size={14}/> {err}</div>}
       {loading ? <div className="es"><div className="spin"/></div>
-        : filtered.length===0 ? <div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No records found</p></div>
-        : <LogTable logs={filtered} showDate/>}
+        : filtered.length===0
+          ? <div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No records found</p></div>
+          : <div className="sc"><LogTable logs={filtered} showDate/></div>
+      }
     </div>
   );
 }
 
-/* ── Admin Analytics ────────────────────────────────────────────────────── */
+/* ── Admin Analytics ─────────────────────────────────────────────────────── */
 function AAnalytics() {
   const [days,    setDays]  = useState([]);
   const [agents,  setAgents]= useState([]);
-  const [loading, setLoad]  = useState(true);
+  const [loading, setLoading]= useState(true);
+  const [err,     setErr]   = useState('');
 
   useEffect(()=>{
-    sb.from('bt_logs').select('agent_name,start_time,duration_secs,break_type').not('duration_secs','is',null)
-      .order('start_time',{ascending:false}).limit(1000)
-      .then(({data})=>{
-        if (!data) return;
-        /* Group by calendar day */
+    q(sb.from('bt_logs').select('agent_name,start_time,duration_secs,break_type')
+      .not('duration_secs','is',null)
+      .order('start_time',{ascending:false}).limit(2000))
+      .then(({data,error})=>{
+        if(error){ setErr(error.message); setLoading(false); return; }
+        const rows = data||[];
+
+        // Group by day
         const byDay = {};
-        data.forEach(l => {
+        rows.forEach(l=>{
           const d = l.start_time.slice(0,10);
-          if (!byDay[d]) byDay[d] = { count:0, totalSec:0 };
+          if(!byDay[d]) byDay[d]={count:0,totalSec:0};
           byDay[d].count++;
           byDay[d].totalSec += l.duration_secs||0;
         });
-        const dayArr = Object.entries(byDay).map(([date,v])=>({
-          date, count:v.count, totalSec:v.totalSec, avgSec: Math.round(v.totalSec/v.count)
-        })).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,14);
+        const dayArr = Object.entries(byDay)
+          .map(([date,v])=>({date,count:v.count,totalSec:v.totalSec,avgSec:Math.round(v.totalSec/v.count)}))
+          .sort((a,b)=>b.date.localeCompare(a.date)).slice(0,14);
         setDays(dayArr);
 
-        /* Group by agent */
+        // Group by agent
         const byAgent = {};
-        data.forEach(l => {
-          if (!byAgent[l.agent_name]) byAgent[l.agent_name] = { count:0, totalSec:0 };
+        rows.forEach(l=>{
+          if(!byAgent[l.agent_name]) byAgent[l.agent_name]={count:0,totalSec:0};
           byAgent[l.agent_name].count++;
           byAgent[l.agent_name].totalSec += l.duration_secs||0;
         });
-        const agentArr = Object.entries(byAgent).map(([name,v])=>({
-          name, count:v.count, totalSec:v.totalSec, avgSec: Math.round(v.totalSec/v.count)
-        })).sort((a,b)=>b.totalSec-a.totalSec);
+        const agentArr = Object.entries(byAgent)
+          .map(([name,v])=>({name,count:v.count,totalSec:v.totalSec,avgSec:Math.round(v.totalSec/v.count)}))
+          .sort((a,b)=>b.totalSec-a.totalSec);
         setAgents(agentArr);
-        setLoad(false);
+        setLoading(false);
       });
   },[]);
 
-  const overallAvgDay = days.length ? Math.round(days.reduce((s,d)=>s+d.avgSec,0)/days.length) : 0;
+  const overallAvg = days.length ? Math.round(days.reduce((s,d)=>s+d.avgSec,0)/days.length) : 0;
 
   return (
     <div className="panel">
-      <div className="phd"><div><h1 className="ptitle">Analytics</h1><p className="psub">Break patterns over the last 14 days</p></div></div>
-
-      <div className="sg3" style={{marginBottom:24}}>
-        <StatCard n="trending" label="Days tracked"        value={days.length}/>
-        <StatCard n="clock"    label="Overall avg/session" value={durStr(overallAvgDay)}/>
-        <StatCard n="users"    label="Agents tracked"      value={agents.length}/>
-      </div>
-
+      <div className="phd"><div><h1 className="ptitle">Analytics</h1><p className="psub">Break patterns · last 14 days</p></div></div>
+      {err && <div className="err-box"><Ic n="alert" size={14}/> {err}</div>}
       {loading ? <div className="es"><div className="spin"/></div> : (
         <>
+          <div className="sg3" style={{marginBottom:24}}>
+            <StatCard n="sun"      label="Days tracked"        value={days.length}/>
+            <StatCard n="clock"    label="Overall avg/session" value={durStr(overallAvg)}/>
+            <StatCard n="users"    label="Agents tracked"      value={agents.length}/>
+          </div>
           <div className="sc" style={{marginBottom:16}}>
             <div className="sc-hd"><span className="sc-ic"><Ic n="sun" size={15}/></span><h2 className="sc-title">Daily Breakdown</h2></div>
-            {days.length===0 ? <div className="es"><p>No data</p></div> : (
+            {days.length===0 ? <div className="es"><p>No completed breaks yet</p></div> : (
               <table className="dt">
                 <thead><tr><th>Date</th><th>Breaks</th><th>Total Time</th><th>Avg per Break</th></tr></thead>
                 <tbody>
@@ -956,10 +878,9 @@ function AAnalytics() {
               </table>
             )}
           </div>
-
           <div className="sc">
             <div className="sc-hd"><span className="sc-ic"><Ic n="users" size={15}/></span><h2 className="sc-title">Per Agent</h2></div>
-            {agents.length===0 ? <div className="es"><p>No data</p></div> : (
+            {agents.length===0 ? <div className="es"><p>No data yet</p></div> : (
               <table className="dt">
                 <thead><tr><th>Agent</th><th>Sessions</th><th>Total Time</th><th>Avg per Break</th></tr></thead>
                 <tbody>
@@ -981,71 +902,78 @@ function AAnalytics() {
   );
 }
 
-/* ── Admin Settings ─────────────────────────────────────────────────────── */
+/* ── Admin Settings ──────────────────────────────────────────────────────── */
 function ASettings() {
   const [maxB,  setMaxB]  = useState(3);
   const [saved, setSaved] = useState(false);
   const [busy,  setBusy]  = useState(false);
+  const [err,   setErr]   = useState('');
 
   useEffect(()=>{
-    sb.from('bt_settings').select('max_concurrent_breaks').eq('id',1).single()
-      .then(({data})=>{ if(data) setMaxB(data.max_concurrent_breaks); });
+    q(sb.from('bt_settings').select('max_concurrent_breaks').eq('id',1).single())
+      .then(({data,error})=>{
+        if(error && error.code!=='PGRST116') setErr('Load error: '+error.message);
+        if(data) setMaxB(data.max_concurrent_breaks);
+      });
   },[]);
 
-  const save = async () => {
-    setBusy(true);
-    await sb.from('bt_settings').upsert({ id:1, max_concurrent_breaks: maxB, updated_at: new Date().toISOString() });
+  const save = async()=>{
+    setBusy(true); setErr(''); setSaved(false);
+    const { error } = await q(
+      sb.from('bt_settings').upsert({
+        id: 1,
+        max_concurrent_breaks: maxB,
+        updated_at: new Date().toISOString()
+      }, { onConflict:'id' })
+    );
+    if(error){ setErr('Save error: '+error.message); setBusy(false); return; }
     setSaved(true); setBusy(false);
-    setTimeout(()=>setSaved(false), 2500);
+    setTimeout(()=>setSaved(false), 3000);
   };
 
   return (
     <div className="panel">
       <div className="phd"><div><h1 className="ptitle">Settings</h1><p className="psub">Team break configuration</p></div></div>
+      {err && <div className="err-box"><Ic n="alert" size={14}/> {err}</div>}
 
       <div className="sblock">
         <h2 className="sh">Max concurrent breaks</h2>
-        <p className="sd" style={{marginBottom:20}}>
-          Set the maximum number of agents allowed on break at the same time.
-          Adjust this daily based on how many agents are working — the rule is no more than half the team on break simultaneously.
-        </p>
+        <p className="sd">How many agents can be on break at the same time. Adjust daily based on how many agents are working — the rule is no more than half the team simultaneously.</p>
         <div className="num-input">
           <button className="num-btn" onClick={()=>setMaxB(n=>Math.max(1,n-1))}>−</button>
           <div className="num-val">{maxB}</div>
           <button className="num-btn" onClick={()=>setMaxB(n=>n+1)}>+</button>
         </div>
-        <p style={{fontSize:12,color:'var(--muted)',marginTop:12}}>
-          Agents will be blocked from starting a new break when this limit is reached.
-        </p>
+        <p style={{fontSize:12,color:'var(--muted)',marginTop:12}}>Agents see a warning and cannot start a break when this limit is reached.</p>
         <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
           <button className="bp" onClick={save} disabled={busy}>
-            {busy ? <span className="spin-sm"/> : 'Save'}
+            {busy?<span className="spin-sm"/>:'Save'}
           </button>
-          {saved && <span style={{color:'var(--accent)',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}><Ic n="check" size={14}/> Saved</span>}
+          {saved && <span style={{color:'var(--accent)',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}><Ic n="check" size={14}/> Saved successfully</span>}
         </div>
       </div>
 
       <div className="sblock">
         <h2 className="sh">Break type thresholds</h2>
-        <p className="sd">Breaks are automatically classified when an agent returns:</p>
+        <p className="sd">Assigned automatically when an agent returns from break:</p>
         <table className="dt" style={{marginTop:0}}>
           <thead><tr><th>Type</th><th>Duration</th></tr></thead>
           <tbody>
-            <tr><td><BreakBadge type="Bathroom Break"/></td><td>Less than 15 minutes</td></tr>
-            <tr><td><BreakBadge type="Break"/></td><td>15 minutes to 1 hour</td></tr>
-            <tr><td><BreakBadge type="Lunch Break"/></td><td>More than 1 hour</td></tr>
+            <tr><td><BBadge type="Bathroom Break"/></td><td>Less than 15 minutes</td></tr>
+            <tr><td><BBadge type="Break"/></td><td>15 minutes to 1 hour</td></tr>
+            <tr><td><BBadge type="Lunch Break"/></td><td>More than 1 hour</td></tr>
           </tbody>
         </table>
       </div>
 
       <div className="sblock">
-        <h2 className="sh">User management</h2>
-        <p className="sd">Users are managed directly in Supabase. To add or configure an agent:</p>
+        <h2 className="sh">Adding users</h2>
+        <p className="sd">Users are managed in Supabase Auth. After inviting a user, set their metadata:</p>
         <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px',fontFamily:'monospace',fontSize:12,color:'#aaa',lineHeight:2}}>
-          Auth → Users → Invite user<br/>
-          Then edit user → Raw User Meta Data →<br/>
-          {'{ "role": "agent", "display_name": "Jane Smith" }'}<br/>
-          {'{ "role": "admin", "display_name": "Admin Name" }'}
+          Auth → Users → Invite user → set password<br/>
+          Edit user → Raw User Meta Data:<br/>
+          <span style={{color:'var(--accent)'}}>{`{ "role": "agent", "display_name": "Jane Smith" }`}</span><br/>
+          <span style={{color:'var(--accent)'}}>{`{ "role": "admin", "display_name": "Admin Name" }`}</span>
         </div>
       </div>
     </div>
@@ -1055,9 +983,9 @@ function ASettings() {
 /* ══════════════════════════════════════════════════════════════════════════
    SHARED COMPONENTS
 ══════════════════════════════════════════════════════════════════════════ */
-function StatCard({ n, label, value, accent, warn }) {
+function StatCard({ n, label, value, ac, wn }) {
   return (
-    <div className={`stat${accent?' ac':''}${warn?' warn':''}`}>
+    <div className={`stat${ac?' ac':''}${wn?' wn':''}`}>
       <div className="stat-ic"><Ic n={n} size={16} sw={1.8}/></div>
       <div className="stat-val">{value}</div>
       <div className="stat-lbl">{label}</div>
@@ -1069,32 +997,29 @@ function AvC({ name }) {
   return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span></div>;
 }
 
-function BreakBadge({ type }) {
-  if (!type) return null;
-  return <span className={`badge ${TYPE_STYLE[type]||'b-break'}`}><Ic n={TYPE_ICON[type]||'coffee'} size={10} sw={2} style={{marginRight:4}}/>{type}</span>;
+function BBadge({ type }) {
+  if(!type) return null;
+  return <span className={`badge ${TYPE_CLS[type]||'b-break'}`}>{type}</span>;
 }
 
-/* Live elapsed counter — shows seconds ticking */
-function LiveElSec({ start }) {
-  const [secs, setSecs] = useState(Math.round((Date.now() - new Date(start).getTime()) / 1000));
-  useEffect(() => {
-    const id = setInterval(() => setSecs(Math.round((Date.now() - new Date(start).getTime()) / 1000)), 1000);
-    return () => clearInterval(id);
-  }, [start]);
-  return <span className="mono ac-txt" style={{fontWeight:700}}>{tStr(secs)}</span>;
+function LiveSec({ start }) {
+  const [s, setS] = useState(Math.round((Date.now()-new Date(start).getTime())/1000));
+  useEffect(()=>{
+    const id = setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),1000);
+    return ()=>clearInterval(id);
+  },[start]);
+  return <span className="mono ac-txt" style={{fontWeight:700}}>{tStr(Math.max(0,s))}</span>;
 }
 
-/* Shows predicted break type live */
 function LiveType({ start }) {
-  const [secs, setSecs] = useState(Math.round((Date.now() - new Date(start).getTime()) / 1000));
-  useEffect(() => {
-    const id = setInterval(() => setSecs(Math.round((Date.now() - new Date(start).getTime()) / 1000)), 5000);
-    return () => clearInterval(id);
-  }, [start]);
-  return <BreakBadge type={breakType(secs)}/>;
+  const [s, setS] = useState(Math.round((Date.now()-new Date(start).getTime())/1000));
+  useEffect(()=>{
+    const id = setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),5000);
+    return ()=>clearInterval(id);
+  },[start]);
+  return <BBadge type={breakType(s)}/>;
 }
 
-/* Reusable log table */
 function LogTable({ logs, showDate }) {
   return (
     <table className="dt">
@@ -1109,14 +1034,14 @@ function LogTable({ logs, showDate }) {
         </tr>
       </thead>
       <tbody>
-        {logs.map(l => (
+        {logs.map(l=>(
           <tr key={l.id}>
             <td><AvC name={l.agent_name}/></td>
             {showDate && <td style={{color:'var(--muted)',fontSize:12}}>{fmtD(l.start_time)}</td>}
             <td>{fmt(l.start_time)}</td>
             <td>{l.end_time ? fmt(l.end_time) : <span className="badge b-active">On Break</span>}</td>
-            <td>{l.duration_secs ? durStr(l.duration_secs) : l.end_time ? '—' : <LiveElSec start={l.start_time}/>}</td>
-            <td>{l.break_type ? <BreakBadge type={l.break_type}/> : l.end_time ? '—' : <LiveType start={l.start_time}/>}</td>
+            <td>{l.duration_secs!=null ? durStr(l.duration_secs) : l.end_time ? '—' : <LiveSec start={l.start_time}/>}</td>
+            <td>{l.break_type ? <BBadge type={l.break_type}/> : l.end_time ? '—' : <LiveType start={l.start_time}/>}</td>
           </tr>
         ))}
       </tbody>
@@ -1124,9 +1049,6 @@ function LogTable({ logs, showDate }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   BOOT
-══════════════════════════════════════════════════════════════════════════ */
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
