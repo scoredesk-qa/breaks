@@ -283,7 +283,7 @@ function App() {
   if(phase==='login') return <Login/>;
   if(!user) return <Splash/>;
 
-  const role = user.user_metadata?.role;
+  const role = user.user_metadata?.app_role;
   const name = user.user_metadata?.display_name || user.email;
   const logout = ()=> sb.auth.signOut();
 
