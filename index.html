@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>BreakTrack</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233ECF8E'/%3E%3Cpath d='M19 4L7 18h9l-1 10 12-14h-9z' fill='%23000'/%3E%3C/svg%3E"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0d;--surf:#141414;--card:#1a1a1a;--bdr:#252525;
+  --acc:#3ECF8E;--acc-d:rgba(62,207,142,.10);--acc-r:rgba(62,207,142,.20);
+  --txt:#ededed;--mut:#666;--dan:#f05252;--wrn:#eab308;
+  --dan-d:rgba(240,82,82,.10);--wrn-d:rgba(234,179,8,.10);
+  --font:'Manrope',sans-serif;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--txt);font-family:var(--font);font-size:14px}
+/* ── Spinner ── */
+.spl{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px}
+.spin{width:28px;height:28px;border:2.5px solid var(--bdr);border-top-color:var(--acc);border-radius:50%;animation:rot .7s linear infinite}
+.spin-sm{width:14px;height:14px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+/* ── Auth ── */
+.auth-bg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(62,207,142,.06) 0%,transparent 70%)}
+.auth-card{background:var(--surf);border:1px solid var(--bdr);border-radius:16px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.auth-h{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+.auth-s{color:var(--mut);font-size:13px;margin-bottom:28px;line-height:1.6}
+/* ── Logo ── */
+.lm{background:var(--acc);color:#000;border-radius:8px;display:flex;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0}
+.lm.sm{width:24px;height:24px;border-radius:6px}
+.lt{font-size:16px;font-weight:800;letter-spacing:-.3px}
+/* ── Form ── */
+.fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.fl{font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.5px;text-transform:uppercase}
+.fi{background:var(--card);border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;color:var(--txt);font-size:14px;font-family:var(--font);outline:none;width:100%;transition:border .18s,box-shadow .18s}
+.fi:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-r)}
+.fi::placeholder{color:#2e2e2e}
+.iw{position:relative}
+.eb{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--mut);cursor:pointer;display:flex;padding:4px}
+.eb:hover{color:var(--txt)}
+/* ── Buttons ── */
+.bp{background:var(--acc);color:#000;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:opacity .15s,transform .12s;white-space:nowrap}
+.bp:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
+.bp:disabled{opacity:.4;cursor:not-allowed}
+.bp.full{width:100%;justify-content:center;margin-top:4px}
+.bs{background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s;white-space:nowrap}
+.bs:hover{border-color:var(--acc)}
+.ib{background:none;border:1px solid transparent;border-radius:6px;color:var(--mut);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:6px;transition:color .15s,background .15s}
+.ib:hover{color:var(--txt);background:var(--card)}
+/* ── Alerts ── */
+.aerr{display:flex;align-items:center;gap:7px;color:var(--dan);font-size:13px;background:var(--dan-d);border:1px solid rgba(240,82,82,.2);border-radius:8px;padding:9px 12px;margin-bottom:12px}
+.awrn{display:flex;align-items:center;gap:8px;color:var(--wrn);font-size:13px;background:var(--wrn-d);border:1px solid rgba(234,179,8,.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-weight:600}
+/* ── Agent layout ── */
+.ag-root{min-height:100vh;display:flex;flex-direction:column}
+.ag-hd{background:var(--surf);border-bottom:1px solid var(--bdr);padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.ag-body{flex:1;max-width:720px;margin:0 auto;width:100%;padding:28px 20px;display:flex;flex-direction:column;gap:16px}
+/* ── Clock card ── */
+.clk-card{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.clk-info{display:flex;flex-direction:column;gap:4px}
+.clk-title{font-size:13px;font-weight:700}
+.clk-sub{font-size:12px;color:var(--mut)}
+.clk-status{display:flex;align-items:center;gap:8px}
+.clk-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.clk-dot.in{background:var(--acc);animation:pulse-a 2s ease-in-out infinite}
+.clk-dot.out{background:var(--mut)}
+@keyframes pulse-a{0%,100%{box-shadow:0 0 0 0 var(--acc-r)}50%{box-shadow:0 0 0 8px transparent}}
+/* ── Break card ── */
+.bcard{background:var(--surf);border:1px solid var(--bdr);border-radius:16px;overflow:hidden}
+.bcard-top{padding:40px 32px 24px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.bcard-foot{border-top:1px solid var(--bdr);padding:18px 32px;display:flex;justify-content:center}
+.pring{padding:14px;border-radius:50%;background:var(--card);border:2px solid var(--bdr);transition:all .3s}
+.pring.on{background:var(--acc-d);border-color:var(--acc-r);animation:pulse-a 2s ease-in-out infinite}
+.bic{color:var(--mut);display:flex;transition:color .3s}
+.bic.on{color:var(--acc)}
+.tbig{font-size:56px;font-weight:800;letter-spacing:-2px;color:var(--acc);font-variant-numeric:tabular-nums;line-height:1}
+.tlbl{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:2px}
+.ttype{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+.tsince{font-size:12px;color:var(--mut)}
+.idle-h{font-size:17px;font-weight:700}
+.idle-s{font-size:13px;color:var(--mut)}
+.btn-go{background:var(--acc);color:#000;border:none;border-radius:10px;padding:12px 36px;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s,transform .12s}
+.btn-go:hover{opacity:.88;transform:translateY(-1px)}
+.btn-go:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-end{background:var(--dan-d);color:var(--dan);border:1px solid rgba(240,82,82,.25);border-radius:10px;padding:12px 36px;font-size:15px;font-weight:700;font-family:var(--font);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+.btn-end:hover{background:rgba(240,82,82,.18)}
+/* ── Day bar ── */
+.dbar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.dst{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:5px}
+.dv{font-size:20px;font-weight:800;letter-spacing:-.5px}
+.dl{font-size:11px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+/* ── Section card ── */
+.sc{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;overflow:hidden}
+.sc-hd{padding:13px 18px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px}
+.sc-t{font-size:13px;font-weight:700}
+.sc-ic{color:var(--mut);display:flex}
+.ldot{width:8px;height:8px;border-radius:50%;background:var(--acc);animation:pulse-a 1.5s ease-in-out infinite;flex-shrink:0}
+/* ── Admin layout ── */
+.adm{display:flex;min-height:100vh}
+.sb{width:220px;min-height:100vh;background:var(--surf);border-right:1px solid var(--bdr);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-logo{padding:18px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:10px}
+.sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.ni{background:none;border:none;border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:10px;color:var(--mut);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:background .15s,color .15s;text-align:left;width:100%}
+.ni:hover{background:var(--card);color:var(--txt)}
+.ni.on{background:var(--acc-d);color:var(--acc)}
+.na{margin-left:auto;display:flex}
+.sb-ft{padding:14px;border-top:1px solid var(--bdr);display:flex;align-items:center;gap:10px}
+.sbu{flex:1;min-width:0}
+.sbn{font-size:13px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbr{font-size:11px;color:var(--mut);display:block}
+.adm-main{flex:1;min-width:0;overflow-x:auto}
+/* ── Panel ── */
+.panel{padding:28px}
+.phd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.pt{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.ps{font-size:13px;color:var(--mut);margin-top:3px}
+.phr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+/* ── Stats ── */
+.sg4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.sg3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.sg2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px}
+.stat{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px}
+.stat.ac{border-color:var(--acc-r);background:var(--acc-d)}
+.stat.wn{border-color:rgba(234,179,8,.3);background:var(--wrn-d)}
+.stic{color:var(--mut);display:flex}
+.stat.ac .stic{color:var(--acc)}
+.stat.wn .stic{color:var(--wrn)}
+.stv{font-size:26px;font-weight:800;letter-spacing:-1px}
+.stl{font-size:12px;color:var(--mut);font-weight:500}
+/* ── Table ── */
+.dt{width:100%;border-collapse:collapse;font-size:13.5px}
+.dt th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap}
+.dt td{padding:11px 16px;border-bottom:1px solid #1c1c1c;vertical-align:middle}
+.dt tbody tr:last-child td{border-bottom:none}
+.dt tbody tr:hover td{background:rgba(255,255,255,.018)}
+/* ── Avatar ── */
+.av{width:28px;height:28px;border-radius:50%;background:var(--acc-d);color:var(--acc);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--acc-r)}
+.hdn{font-size:13px;font-weight:600;color:var(--mut)}
+.fc{display:flex;align-items:center}
+.g4{gap:4px}.g6{gap:6px}.g8{gap:8px}.g10{gap:10px}
+.es{padding:40px 20px;text-align:center;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:10px;font-size:13px}
+.es-ic{opacity:.2;display:flex}
+.mono{font-family:'Courier New',monospace}
+.act{color:var(--acc)}
+.si{background:var(--card);border:1px solid var(--bdr);border-radius:8px;padding:8px 14px;color:var(--txt);font-size:13px;font-family:var(--font);outline:none;width:180px;transition:border .18s}
+.si:focus{border-color:var(--acc)}
+.si::placeholder{color:#2e2e2e}
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+.b-on{background:#2b1e00;color:#eab308;border:1px solid #3d2e00}
+.b-done{background:#0f2b1e;color:#3ECF8E;border:1px solid #1a4030}
+.b-lunch{background:#1a0d2b;color:#a78bfa;border:1px solid #2d1a4a}
+.b-bath{background:#0d1f2b;color:#67e8f9;border:1px solid #1a3540}
+.b-brk{background:#1e1f0d;color:#86efac;border:1px solid #2b3016}
+.b-in{background:#0f2b1e;color:#3ECF8E;border:1px solid #1a4030}
+.b-out{background:var(--card);color:var(--mut);border:1px solid var(--bdr)}
+/* ── Settings ── */
+.sblk{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:24px;margin-bottom:16px}
+.sh{font-size:15px;font-weight:700;margin-bottom:8px}
+.sd{font-size:13px;color:var(--mut);margin-bottom:16px;line-height:1.6}
+.num-wrap{display:flex;align-items:center;gap:12px}
+.nb{width:36px;height:36px;background:var(--card);border:1px solid var(--bdr);border-radius:8px;color:var(--txt);font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s;line-height:1;font-family:var(--font)}
+.nb:hover{border-color:var(--acc);color:var(--acc)}
+.nv{font-size:32px;font-weight:800;color:var(--acc);min-width:50px;text-align:center}
+/* ── RT pill ── */
+.rtp{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--acc);background:var(--acc-d);border:1px solid var(--acc-r);border-radius:20px;padding:3px 10px}
+.rtd{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:pulse-a 1.2s ease-in-out infinite}
+/* ── Error box ── */
+.ebox{background:var(--dan-d);border:1px solid rgba(240,82,82,.25);border-radius:10px;padding:14px 18px;color:var(--dan);font-size:13px;line-height:1.6;margin-bottom:16px;display:flex;align-items:flex-start;gap:8px}
+
+@media(max-width:900px){
+  .sg4{grid-template-columns:repeat(2,1fr)}
+  .sg3{grid-template-columns:repeat(2,1fr)}
+  .dbar{grid-template-columns:1fr 1fr}
+  .sb{width:52px}
+  .sb-logo span,.sbn,.sbr,.ni span,.sbu,.na{display:none}
+  .ni{justify-content:center;padding:12px}
+  .sb-ft{justify-content:center;padding:12px}
+  .sb-logo{justify-content:center;padding:12px}
+  .panel{padding:18px 12px}
+}
+
+/* ── Live Clock ── */
+.live-clock{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:20px 24px;display:flex;align-items:center;justify-content:center;gap:0}
+.clk-seg{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:72px}
+.clk-num{font-size:48px;font-weight:800;letter-spacing:-1px;color:var(--txt);font-variant-numeric:tabular-nums;line-height:1;font-family:'Courier New',monospace}
+.clk-unit{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:2px}
+.clk-sep{font-size:44px;font-weight:300;color:var(--bdr);margin:0 4px;line-height:1;padding-bottom:18px;align-self:flex-start;margin-top:2px}
+.clk-day-val{font-size:48px;font-weight:800;color:var(--acc);letter-spacing:1px;line-height:1;font-family:'Manrope',sans-serif}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- !! REPLACE THESE WITH YOUR SUPABASE CREDENTIALS !! -->
+<script>
+  window.BT_URL = 'https://bmfwgyruomldxebinwcr.supabase.co';
+  window.BT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw';
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ── Supabase ── */
+const SB = supabase.createClient(window.BT_URL, window.BT_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+
+/* ── Icons ── */
+const PATHS = {
+  zap:      "M13 2L3 14h9l-1 8 10-12h-9z",
+  logout:   ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
+  coffee:   ["M18 8h1a4 4 0 0 1 0 8h-1","M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z","M6 1v3","M10 1v3","M14 1v3"],
+  timer:    ["M10 2h4","M12 14l4-4","M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"],
+  clock:    ["M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z","M12 6v6l4 2"],
+  play:     "M5 3l14 9-14 9V3z",
+  stop:     "M6 6h12v12H6z",
+  users:    ["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
+  grid:     ["M3 3h7v7H3z","M14 3h7v7h-7z","M14 14h7v7h-7z","M3 14h7v7H3z"],
+  settings: ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"],
+  chevron:  "M9 18l6-6-6-6",
+  download: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","M7 10l5 5 5-5","M12 15V3"],
+  eye:      ["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z","M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"],
+  eyeoff:   ["M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94","M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19","M1 1l22 22","M10.59 10.59A3 3 0 0 0 14.83 15"],
+  alert:    ["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z","M12 9v4","M12 17h.01"],
+  check:    ["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4L12 14.01l-3-3"],
+  activity: "M22 12h-4l-3 9L9 3l-3 9H2",
+  trending: ["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
+  refresh:  ["M23 4v6h-6","M1 20v-6h6","M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"],
+  login2:   ["M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4","M10 17l5-5-5-5","M15 12H3"],
+  logoff:   ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
+  sun:      ["M12 2v2","M12 20v2","M4.93 4.93l1.41 1.41","M17.66 17.66l1.41 1.41","M2 12h2","M20 12h2","M6.34 17.66l-1.41 1.41","M19.07 4.93l-1.41 1.41","M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
+  moon:     ["M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"],
+};
+const Ic = ({ n, size=16, sw=1.8, col }) => {
+  const d = PATHS[n] || "M12 12h.01";
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={col||"currentColor"} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
+      style={{display:'inline-block',flexShrink:0,verticalAlign:'middle'}}>
+      {Array.isArray(d) ? d.map((p,i)=><path key={i} d={p}/>) : <path d={d}/>}
+    </svg>
+  );
+};
+
+/* ── Helpers ── */
+const pad    = n  => String(n).padStart(2,'0');
+const tStr   = s  => { s=Math.max(0,s); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60; return h>0?`${h}:${pad(m)}:${pad(sec)}`:`${pad(m)}:${pad(sec)}`; };
+const tMs    = ms => tStr(Math.floor(ms/1000));
+const fmtT   = d  => d ? new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
+const fmtD   = d  => new Date(d).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+const todayISO = () => new Date().toISOString().slice(0,10);
+const ini    = n  => (n||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+const durStr = s  => {
+  if(s==null||s===0) return '0s';
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(h>0) return `${h}h ${m}m`;
+  if(m>0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+};
+const bType  = s  => { if(s==null)return null; if(s>=3600)return'Lunch Break'; if(s>=900)return'Break'; return'Bathroom Break'; };
+const BCLS   = {'Lunch Break':'b-lunch','Break':'b-brk','Bathroom Break':'b-bath'};
+
+const csvExport = (rows) => {
+  const h = 'Agent,Date,Start,Return,Duration,Type\n';
+  const b = rows.map(r=>{
+    const d = r.end_time?Math.round((new Date(r.end_time)-new Date(r.start_time))/1000):0;
+    return `"${r.agent_name}","${fmtD(r.start_time)}","${fmtT(r.start_time)}","${fmtT(r.end_time)}","${durStr(d)}","${r.break_type||''}"`;
+  }).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([h+b],{type:'text/csv'}));
+  a.download=`breaks-${todayISO()}.csv`;a.click();
+};
+
+/* ── Safe query wrapper ── */
+const run = async(p) => { try{ return await p; }catch(e){ return {data:null,error:e}; } };
+
+/* ══════════════════════════════════════════════════════════════
+   ROOT
+══════════════════════════════════════════════════════════════ */
+function App() {
+  const [user,  setUser]  = useState(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(()=>{
+    SB.auth.getSession().then(({data:{session}})=>{
+      setUser(session?.user||null);
+      setReady(true);
+    });
+    const {data:{subscription}} = SB.auth.onAuthStateChange((_,session)=>{
+      setUser(session?.user||null);
+    });
+    return ()=>subscription.unsubscribe();
+  },[]);
+
+  if(!ready) return <Splash/>;
+  if(!user)  return <LoginPage/>;
+
+  const role = user.user_metadata?.role;
+  const name = user.user_metadata?.display_name || user.email;
+  const out  = ()=>SB.auth.signOut();
+
+  return role==='admin'
+    ? <AdminApp user={user} name={name} onLogout={out}/>
+    : <AgentApp user={user} name={name} onLogout={out}/>;
+}
+
+function Splash(){
+  return(
+    <div className="spl">
+      <div className="fc g8"><div className="lm"><Ic n="zap" size={18} sw={2.5}/></div><span className="lt">BreakTrack</span></div>
+      <div className="spin"/>
+    </div>
+  );
+}
+
+/* ── Login ── */
+function LoginPage(){
+  const [email,setEmail]=useState('');
+  const [pass,setPass]=useState('');
+  const [show,setShow]=useState(false);
+  const [err,setErr]=useState('');
+  const [busy,setBusy]=useState(false);
+
+  const go=async()=>{
+    if(!email||!pass)return;
+    setBusy(true);setErr('');
+    const{error}=await SB.auth.signInWithPassword({email:email.trim(),password:pass});
+    if(error){setErr(error.message);setBusy(false);}
+  };
+
+  return(
+    <div className="auth-bg">
+      <div className="auth-card">
+        <div className="auth-logo"><div className="lm"><Ic n="zap" size={18} sw={2.5}/></div><span className="lt">BreakTrack</span></div>
+        <h1 className="auth-h">Welcome back</h1>
+        <p className="auth-s">Sign in to your workspace</p>
+        <div className="fg">
+          <label className="fl">Email</label>
+          <input className="fi" type="email" placeholder="you@company.com" value={email}
+            onChange={e=>{setEmail(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&go()} autoFocus/>
+        </div>
+        <div className="fg">
+          <label className="fl">Password</label>
+          <div className="iw">
+            <input className="fi" type={show?'text':'password'} placeholder="••••••••" value={pass}
+              onChange={e=>{setPass(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&go()} style={{paddingRight:44}}/>
+            <button className="eb" onClick={()=>setShow(s=>!s)}><Ic n={show?'eyeoff':'eye'} size={15}/></button>
+          </div>
+        </div>
+        {err&&<div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+        <button className="bp full" onClick={go} disabled={busy||!email||!pass}>
+          {busy?<span className="spin-sm"/>:'Sign in'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AGENT
+══════════════════════════════════════════════════════════════ */
+function AgentApp({user,name,onLogout}){
+  const [clockRow,  setClockRow]  = useState(null);
+  const [active,    setActive]    = useState(null);
+  const [logs,      setLogs]      = useState([]);
+  const [elapsed,   setElapsed]   = useState(0);
+  const [maxB,      setMaxB]      = useState(3);
+  const [teamCount, setTeamCount] = useState(0);
+  const [loading,   setLoading]   = useState(true);
+  const [err,       setErr]       = useState('');
+  const timerRef = useRef(null);
+  const today = todayISO();
+
+  const load = useCallback(async()=>{
+    setLoading(true); setErr('');
+    // 1. Clock record for today
+    const {data:cr,error:e1} = await run(
+      SB.from('bt_clocklogs').select('*').eq('user_id',user.id).eq('date',today).maybeSingle()
+    );
+    if(e1){setErr(e1.message);setLoading(false);return;}
+    setClockRow(cr);
+
+    // 2. Today's break logs for this agent
+    const {data:bl,error:e2} = await run(
+      SB.from('bt_logs').select('*')
+        .eq('user_id',user.id)
+        .gte('start_time',today+'T00:00:00.000Z')
+        .order('start_time',{ascending:false})
+    );
+    if(e2){setErr(e2.message);setLoading(false);return;}
+    setLogs(bl||[]);
+    const openBreak = (bl||[]).find(l=>!l.end_time);
+    setActive(openBreak||null);
+
+    // 3. Settings + team on break count
+    const {data:cfg} = await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
+    if(cfg) setMaxB(cfg.max_concurrent_breaks);
+    const {data:tc}  = await run(SB.from('bt_logs').select('id').is('end_time',null));
+    setTeamCount((tc||[]).length);
+    setLoading(false);
+  },[user.id,today]);
+
+  useEffect(()=>{ load(); },[load]);
+
+  // ── Realtime: watch ALL bt_logs changes so team count + own logs stay live ──
+  useEffect(()=>{
+    const ch = SB.channel('agent-rt-'+user.id)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bt_logs'},({new:nw})=>{
+        // Someone else started a break → bump team count
+        if(nw.user_id !== user.id) {
+          setTeamCount(c=>c+1);
+        } else {
+          // Our own insert (shouldn't normally fire, but keep logs in sync)
+          setLogs(p=>p.some(l=>l.id===nw.id)?p:[nw,...p]);
+        }
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bt_logs'},({new:nw})=>{
+        if(nw.user_id !== user.id) {
+          // Someone else returned from break → reduce team count if they ended it
+          if(nw.end_time) setTeamCount(c=>Math.max(0,c-1));
+        } else {
+          // Our own row updated (end_time written) → sync our log list
+          setLogs(p=>p.map(l=>l.id===nw.id?nw:l));
+        }
+      })
+      .subscribe();
+    return()=>SB.removeChannel(ch);
+  },[user.id]);
+
+  // ── Polling fallback every 15s — refreshes team count silently ──
+  useEffect(()=>{
+    const poll = async()=>{
+      const {data} = await run(SB.from('bt_logs').select('id').is('end_time',null));
+      setTeamCount((data||[]).length);
+    };
+    const id = setInterval(poll, 15000);
+    return()=>clearInterval(id);
+  },[]);
+
+  // Timer
+  useEffect(()=>{
+    if(active){
+      const s = new Date(active.start_time).getTime();
+      timerRef.current = setInterval(()=>setElapsed(Date.now()-s),250);
+    } else {
+      clearInterval(timerRef.current);
+      setElapsed(0);
+    }
+    return()=>clearInterval(timerRef.current);
+  },[active]);
+
+  // ── Clock in ──
+  const clockIn = async()=>{
+    setErr('');
+    const now = new Date().toISOString();
+    const {data,error} = await run(
+      SB.from('bt_clocklogs').insert({user_id:user.id,agent_name:name,clock_in:now,date:today}).select().single()
+    );
+    if(error){setErr('Clock-in failed: '+error.message);return;}
+    setClockRow(data);
+  };
+
+  // ── Clock out ──
+  const clockOut = async()=>{
+    if(!clockRow)return;
+    setErr('');
+    const now = new Date().toISOString();
+    const {data,error} = await run(
+      SB.from('bt_clocklogs').update({clock_out:now}).eq('id',clockRow.id).select().single()
+    );
+    if(error){setErr('Clock-out failed: '+error.message);return;}
+    setClockRow(data);
+  };
+
+  // ── Start break ──
+  const startBreak = async()=>{
+    setErr('');
+    const {data:tc} = await run(SB.from('bt_logs').select('id').is('end_time',null));
+    if((tc||[]).length>=maxB){setErr(`All ${maxB} break slots are taken. Please wait.`);return;}
+    const now = new Date().toISOString();
+    const {data,error} = await run(
+      SB.from('bt_logs').insert({user_id:user.id,agent_name:name,start_time:now}).select().single()
+    );
+    if(error){setErr('Could not start break: '+error.message);return;}
+    setActive(data);
+    setLogs(p=>[data,...p]);
+    setTeamCount(c=>c+1);
+  };
+
+  // ── End break ──
+  const endBreak = async()=>{
+    if(!active)return;
+    setErr('');
+    const now     = new Date().toISOString();
+    const durSecs = Math.round((new Date(now)-new Date(active.start_time))/1000);
+    const bt      = bType(durSecs);
+    const {error} = await run(
+      SB.from('bt_logs').update({end_time:now,duration_secs:durSecs,break_type:bt}).eq('id',active.id)
+    );
+    if(error){setErr('Could not end break: '+error.message);return;}
+    setLogs(p=>p.map(l=>l.id===active.id?{...l,end_time:now,duration_secs:durSecs,break_type:bt}:l));
+    setActive(null);
+    setTeamCount(c=>Math.max(0,c-1));
+  };
+
+  const done     = logs.filter(l=>l.end_time);
+  const totalSec = done.reduce((s,l)=>s+(l.duration_secs||0),0);
+  const predType = active ? bType(Math.floor(elapsed/1000)) : null;
+  const atCap    = teamCount>=maxB;
+  const isClockedIn  = clockRow?.clock_in && !clockRow?.clock_out;
+  const isClockedOut = clockRow?.clock_out;
+
+  return(
+    <div className="ag-root">
+      <header className="ag-hd">
+        <div className="fc g8"><div className="lm sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="lt">BreakTrack</span></div>
+        <div className="fc g10">
+          <span className="rtp" style={{fontSize:10,padding:'2px 8px'}}><span className="rtd"/>Live</span>
+          <div className="av">{ini(name)}</div>
+          <span className="hdn">{name}</span>
+          <button className="ib" onClick={onLogout} title="Sign out"><Ic n="logout" size={15}/></button>
+        </div>
+      </header>
+
+      <div className="ag-body">
+        {err&&<div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+        {atCap&&!active&&<div className="awrn"><Ic n="alert" size={15}/> All break slots are taken ({teamCount}/{maxB}). Wait for a colleague to return.</div>}
+
+        {/* ── Live Clock ── */}
+        <LiveClock/>
+
+        {/* ── Clock in/out card ── */}
+        <div className="clk-card">
+          <div className="clk-info">
+            <div className="clk-title">
+              {isClockedIn ? 'You are clocked in' : isClockedOut ? 'You have clocked out' : 'Not clocked in'}
+            </div>
+            <div className="clk-sub">
+              {clockRow?.clock_in  && `In: ${fmtT(clockRow.clock_in)}`}
+              {clockRow?.clock_out && `  ·  Out: ${fmtT(clockRow.clock_out)}`}
+              {!clockRow && 'Clock in to start your shift'}
+            </div>
+          </div>
+          <div className="clk-status">
+            <span className={`clk-dot ${isClockedIn?'in':'out'}`}/>
+            {!clockRow && (
+              <button className="bp" onClick={clockIn}><Ic n="login2" size={15}/> Clock In</button>
+            )}
+            {isClockedIn && (
+              <button className="bs" onClick={clockOut}><Ic n="logoff" size={15}/> Clock Out</button>
+            )}
+            {isClockedOut && (
+              <span className="badge b-out" style={{fontSize:12}}>Shift ended</span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Break card ── */}
+        <div className="bcard">
+          <div className="bcard-top">
+            <div className={`pring${active?' on':''}`}>
+              <div className={`bic${active?' on':''}`}>
+                <Ic n={active?'timer':'coffee'} size={30} sw={1.5}/>
+              </div>
+            </div>
+            {active?(
+              <>
+                <div className="tbig">{tMs(elapsed)}</div>
+                <div className="tlbl">On Break</div>
+                {predType&&<span className={`badge ${BCLS[predType]} ttype`}>{predType}</span>}
+                <div className="tsince">Started at {fmtT(active.start_time)}</div>
+              </>
+            ):(
+              <>
+                <div className="idle-h">Ready for a break?</div>
+                <div className="idle-s">Your break will be timed and logged automatically</div>
+              </>
+            )}
+          </div>
+          <div className="bcard-foot">
+            {!active
+              ?<button className="btn-go" onClick={startBreak} disabled={atCap||loading||!isClockedIn}>
+                  <Ic n="play" size={16} sw={2.5}/>
+                  {!isClockedIn?'Clock in first to take breaks':'Start Break'}
+                </button>
+              :<button className="btn-end" onClick={endBreak}>
+                  <Ic n="stop" size={16} sw={2.5}/> Return from Break
+                </button>
+            }
+          </div>
+        </div>
+
+        {/* ── Daily summary ── */}
+        <div className="dbar">
+          <div className="dst"><div className="dl">Breaks today</div><div className="dv">{done.length}</div></div>
+          <div className="dst"><div className="dl">Total time</div><div className="dv" style={{fontSize:18}}>{durStr(totalSec)}</div></div>
+          <div className="dst">
+            <div className="dl">Team on break</div>
+            <div className="dv" style={{color:atCap?'var(--dan)':'var(--acc)',fontSize:20}}>
+              {teamCount}<span style={{fontSize:13,color:'var(--mut)',fontWeight:500}}>/{maxB}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Today history ── */}
+        <div className="sc">
+          <div className="sc-hd">
+            <span className="sc-ic"><Ic n="clock" size={15}/></span>
+            <h2 className="sc-t">Today's Breaks</h2>
+            <button className="ib" style={{marginLeft:'auto'}} onClick={load}><Ic n="refresh" size={14}/></button>
+          </div>
+          {loading?<div className="es"><div className="spin"/></div>
+            :logs.length===0?<div className="es"><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No breaks yet today</p></div>
+            :(
+              <table className="dt">
+                <thead><tr><th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
+                <tbody>
+                  {logs.map(l=>(
+                    <tr key={l.id}>
+                      <td>{fmtT(l.start_time)}</td>
+                      <td>{l.end_time?fmtT(l.end_time):<span className="badge b-on">On Break</span>}</td>
+                      <td>{l.duration_secs!=null?durStr(l.duration_secs):l.end_time?'—':<LSec start={l.start_time}/>}</td>
+                      <td>{l.break_type?<BB type={l.break_type}/>:l.end_time?'—':<LType start={l.start_time}/>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN
+══════════════════════════════════════════════════════════════ */
+function AdminApp({user,name,onLogout}){
+  const [tab,setTab]=useState('dashboard');
+  const nav=[
+    {id:'dashboard',n:'grid',    label:'Dashboard'},
+    {id:'live',     n:'activity',label:'Live'},
+    {id:'clocks',   n:'sun',     label:'Clock In/Out'},
+    {id:'analytics',n:'trending',label:'Analytics'},
+    {id:'logs',     n:'clock',   label:'All Logs'},
+    {id:'settings', n:'settings',label:'Settings'},
+  ];
+  return(
+    <div className="adm">
+      <aside className="sb">
+        <div className="sb-logo"><div className="lm sm"><Ic n="zap" size={14} sw={2.5}/></div><span className="lt">BreakTrack</span></div>
+        <nav className="sb-nav">
+          {nav.map(({id,n,label})=>(
+            <button key={id} className={`ni${tab===id?' on':''}`} onClick={()=>setTab(id)}>
+              <Ic n={n} size={16} sw={1.8}/><span>{label}</span>
+              {tab===id&&<span className="na"><Ic n="chevron" size={13}/></span>}
+            </button>
+          ))}
+        </nav>
+        <div className="sb-ft">
+          <div className="av">{ini(name)}</div>
+          <div className="sbu"><span className="sbn">{name}</span><span className="sbr">Administrator</span></div>
+          <button className="ib" onClick={onLogout} title="Sign out"><Ic n="logout" size={15}/></button>
+        </div>
+      </aside>
+      <main className="adm-main">
+        {tab==='dashboard'&&<ADash/>}
+        {tab==='live'     &&<ALive/>}
+        {tab==='clocks'   &&<AClocks/>}
+        {tab==='analytics'&&<AAnalytics/>}
+        {tab==='logs'     &&<ALogs/>}
+        {tab==='settings' &&<ASettings/>}
+      </main>
+    </div>
+  );
+}
+
+/* ── Admin Dashboard ── */
+function ADash(){
+  const [logs,    setLogs]   = useState([]);
+  const [maxB,    setMaxB]   = useState(3);
+  const [loading, setLoad]   = useState(true);
+  const [err,     setErr]    = useState('');
+  const [rt,      setRt]     = useState(false);
+
+  const load = useCallback(async()=>{
+    setErr('');
+    const {data:cfg,error:e1} = await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
+    if(e1){setErr('Settings: '+e1.message);}
+    else if(cfg) setMaxB(cfg.max_concurrent_breaks);
+
+    const {data:bl,error:e2} = await run(SB.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(300));
+    if(e2){setErr(p=>p+' | Logs: '+e2.message);setLoad(false);return;}
+    setLogs(bl||[]);
+    setLoad(false);
+  },[]);
+
+  useEffect(()=>{
+    load();
+    const ch = SB.channel('dash-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_logs'},({eventType,new:nw,old:ol})=>{
+        if(eventType==='INSERT')  setLogs(p=>[nw,...p]);
+        if(eventType==='UPDATE')  setLogs(p=>p.map(r=>r.id===nw.id?nw:r));
+        if(eventType==='DELETE')  setLogs(p=>p.filter(r=>r.id!==ol.id));
+      })
+      .subscribe(s=>setRt(s==='SUBSCRIBED'));
+    return()=>SB.removeChannel(ch);
+  },[load]);
+
+  const today   = todayISO();
+  const active  = logs.filter(l=>!l.end_time);
+  const done    = logs.filter(l=>l.end_time&&l.duration_secs!=null);
+  const todayL  = logs.filter(l=>l.start_time.startsWith(today));
+  const todaySec= todayL.filter(l=>l.duration_secs).reduce((s,l)=>s+l.duration_secs,0);
+  const avg     = done.length?Math.round(done.reduce((s,l)=>s+l.duration_secs,0)/done.length):0;
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Dashboard</h1><p className="ps">All agents · realtime</p></div>
+        <div className="fc g10">
+          <span className="rtp"><span className="rtd"/>{rt?'Live':'Connecting…'}</span>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>:(
+        <>
+          <div className="sg4">
+            <SC n="activity" label="Total Breaks"    val={logs.length}/>
+            <SC n="timer"    label="On Break Now"    val={active.length} ac={active.length>0&&active.length<maxB} wn={active.length>=maxB}/>
+            <SC n="sun"      label="Breaks Today"    val={todayL.length}/>
+            <SC n="clock"    label="Avg Duration"    val={durStr(avg)}/>
+          </div>
+          <div className="sg3">
+            <SC n="trending" label="Today's Total Break Time" val={durStr(todaySec)}/>
+            <SC n="users"    label="Max Concurrent"           val={maxB}/>
+            <SC n="activity" label="Slots Used"               val={`${active.length}/${maxB}`} ac={active.length>0&&active.length<maxB} wn={active.length>=maxB}/>
+          </div>
+          {active.length>0&&(
+            <div className="sc" style={{marginBottom:16}}>
+              <div className="sc-hd"><span className="ldot"/><h2 className="sc-t">Currently on Break ({active.length})</h2></div>
+              <LT logs={active}/>
+            </div>
+          )}
+          <div className="sc">
+            <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-t">Recent Breaks</h2></div>
+            {logs.length===0?<div className="es"><span className="es-ic"><Ic n="activity" size={36} sw={1.2}/></span><p>No breaks logged yet</p></div>:<LT logs={logs.slice(0,15)} showDate/>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin Live ── */
+function ALive(){
+  const [live,   setLive]  = useState([]);
+  const [maxB,   setMaxB]  = useState(3);
+  const [loading,setLoad]  = useState(true);
+  const [err,    setErr]   = useState('');
+  const [rt,     setRt]    = useState(false);
+
+  const load = useCallback(async()=>{
+    const {data:bl,error} = await run(SB.from('bt_logs').select('*').is('end_time',null).order('start_time'));
+    if(error){setErr(error.message);setLoad(false);return;}
+    setLive(bl||[]);
+    const {data:cfg} = await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
+    if(cfg) setMaxB(cfg.max_concurrent_breaks);
+    setLoad(false);
+  },[]);
+
+  useEffect(()=>{
+    load();
+    const ch = SB.channel('live-rt')
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bt_logs'},({new:nw})=>{
+        if(!nw.end_time) setLive(p=>[...p,nw]);
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bt_logs'},({new:nw})=>{
+        if(nw.end_time) setLive(p=>p.filter(r=>r.id!==nw.id));
+        else setLive(p=>p.map(r=>r.id===nw.id?nw:r));
+      })
+      .subscribe(s=>setRt(s==='SUBSCRIBED'));
+    return()=>SB.removeChannel(ch);
+  },[load]);
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Live Breaks</h1><p className="ps">{live.length}/{maxB} slots · updates instantly</p></div>
+        <div className="fc g10">
+          <span className="rtp"><span className="rtd"/>{rt?'Live':'Connecting…'}</span>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>
+        :live.length===0?<div className="es"><span className="es-ic"><Ic n="coffee" size={40} sw={1.2}/></span><p>No agents on break right now</p></div>
+        :(
+          <div className="sc">
+            <div className="sc-hd"><span className="ldot"/><h2 className="sc-t">On Break Now ({live.length})</h2></div>
+            <table className="dt">
+              <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th><th>Predicted Type</th></tr></thead>
+              <tbody>
+                {live.map(l=>(
+                  <tr key={l.id}>
+                    <td><AvC name={l.agent_name}/></td>
+                    <td>{fmtT(l.start_time)}</td>
+                    <td><LSec start={l.start_time}/></td>
+                    <td><LType start={l.start_time}/></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+/* ── Admin Clock In/Out ── */
+function AClocks(){
+  const [rows,   setRows]  = useState([]);
+  const [date,   setDate]  = useState(todayISO());
+  const [loading,setLoad]  = useState(true);
+  const [err,    setErr]   = useState('');
+  const [rt,     setRt]    = useState(false);
+
+  const load = useCallback(async()=>{
+    setLoad(true); setErr('');
+    const {data,error} = await run(
+      SB.from('bt_clocklogs').select('*').eq('date',date).order('clock_in',{ascending:true})
+    );
+    if(error){setErr(error.message);setLoad(false);return;}
+    setRows(data||[]);
+    setLoad(false);
+  },[date]);
+
+  useEffect(()=>{
+    load();
+    const ch = SB.channel('clock-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_clocklogs'},({eventType,new:nw,old:ol})=>{
+        if(nw?.date!==date&&ol?.date!==date) return;
+        if(eventType==='INSERT') setRows(p=>[...p,nw]);
+        if(eventType==='UPDATE') setRows(p=>p.map(r=>r.id===nw.id?nw:r));
+        if(eventType==='DELETE') setRows(p=>p.filter(r=>r.id!==ol.id));
+      })
+      .subscribe(s=>setRt(s==='SUBSCRIBED'));
+    return()=>SB.removeChannel(ch);
+  },[load,date]);
+
+  const clockedIn    = rows.filter(r=>r.clock_in&&!r.clock_out);
+  const clockedOut   = rows.filter(r=>r.clock_out);
+
+  const shiftDur = r => {
+    if(!r.clock_in||!r.clock_out) return '—';
+    return durStr(Math.round((new Date(r.clock_out)-new Date(r.clock_in))/1000));
+  };
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Clock In / Out</h1><p className="ps">Agent attendance · {rows.length} records</p></div>
+        <div className="fc g10">
+          <span className="rtp"><span className="rtd"/>{rt?'Live':'Connecting…'}</span>
+          <input className="si" type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:160}}/>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+
+      <div className="sg3" style={{marginBottom:20}}>
+        <SC n="users"    label="Total agents" val={rows.length}/>
+        <SC n="login2"   label="Currently in"  val={clockedIn.length} ac={clockedIn.length>0}/>
+        <SC n="moon"     label="Clocked out"   val={clockedOut.length}/>
+      </div>
+
+      {loading?<div className="es"><div className="spin"/></div>
+        :rows.length===0?<div className="es"><span className="es-ic"><Ic n="sun" size={36} sw={1.2}/></span><p>No clock records for this date</p></div>
+        :(
+          <div className="sc">
+            <div className="sc-hd"><span className="sc-ic"><Ic n="sun" size={15}/></span><h2 className="sc-t">Attendance — {date}</h2></div>
+            <table className="dt">
+              <thead><tr><th>Agent</th><th>Clock In</th><th>Clock Out</th><th>Shift Duration</th><th>Status</th></tr></thead>
+              <tbody>
+                {rows.map(r=>(
+                  <tr key={r.id}>
+                    <td><AvC name={r.agent_name}/></td>
+                    <td>{fmtT(r.clock_in)}</td>
+                    <td>{r.clock_out?fmtT(r.clock_out):'—'}</td>
+                    <td>{shiftDur(r)}</td>
+                    <td>
+                      {r.clock_out
+                        ?<span className="badge b-out">Clocked Out</span>
+                        :<span className="badge b-in"><span style={{width:6,height:6,borderRadius:'50%',background:'var(--acc)',display:'inline-block'}}/> On Shift</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+/* ── Admin All Logs ── */
+function ALogs(){
+  const [logs,   setLogs]  = useState([]);
+  const [filter, setFilter]= useState('');
+  const [date,   setDate]  = useState('');
+  const [loading,setLoad]  = useState(true);
+  const [err,    setErr]   = useState('');
+
+  useEffect(()=>{
+    run(SB.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(500))
+      .then(({data,error})=>{
+        if(error) setErr(error.message);
+        setLogs(data||[]);
+        setLoad(false);
+      });
+  },[]);
+
+  const filtered = logs.filter(l=>{
+    const nm = !filter||l.agent_name.toLowerCase().includes(filter.toLowerCase());
+    const dt = !date||l.start_time.startsWith(date);
+    return nm&&dt;
+  });
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">All Break Logs</h1><p className="ps">{logs.length} total records</p></div>
+        <div className="phr">
+          <input className="si" placeholder="Filter by agent…" value={filter} onChange={e=>setFilter(e.target.value)}/>
+          <input className="si" type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:150}}/>
+          <button className="bs" onClick={()=>csvExport(filtered)}><Ic n="download" size={14}/> Export CSV</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>
+        :filtered.length===0?<div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No records found</p></div>
+        :<div className="sc"><LT logs={filtered} showDate/></div>
+      }
+    </div>
+  );
+}
+
+/* ── Admin Analytics (today only) ── */
+function AAnalytics(){
+  const [agents, setAgents]= useState([]);
+  const [summary,setSummary]= useState({count:0,total:0,avg:0,lunch:0,brk:0,bath:0});
+  const [loading,setLoad]  = useState(true);
+  const [err,    setErr]   = useState('');
+  const today = todayISO();
+
+  const load = useCallback(async()=>{
+    setLoad(true); setErr('');
+    const {data,error} = await run(
+      SB.from('bt_logs')
+        .select('agent_name,start_time,duration_secs,break_type')
+        .gte('start_time', today+'T00:00:00.000Z')
+        .not('duration_secs','is',null)
+        .order('start_time',{ascending:false})
+    );
+    if(error){setErr(error.message);setLoad(false);return;}
+    const rows = data||[];
+    // Overall summary
+    const total = rows.reduce((s,l)=>s+(l.duration_secs||0),0);
+    const avg   = rows.length ? Math.round(total/rows.length) : 0;
+    const lunch = rows.filter(l=>l.break_type==='Lunch Break').length;
+    const brk   = rows.filter(l=>l.break_type==='Break').length;
+    const bath  = rows.filter(l=>l.break_type==='Bathroom Break').length;
+    setSummary({count:rows.length,total,avg,lunch,brk,bath});
+    // Per agent
+    const byAg = {};
+    rows.forEach(l=>{
+      if(!byAg[l.agent_name])byAg[l.agent_name]={count:0,total:0,lunch:0,brk:0,bath:0};
+      byAg[l.agent_name].count++;
+      byAg[l.agent_name].total += l.duration_secs||0;
+      if(l.break_type==='Lunch Break')    byAg[l.agent_name].lunch++;
+      else if(l.break_type==='Break')     byAg[l.agent_name].brk++;
+      else if(l.break_type==='Bathroom Break') byAg[l.agent_name].bath++;
+    });
+    setAgents(Object.entries(byAg)
+      .map(([n,v])=>({name:n,...v,avg:Math.round(v.total/v.count)}))
+      .sort((a,b)=>b.total-a.total)
+    );
+    setLoad(false);
+  },[today]);
+
+  useEffect(()=>{load();},[load]);
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Analytics</h1><p className="ps">Today · {fmtD(today+'T12:00:00')}</p></div>
+        <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>:(
+        <>
+          <div className="sg4" style={{marginBottom:16}}>
+            <SC n="activity" label="Total Breaks Today" val={summary.count}/>
+            <SC n="clock"    label="Total Break Time"   val={durStr(summary.total)}/>
+            <SC n="trending" label="Avg per Break"      val={durStr(summary.avg)}/>
+            <SC n="users"    label="Agents on Breaks"   val={agents.length}/>
+          </div>
+          <div className="sg3" style={{marginBottom:20}}>
+            <SC n="utensils" label="Lunch Breaks"    val={summary.lunch}  ac={summary.lunch>0}/>
+            <SC n="coffee"   label="Breaks"          val={summary.brk}/>
+            <SC n="activity" label="Bathroom Breaks" val={summary.bath}/>
+          </div>
+          <div className="sc">
+            <div className="sc-hd"><span className="sc-ic"><Ic n="users" size={15}/></span><h2 className="sc-t">Per Agent — Today</h2></div>
+            {agents.length===0
+              ?<div className="es"><span className="es-ic"><Ic n="trending" size={36} sw={1.2}/></span><p>No completed breaks yet today</p></div>
+              :(
+                <table className="dt">
+                  <thead><tr><th>Agent</th><th>Breaks</th><th>Total Time</th><th>Avg</th><th>Lunch</th><th>Break</th><th>Bathroom</th></tr></thead>
+                  <tbody>
+                    {agents.map(a=>(
+                      <tr key={a.name}>
+                        <td><AvC name={a.name}/></td>
+                        <td>{a.count}</td>
+                        <td style={{fontWeight:600,color:'var(--acc)'}}>{durStr(a.total)}</td>
+                        <td>{durStr(a.avg)}</td>
+                        <td>{a.lunch||'—'}</td>
+                        <td>{a.brk||'—'}</td>
+                        <td>{a.bath||'—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            }
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin Settings ── */
+function ASettings(){
+  const [maxB, setMaxB] = useState(3);
+  const [busy, setBusy] = useState(false);
+  const [ok,   setOk]   = useState(false);
+  const [err,  setErr]  = useState('');
+
+  useEffect(()=>{
+    run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle())
+      .then(({data,error})=>{
+        if(error){setErr('Load: '+error.message);return;}
+        if(data) setMaxB(data.max_concurrent_breaks);
+      });
+  },[]);
+
+  const save=async()=>{
+    setBusy(true);setErr('');setOk(false);
+    const{error}=await run(
+      SB.from('bt_settings').upsert({id:1,max_concurrent_breaks:maxB,updated_at:new Date().toISOString()},{onConflict:'id'})
+    );
+    if(error){setErr('Save: '+error.message);setBusy(false);return;}
+    setOk(true);setBusy(false);
+    setTimeout(()=>setOk(false),3000);
+  };
+
+  return(
+    <div className="panel">
+      <div className="phd"><div><h1 className="pt">Settings</h1><p className="ps">Team configuration</p></div></div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      <div className="sblk">
+        <h2 className="sh">Max concurrent breaks</h2>
+        <p className="sd">Set how many agents can be on break simultaneously. Adjust daily based on how many staff are working — the rule is no more than half the team at once.</p>
+        <div className="num-wrap">
+          <button className="nb" onClick={()=>setMaxB(n=>Math.max(1,n-1))}>−</button>
+          <div className="nv">{maxB}</div>
+          <button className="nb" onClick={()=>setMaxB(n=>n+1)}>+</button>
+        </div>
+        <p style={{fontSize:12,color:'var(--mut)',marginTop:10}}>Agents are blocked from starting breaks when this limit is reached.</p>
+        <div style={{marginTop:18,display:'flex',alignItems:'center',gap:12}}>
+          <button className="bp" onClick={save} disabled={busy}>{busy?<span className="spin-sm"/>:'Save'}</button>
+          {ok&&<span style={{color:'var(--acc)',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}><Ic n="check" size={14}/> Saved</span>}
+        </div>
+      </div>
+      <div className="sblk">
+        <h2 className="sh">Break type thresholds</h2>
+        <p className="sd">Automatically assigned when an agent returns:</p>
+        <table className="dt" style={{marginTop:0}}>
+          <thead><tr><th>Type</th><th>Duration</th></tr></thead>
+          <tbody>
+            <tr><td><BB type="Bathroom Break"/></td><td>Less than 15 minutes</td></tr>
+            <tr><td><BB type="Break"/></td><td>15 minutes – 1 hour</td></tr>
+            <tr><td><BB type="Lunch Break"/></td><td>More than 1 hour</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="sblk">
+        <h2 className="sh">Adding users</h2>
+        <p className="sd">Manage users in Supabase: Authentication → Users → Invite user. Then set their Raw User Meta Data:</p>
+        <div style={{background:'var(--card)',border:'1px solid var(--bdr)',borderRadius:8,padding:'12px 14px',fontFamily:'monospace',fontSize:12,color:'#888',lineHeight:2.2}}>
+          Agent: <span style={{color:'var(--acc)'}}>{`{ "role": "agent", "display_name": "Jane Smith" }`}</span><br/>
+          Admin: <span style={{color:'var(--acc)'}}>{`{ "role": "admin", "display_name": "Team Lead" }`}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SHARED COMPONENTS
+══════════════════════════════════════════════════════════════ */
+function SC({n,label,val,ac,wn}){
+  return(
+    <div className={`stat${ac?' ac':''}${wn?' wn':''}`}>
+      <div className="stic"><Ic n={n} size={16} sw={1.8}/></div>
+      <div className="stv">{val}</div>
+      <div className="stl">{label}</div>
+    </div>
+  );
+}
+function AvC({name}){
+  return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span></div>;
+}
+function BB({type}){
+  if(!type)return null;
+  return <span className={`badge ${BCLS[type]||'b-brk'}`}>{type}</span>;
+}
+function LiveClock(){
+  const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const [t, setT] = useState(new Date());
+  useEffect(()=>{
+    const id = setInterval(()=>setT(new Date()), 1000);
+    return()=>clearInterval(id);
+  },[]);
+  const day  = DAYS[t.getDay()];
+  const hrs  = pad(t.getHours());
+  const mins = pad(t.getMinutes());
+  const secs = pad(t.getSeconds());
+  return(
+    <div className="live-clock">
+      <div className="clk-seg">
+        <div className="clk-day-val">{day}</div>
+        <div className="clk-unit">Day</div>
+      </div>
+      <div className="clk-sep">:</div>
+      <div className="clk-seg">
+        <div className="clk-num">{hrs}</div>
+        <div className="clk-unit">Hours</div>
+      </div>
+      <div className="clk-sep">:</div>
+      <div className="clk-seg">
+        <div className="clk-num">{mins}</div>
+        <div className="clk-unit">Minutes</div>
+      </div>
+      <div className="clk-sep">:</div>
+      <div className="clk-seg">
+        <div className="clk-num">{secs}</div>
+        <div className="clk-unit">Seconds</div>
+      </div>
+    </div>
+  );
+}
+
+function LSec({start}){
+  const [s,setS]=useState(Math.round((Date.now()-new Date(start).getTime())/1000));
+  useEffect(()=>{const id=setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),1000);return()=>clearInterval(id);},[start]);
+  return <span className="mono act" style={{fontWeight:700}}>{tStr(Math.max(0,s))}</span>;
+}
+function LType({start}){
+  const [s,setS]=useState(Math.round((Date.now()-new Date(start).getTime())/1000));
+  useEffect(()=>{const id=setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),5000);return()=>clearInterval(id);},[start]);
+  return <BB type={bType(s)}/>;
+}
+function LT({logs,showDate}){
+  return(
+    <table className="dt">
+      <thead><tr><th>Agent</th>{showDate&&<th>Date</th>}<th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
+      <tbody>
+        {logs.map(l=>(
+          <tr key={l.id}>
+            <td><AvC name={l.agent_name}/></td>
+            {showDate&&<td style={{color:'var(--mut)',fontSize:12}}>{fmtD(l.start_time)}</td>}
+            <td>{fmtT(l.start_time)}</td>
+            <td>{l.end_time?fmtT(l.end_time):<span className="badge b-on">On Break</span>}</td>
+            <td>{l.duration_secs!=null?durStr(l.duration_secs):l.end_time?'—':<LSec start={l.start_time}/>}</td>
+            <td>{l.break_type?<BB type={l.break_type}/>:l.end_time?'—':<LType start={l.start_time}/>}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
