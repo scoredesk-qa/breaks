@@ -255,7 +255,7 @@ const durStr = s  => {
   if(m>0) return `${m}m ${sec}s`;
   return `${sec}s`;
 };
-const bType  = s  => { if(s==null)return null; if(s>=3600)return'Lunch Break'; if(s>=900)return'Break'; return'Bathroom Break'; };
+const bType  = s  => { if(s==null)return null; if(s>=3300)return'Lunch Break'; if(s>=840)return'Break'; return'Bathroom Break'; };
 const BCLS   = {'Lunch Break':'b-lunch','Break':'b-brk','Bathroom Break':'b-bath'};
 
 const csvExport = (rows) => {
