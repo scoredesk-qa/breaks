@@ -192,6 +192,23 @@ html,body,#root{height:100%;background:var(--bg);color:var(--txt);font-family:va
 .clk-unit{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:2px}
 .clk-sep{font-size:44px;font-weight:300;color:var(--bdr);margin:0 4px;line-height:1;padding-bottom:18px;align-self:flex-start;margin-top:2px}
 .clk-day-val{font-size:48px;font-weight:800;color:var(--acc);letter-spacing:1px;line-height:1;font-family:'Manrope',sans-serif}
+
+/* ── Admin action buttons ── */
+.btn-remote{background:var(--acc-d);color:var(--acc);border:1px solid var(--acc-r);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:background .15s}
+.btn-remote:hover{background:var(--acc);color:#000}
+.btn-remote:disabled{opacity:.4;cursor:not-allowed}
+.btn-edit{background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--mut);padding:4px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .15s}
+.btn-edit:hover{border-color:var(--acc);color:var(--acc)}
+/* ── Type edit dropdown inline ── */
+.type-sel{background:var(--card);border:1px solid var(--acc-r);border-radius:6px;padding:4px 8px;color:var(--txt);font-size:12px;font-weight:600;font-family:var(--font);outline:none;cursor:pointer}
+.type-sel:focus{box-shadow:0 0 0 2px var(--acc-r)}
+/* ── Remote break confirm modal ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;backdrop-filter:blur(4px)}
+.modal-box{background:var(--surf);border:1px solid var(--bdr);border-radius:16px;padding:28px 32px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.6);animation:mslide .2s ease}
+@keyframes mslide{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+.modal-title{font-size:17px;font-weight:800;margin-bottom:8px}
+.modal-sub{font-size:13px;color:var(--mut);margin-bottom:24px;line-height:1.6}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -236,6 +253,7 @@ const PATHS = {
   logoff:   ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
   sun:      ["M12 2v2","M12 20v2","M4.93 4.93l1.41 1.41","M17.66 17.66l1.41 1.41","M2 12h2","M20 12h2","M6.34 17.66l-1.41 1.41","M19.07 4.93l-1.41 1.41","M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
   moon:     ["M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"],
+  edit:     ["M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7","M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"],
 };
 const Ic = ({ n, size=16, sw=1.8, col }) => {
   const d = PATHS[n] || "M12 12h.01";
@@ -762,16 +780,27 @@ function ADash(){
 
 /* ── Admin Live ── */
 function ALive(){
-  const [live,   setLive]  = useState([]);
-  const [maxB,   setMaxB]  = useState(3);
-  const [loading,setLoad]  = useState(true);
-  const [err,    setErr]   = useState('');
-  const [rt,     setRt]    = useState(false);
+  const [live,      setLive]     = useState([]);
+  const [clocked,   setClocked]  = useState([]); // agents clocked in but NOT on break
+  const [maxB,      setMaxB]     = useState(3);
+  const [loading,   setLoad]     = useState(true);
+  const [err,       setErr]      = useState('');
+  const [rt,        setRt]       = useState(false);
+  const [confirm,   setConfirm]  = useState(null); // {user_id, agent_name}
+  const [remoting,  setRemoting] = useState(null); // user_id being processed
 
   const load = useCallback(async()=>{
-    const {data:bl,error} = await run(SB.from('bt_logs').select('*').is('end_time',null).order('start_time'));
-    if(error){setErr(error.message);setLoad(false);return;}
+    setErr('');
+    // Active breaks
+    const {data:bl,error:e1} = await run(SB.from('bt_logs').select('*').is('end_time',null).order('start_time'));
+    if(e1){setErr(e1.message);setLoad(false);return;}
     setLive(bl||[]);
+
+    // Agents clocked in today (so we can offer remote break for those NOT already on break)
+    const today = todayISO();
+    const {data:ck} = await run(SB.from('bt_clocklogs').select('*').eq('date',today).is('clock_out',null));
+    setClocked(ck||[]);
+
     const {data:cfg} = await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
     if(cfg) setMaxB(cfg.max_concurrent_breaks);
     setLoad(false);
@@ -779,7 +808,7 @@ function ALive(){
 
   useEffect(()=>{
     load();
-    const ch = SB.channel('live-rt')
+    const ch = SB.channel('live-rt2')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'bt_logs'},({new:nw})=>{
         if(!nw.end_time) setLive(p=>[...p,nw]);
       })
@@ -791,6 +820,28 @@ function ALive(){
     return()=>SB.removeChannel(ch);
   },[load]);
 
+  // Remote start break for an agent
+  const remoteStart = async(agent)=>{
+    setRemoting(agent.user_id); setErr('');
+    const now = new Date().toISOString();
+    const {data,error} = await run(
+      SB.from('bt_logs').insert({
+        user_id:    agent.user_id,
+        agent_name: agent.agent_name,
+        start_time: now,
+        remote_started: true
+      }).select().single()
+    );
+    if(error){setErr('Remote break failed: '+error.message);}
+    else { setLive(p=>[...p,data]); }
+    setRemoting(null); setConfirm(null);
+  };
+
+  // Agents clocked in but not currently on break
+  const onBreakIds = new Set(live.map(l=>l.user_id));
+  const available  = clocked.filter(a=>!onBreakIds.has(a.user_id));
+  const atCap      = live.length >= maxB;
+
   return(
     <div className="panel">
       <div className="phd">
@@ -801,27 +852,84 @@ function ALive(){
         </div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
-      {loading?<div className="es"><div className="spin"/></div>
-        :live.length===0?<div className="es"><span className="es-ic"><Ic n="coffee" size={40} sw={1.2}/></span><p>No agents on break right now</p></div>
-        :(
+      {loading?<div className="es"><div className="spin"/></div>:(
+        <>
+          {/* Currently on break */}
+          {live.length>0&&(
+            <div className="sc" style={{marginBottom:16}}>
+              <div className="sc-hd"><span className="ldot"/><h2 className="sc-t">On Break Now ({live.length})</h2></div>
+              <table className="dt">
+                <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th><th>Predicted Type</th></tr></thead>
+                <tbody>
+                  {live.map(l=>(
+                    <tr key={l.id}>
+                      <td><AvC name={l.agent_name}/></td>
+                      <td>{fmtT(l.start_time)}</td>
+                      <td><LSec start={l.start_time}/></td>
+                      <td><LType start={l.start_time}/></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {live.length===0&&<div className="es" style={{padding:'24px 20px'}}><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No agents on break right now</p></div>}
+
+          {/* Remote break section */}
           <div className="sc">
-            <div className="sc-hd"><span className="ldot"/><h2 className="sc-t">On Break Now ({live.length})</h2></div>
-            <table className="dt">
-              <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th><th>Predicted Type</th></tr></thead>
-              <tbody>
-                {live.map(l=>(
-                  <tr key={l.id}>
-                    <td><AvC name={l.agent_name}/></td>
-                    <td>{fmtT(l.start_time)}</td>
-                    <td><LSec start={l.start_time}/></td>
-                    <td><LType start={l.start_time}/></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="sc-hd">
+              <span className="sc-ic"><Ic n="play" size={15}/></span>
+              <h2 className="sc-t">Start Break Remotely</h2>
+              <span style={{marginLeft:8,fontSize:11,color:'var(--mut)'}}>For agents who left their desk without starting a break</span>
+            </div>
+            {available.length===0?(
+              <div className="es" style={{padding:'24px 20px'}}>
+                <p style={{color:'var(--mut)',fontSize:13}}>All clocked-in agents are already on break, or no agents are clocked in yet.</p>
+              </div>
+            ):(
+              <table className="dt">
+                <thead><tr><th>Agent</th><th>Clocked In At</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                  {available.map(a=>(
+                    <tr key={a.id}>
+                      <td><AvC name={a.agent_name}/></td>
+                      <td>{fmtT(a.clock_in)}</td>
+                      <td><span className="badge b-in"><span style={{width:6,height:6,borderRadius:'50%',background:'var(--acc)',display:'inline-block'}}/> On Shift</span></td>
+                      <td>
+                        <button
+                          className="btn-remote"
+                          disabled={atCap||remoting===a.user_id}
+                          onClick={()=>setConfirm({user_id:a.user_id,agent_name:a.agent_name})}
+                          title={atCap?'Break slots full':'Start break for this agent'}
+                        >
+                          {remoting===a.user_id?<span className="spin-sm"/>:<Ic n="play" size={12}/>}
+                          {atCap?'Slots Full':'Start Break'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-        )
-      }
+        </>
+      )}
+
+      {/* Confirm modal */}
+      {confirm&&(
+        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setConfirm(null)}>
+          <div className="modal-box">
+            <div className="modal-title">Start break for {confirm.agent_name}?</div>
+            <div className="modal-sub">This will log a break starting right now on their behalf. The break timer will begin immediately and they will see it on their screen.</div>
+            <div className="modal-foot">
+              <button className="bs" onClick={()=>setConfirm(null)}>Cancel</button>
+              <button className="bp" onClick={()=>remoteStart(confirm)} disabled={!!remoting}>
+                {remoting?<span className="spin-sm"/>:<Ic n="play" size={14}/>} Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -915,21 +1023,34 @@ function AClocks(){
 }
 
 /* ── Admin All Logs ── */
-function ALogs(){
-  const [logs,   setLogs]  = useState([]);
-  const [filter, setFilter]= useState('');
-  const [date,   setDate]  = useState('');
-  const [loading,setLoad]  = useState(true);
-  const [err,    setErr]   = useState('');
+const BREAK_TYPES = ['Bathroom Break','Break','Lunch Break'];
 
-  useEffect(()=>{
+function ALogs(){
+  const [logs,    setLogs]   = useState([]);
+  const [filter,  setFilter] = useState('');
+  const [date,    setDate]   = useState('');
+  const [loading, setLoad]   = useState(true);
+  const [err,     setErr]    = useState('');
+  const [editing, setEditing]= useState(null);  // log id being edited
+  const [saving,  setSaving] = useState(null);   // log id being saved
+
+  const load = ()=>{
     run(SB.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(500))
       .then(({data,error})=>{
         if(error) setErr(error.message);
         setLogs(data||[]);
         setLoad(false);
       });
-  },[]);
+  };
+  useEffect(()=>{ load(); },[]);
+
+  const saveType = async(logId, newType)=>{
+    setSaving(logId);
+    const {error} = await run(SB.from('bt_logs').update({break_type:newType}).eq('id',logId));
+    if(error){ setErr('Save failed: '+error.message); }
+    else { setLogs(p=>p.map(l=>l.id===logId?{...l,break_type:newType}:l)); }
+    setSaving(null); setEditing(null);
+  };
 
   const filtered = logs.filter(l=>{
     const nm = !filter||l.agent_name.toLowerCase().includes(filter.toLowerCase());
@@ -944,13 +1065,59 @@ function ALogs(){
         <div className="phr">
           <input className="si" placeholder="Filter by agent…" value={filter} onChange={e=>setFilter(e.target.value)}/>
           <input className="si" type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:150}}/>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
           <button className="bs" onClick={()=>csvExport(filtered)}><Ic n="download" size={14}/> Export CSV</button>
         </div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
       {loading?<div className="es"><div className="spin"/></div>
         :filtered.length===0?<div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No records found</p></div>
-        :<div className="sc"><LT logs={filtered} showDate/></div>
+        :(
+          <div className="sc">
+            <table className="dt">
+              <thead>
+                <tr>
+                  <th>Agent</th><th>Date</th><th>Start</th><th>Return</th>
+                  <th>Duration</th><th>Type</th><th style={{width:60}}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(l=>(
+                  <tr key={l.id}>
+                    <td><AvC name={l.agent_name}/></td>
+                    <td style={{color:'var(--mut)',fontSize:12}}>{fmtD(l.start_time)}</td>
+                    <td>{fmtT(l.start_time)}</td>
+                    <td>{l.end_time?fmtT(l.end_time):<span className="badge b-on">On Break</span>}</td>
+                    <td>{l.duration_secs!=null?durStr(l.duration_secs):l.end_time?'—':<LSec start={l.start_time}/>}</td>
+                    <td>
+                      {editing===l.id?(
+                        <div className="fc g6">
+                          <select className="type-sel" defaultValue={l.break_type||''}
+                            onChange={e=>saveType(l.id,e.target.value)}
+                            disabled={saving===l.id}
+                          >
+                            <option value="" disabled>Select type…</option>
+                            {BREAK_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                          </select>
+                          {saving===l.id&&<span className="spin-sm"/>}
+                        </div>
+                      ):(
+                        l.break_type?<BB type={l.break_type}/>:l.end_time?<span style={{color:'var(--mut)',fontSize:12}}>No label</span>:<LType start={l.start_time}/>
+                      )}
+                    </td>
+                    <td>
+                      {l.end_time&&(
+                        editing===l.id
+                          ?<button className="btn-edit" onClick={()=>setEditing(null)}>✕ Cancel</button>
+                          :<button className="btn-edit" onClick={()=>setEditing(l.id)} title="Edit break type"><Ic n="edit" size={12}/> Edit</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       }
     </div>
   );
