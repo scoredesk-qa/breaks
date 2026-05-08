@@ -997,31 +997,52 @@ function AClocks(){
   );
 }
 
-/* Modal for remote clock in — picks agent from recent records */
+/* Modal for remote clock in — picks from ALL known agents, filters out already clocked in today */
 function RemoteClockInModal({date,onDone,onClose}){
-  const [agents,setAgents]=useState([]);
-  const [selected,setSelected]=useState('');
-  const [busy,setBusy]=useState(false);
-  const [err,setErr]=useState('');
+  const [allAgents,  setAllAgents]  = useState([]); // everyone ever in bt_clocklogs
+  const [todayNames, setTodayNames] = useState([]); // names already clocked in today
+  const [available,  setAvailable]  = useState([]); // allAgents minus today
+  const [selected,   setSelected]   = useState('');
+  const [busy,       setBusy]       = useState(false);
+  const [loading,    setLoading]    = useState(true);
+  const [err,        setErr]        = useState('');
 
   useEffect(()=>{
-    // Get known agents from recent clock logs (last 30 days)
-    run(SB.from('bt_clocklogs').select('user_id,agent_name').order('created_at',{ascending:false}).limit(200))
-      .then(({data})=>{
-        if(!data)return;
-        const seen=new Set();
-        const unique=[];
-        data.forEach(r=>{ if(!seen.has(r.user_id)){seen.add(r.user_id);unique.push(r);} });
-        setAgents(unique);
-        if(unique.length>0)setSelected(unique[0].user_id);
+    (async()=>{
+      // 1. All unique agents ever recorded — order by clock_in desc, no created_at needed
+      const {data:hist} = await run(
+        SB.from('bt_clocklogs')
+          .select('user_id,agent_name')
+          .order('clock_in',{ascending:false})
+          .limit(500)
+      );
+      const seen = new Set();
+      const unique = [];
+      (hist||[]).forEach(r=>{
+        if(!seen.has(r.user_id)){ seen.add(r.user_id); unique.push(r); }
       });
-  },[]);
+      setAllAgents(unique);
+
+      // 2. Who is already clocked in today?
+      const {data:today} = await run(
+        SB.from('bt_clocklogs').select('agent_name').eq('date',date)
+      );
+      const todaySet = new Set((today||[]).map(r=>r.agent_name));
+      setTodayNames([...todaySet]);
+
+      // 3. Available = in history but NOT already clocked in today
+      const avail = unique.filter(a=>!todaySet.has(a.agent_name));
+      setAvailable(avail);
+      if(avail.length>0) setSelected(avail[0].user_id);
+      setLoading(false);
+    })();
+  },[date]);
 
   const go=async()=>{
-    const ag=agents.find(a=>a.user_id===selected);
+    const ag=available.find(a=>a.user_id===selected);
     if(!ag)return;
     setBusy(true);
-    await onDone(ag.agent_name,ag.user_id);
+    await onDone(ag.agent_name, ag.user_id);
     setBusy(false);
   };
 
@@ -1029,22 +1050,33 @@ function RemoteClockInModal({date,onDone,onClose}){
     <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal-box">
         <div className="modal-title">Clock In Agent Remotely</div>
-        <div className="modal-sub">This will log a clock-in for the selected agent right now. Use this when an agent forgot to clock in themselves.</div>
-        {agents.length===0
-          ?<p style={{color:'var(--mut)',fontSize:13,marginBottom:16}}>No known agents found. Agents must clock in at least once manually first.</p>
-          :(
-            <div className="fg">
-              <label className="fl">Select Agent</label>
-              <select className="fi" value={selected} onChange={e=>setSelected(e.target.value)}>
-                {agents.map(a=><option key={a.user_id} value={a.user_id}>{a.agent_name}</option>)}
-              </select>
-            </div>
-          )
+        <div className="modal-sub">
+          Select an agent to clock them in right now. Only agents not yet clocked in today are shown.
+        </div>
+        {loading
+          ?<div style={{textAlign:'center',padding:'16px'}}><div className="spin" style={{margin:'0 auto'}}/></div>
+          :available.length===0
+            ?<div style={{background:'var(--card)',borderRadius:8,padding:'12px 14px',fontSize:13,color:'var(--mut)',marginBottom:16}}>
+                {allAgents.length===0
+                  ?'No agents found in the system yet. Each agent must clock in manually at least once before they appear here.'
+                  :`All ${allAgents.length} known agent${allAgents.length>1?'s are':' is'} already clocked in today.`
+                }
+              </div>
+            :(
+              <div className="fg">
+                <label className="fl">Select Agent ({available.length} available)</label>
+                <select className="fi" value={selected} onChange={e=>setSelected(e.target.value)}>
+                  {available.map(a=><option key={a.user_id} value={a.user_id}>{a.agent_name}</option>)}
+                </select>
+              </div>
+            )
         }
         {err&&<div className="aerr"><Ic n="alert" size={14}/>{err}</div>}
         <div className="modal-foot">
           <button className="bs" onClick={onClose}>Cancel</button>
-          <button className="bp" onClick={go} disabled={busy||agents.length===0}>{busy?<span className="spin-sm"/>:<Ic n="login2" size={14}/>} Clock In</button>
+          <button className="bp" onClick={go} disabled={busy||available.length===0||loading}>
+            {busy?<span className="spin-sm"/>:<Ic n="login2" size={14}/>} Clock In
+          </button>
         </div>
       </div>
     </div>
@@ -1066,23 +1098,50 @@ function ALunch(){
 
   const load=useCallback(async()=>{
     setLoad(true);setErr('');setSaved(false);
-    // Load existing schedule for the date
+
+    // Load existing schedule for the selected date
     const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',date).maybeSingle());
-    // Load agents clocked in that day
+
+    // Load agents clocked in on the selected date
     const {data:ck}=await run(SB.from('bt_clocklogs').select('agent_name').eq('date',date));
     const allClocked=[...new Set((ck||[]).map(r=>r.agent_name))];
+
     if(ls){
-      setRow(ls);
+      // Schedule already exists for this date — use it directly
       const a=ls.group_a||[];
       const b=ls.group_b||[];
-      setGrpA(a); setGrpB(b);
+      setRow(ls); setGrpA(a); setGrpB(b);
       setFirst(ls.group_first||defaultFirst(date));
+      // Any agent clocked in today but not yet assigned → pool
       setPool(allClocked.filter(n=>!a.includes(n)&&!b.includes(n)));
     } else {
+      // No schedule for this date — try to auto-fill from the most recent previous schedule
+      const {data:prev}=await run(
+        SB.from('bt_lunch_schedule')
+          .select('*')
+          .lt('date', date)          // any date before today
+          .order('date',{ascending:false})
+          .limit(1)
+          .maybeSingle()
+      );
+
       setRow(null);
-      setGrpA([]); setGrpB([]);
       setFirst(defaultFirst(date));
-      setPool(allClocked);
+
+      if(prev){
+        // Auto-fill: keep agents from previous groups if they're clocked in today
+        const prevA = (prev.group_a||[]).filter(n=>allClocked.includes(n));
+        const prevB = (prev.group_b||[]).filter(n=>allClocked.includes(n));
+        const assigned = new Set([...prevA,...prevB]);
+        // Any new agent clocked in today who wasn't in yesterday's schedule → pool
+        const newAgents = allClocked.filter(n=>!assigned.has(n));
+        setGrpA(prevA); setGrpB(prevB);
+        setPool(newAgents);
+      } else {
+        // No previous schedule at all — everyone goes to pool
+        setGrpA([]); setGrpB([]);
+        setPool(allClocked);
+      }
     }
     setLoad(false);
   },[date]);
