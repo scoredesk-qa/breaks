@@ -11,7 +11,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
-/* … entire CSS block from original file remains exactly the same … */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0d0d0d;--surf:#141414;--card:#1a1a1a;--bdr:#252525;
@@ -360,7 +359,42 @@ const run = async(p) => { try{ return await p; }catch(e){ return {data:null,erro
 /* ══════════════════════════════════════════════════════════════
    TOAST / NOTIFICATION SYSTEM
 ══════════════════════════════════════════════════════════════ */
-/* Global toast emitter — works without React context */
+
+/* ── Web Audio notification sounds ── */
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+function playNotifSound(type = 'info') {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const presets = {
+      lunch:  [{ f:660, t:0,    d:0.12, g:0.5 }, { f:880, t:0.13, d:0.12, g:0.5 }, { f:1100, t:0.26, d:0.2, g:0.6 }],
+      break:  [{ f:520, t:0,    d:0.15, g:0.4 }, { f:660, t:0.18, d:0.2,  g:0.4 }],
+      warn:   [{ f:440, t:0,    d:0.1,  g:0.5 }, { f:340, t:0.13, d:0.1,  g:0.5 }, { f:440, t:0.26, d:0.15, g:0.5 }],
+      info:   [{ f:600, t:0,    d:0.1,  g:0.3 }, { f:800, t:0.12, d:0.15, g:0.3 }],
+      custom: [{ f:500, t:0,    d:0.1,  g:0.35}, { f:700, t:0.13, d:0.1,  g:0.35}, { f:900, t:0.26, d:0.2, g:0.4 }],
+    };
+    const notes = presets[type] || presets.info;
+    const now = ctx.currentTime;
+    notes.forEach(({ f, t, d, g }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now + t);
+      gain.gain.setValueAtTime(0, now + t);
+      gain.gain.linearRampToValueAtTime(g, now + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+      osc.start(now + t);
+      osc.stop(now + t + d + 0.01);
+    });
+  } catch(e) { /* audio blocked — silent fail */ }
+}
+
+/* ── Global toast emitter — works without React context ── */
 const _toastListeners = [];
 const toastEmit = (toast) => _toastListeners.forEach(fn => fn(toast));
 
@@ -371,38 +405,33 @@ function useToastEmitter(addToast) {
   }, [addToast]);
 }
 
-/* Utility to fire a desktop (OS) notification + in-app toast */
+/* ── Master fire function: in-app toast + OS desktop notification + sound ── */
 function fireNotification({ title, body, type = 'info', duration = 7000 }) {
-  // In-app toast
+  playNotifSound(type);
   toastEmit({ id: Date.now() + Math.random(), title, body, type, duration });
-  // Desktop notification
   if ('Notification' in window) {
-    if (Notification.permission === 'granted') {
-      new Notification(title, { body, icon: '/favicon.ico', tag: type });
-    } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(p => {
-        if (p === 'granted') new Notification(title, { body, icon: '/favicon.ico', tag: type });
-      });
-    }
+    const show = () => new Notification(title, { body, tag: type + '-' + Date.now() });
+    if (Notification.permission === 'granted') show();
+    else if (Notification.permission !== 'denied') Notification.requestPermission().then(p => { if(p==='granted') show(); });
   }
 }
 
-/* Toast Container — mounted once at top level */
+/* ── Toast Container ── */
 function ToastContainer() {
   const [toasts, setToasts] = useState([]);
   const addToast = useCallback((t) => {
     setToasts(p => [...p, { ...t, leaving: false }]);
     setTimeout(() => {
       setToasts(p => p.map(x => x.id === t.id ? { ...x, leaving: true } : x));
-      setTimeout(() => setToasts(p => p.filter(x => x.id !== t.id)), 250);
+      setTimeout(() => setToasts(p => p.filter(x => x.id !== t.id)), 260);
     }, t.duration || 7000);
   }, []);
   useToastEmitter(addToast);
   const dismiss = (id) => {
     setToasts(p => p.map(x => x.id === id ? { ...x, leaving: true } : x));
-    setTimeout(() => setToasts(p => p.filter(x => x.id !== id)), 250);
+    setTimeout(() => setToasts(p => p.filter(x => x.id !== id)), 260);
   };
-  const typeIcon = { lunch: 'utensils', break: 'coffee', info: 'bell', warn: 'alert', custom: 'zap' };
+  const typeIcon = { lunch:'utensils', break:'coffee', info:'bell', warn:'alert', custom:'zap' };
   return (
     <div className="toast-container">
       {toasts.map(t => (
@@ -413,26 +442,66 @@ function ToastContainer() {
             <div className="toast-body">{t.body}</div>
           </div>
           <button className="toast-close" onClick={()=>dismiss(t.id)}><Ic n="x" size={14}/></button>
-          <div className="toast-bar" style={{animationDuration:`${(t.duration||7000)}ms`}}/>
+          <div className="toast-bar" style={{animationDuration:`${t.duration||7000}ms`}}/>
         </div>
       ))}
     </div>
   );
 }
 
-/* Request desktop notification permission early */
+/* ── Request OS permission early ── */
 function useNotifPermission() {
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
-      // Small delay so it doesn't pop immediately on login
-      const t = setTimeout(() => Notification.requestPermission(), 3000);
+      const t = setTimeout(() => Notification.requestPermission(), 2500);
       return () => clearTimeout(t);
     }
   }, []);
 }
 
-/* ── Lunch reminder hook (used by AgentApp) ──
-   Checks every 30 seconds if lunch is 5 minutes away and fires once per slot. */
+/* ══════════════════════════════════════════════════════════════
+   SUPABASE REALTIME BROADCAST CHANNEL
+   Admins publish to 'bt_broadcast'; agents receive.
+   Nothing is written to the database.
+══════════════════════════════════════════════════════════════ */
+const BROADCAST_CHANNEL = 'bt_broadcast';
+const BROADCAST_EVENT   = 'notif';
+
+/* Publish a notification to all agents (or a specific user_id) via Supabase Realtime broadcast */
+async function broadcastNotif({ title, body, type = 'custom', targetUserId = null, lunchGroup = null }) {
+  const ch = SB.channel(BROADCAST_CHANNEL);
+  await new Promise(res => {
+    ch.subscribe(status => { if(status === 'SUBSCRIBED') res(); });
+  });
+  await ch.send({ type:'broadcast', event: BROADCAST_EVENT, payload:{ title, body, type, targetUserId, lunchGroup } });
+  SB.removeChannel(ch);
+}
+
+/* ── Agent: listen for broadcast notifications ── */
+/* lunchInfo is passed in so we can filter lunch broadcasts to the right group */
+function useAgentNotifListener(userId, lunchInfo) {
+  useEffect(() => {
+    const ch = SB.channel(BROADCAST_CHANNEL)
+      .on('broadcast', { event: BROADCAST_EVENT }, ({ payload }) => {
+        // Filter by specific user if targeted
+        if (payload.targetUserId && payload.targetUserId !== userId) return;
+        // Filter lunch broadcasts: only show if agent is in the notified group
+        if (payload.lunchGroup) {
+          const myGroup = lunchInfo?.group || null;
+          if (!myGroup || myGroup !== payload.lunchGroup) return;
+        }
+        fireNotification({ title: payload.title, body: payload.body, type: payload.type || 'custom', duration: 9000 });
+      })
+      .subscribe();
+    return () => SB.removeChannel(ch);
+  }, [userId, lunchInfo?.group]);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LUNCH REMINDER HOOKS
+══════════════════════════════════════════════════════════════ */
+
+/* Agent: 5-min personal reminder based on their own lunch slot */
 function useLunchReminder(lunchInfo) {
   const firedRef = useRef(new Set());
   useEffect(() => {
@@ -441,36 +510,57 @@ function useLunchReminder(lunchInfo) {
       const now = new Date();
       const [h, m] = lunchInfo.slot.from.split(':').map(Number);
       const lunch = new Date(now); lunch.setHours(h, m, 0, 0);
-      const diff = (lunch - now) / 60000; // minutes
-      const key = `${lunchInfo.slot.from}-${lunchInfo.group}`;
+      const diff = (lunch - now) / 60000;
+      const key = lunchInfo.slot.from + '-' + lunchInfo.group;
       if (diff > 0 && diff <= 5 && !firedRef.current.has(key)) {
         firedRef.current.add(key);
         fireNotification({
-          title: `🍽️ Lunch in ${Math.ceil(diff)} minute${Math.ceil(diff)===1?'':'s'}!`,
-          body: `Group ${lunchInfo.group} lunch starts at ${lunchInfo.slot.from}. Please get ready!`,
-          type: 'lunch',
-          duration: 10000,
+          title: `🍽️ Lunch in ${Math.ceil(diff)} min!`,
+          body: `Group ${lunchInfo.group} — your lunch starts at ${lunchInfo.slot.from}. Get ready!`,
+          type: 'lunch', duration: 10000,
         });
       }
     };
     check();
-    const id = setInterval(check, 30000);
+    const id = setInterval(check, 20000);
     return () => clearInterval(id);
   }, [lunchInfo]);
 }
 
-/* ── Supabase realtime notification listener (used by AgentApp) ──
-   Listens for rows inserted into bt_notifications addressed to this user or 'all'. */
-function useAgentNotifListener(userId) {
+/* Admin: automated broadcast to ALL agents at the exact scheduled lunch times.
+   Reads today's lunch schedule from Supabase once per minute and fires broadcasts
+   at configured alert times (default 5 min before each group's slot). */
+function useAdminLunchBroadcast(alertMinutes = 5) {
+  const firedRef = useRef(new Set());
   useEffect(() => {
-    const ch = SB.channel('notifs-agent-' + userId)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bt_notifications' }, ({ new: nw }) => {
-        if (nw.target_user_id && nw.target_user_id !== userId) return; // not for us
-        fireNotification({ title: nw.title, body: nw.body, type: nw.type || 'custom', duration: 9000 });
-      })
-      .subscribe();
-    return () => SB.removeChannel(ch);
-  }, [userId]);
+    const check = async () => {
+      const today = todayISO();
+      const { data: ls } = await run(SB.from('bt_lunch_schedule').select('*').eq('date', today).maybeSingle());
+      if (!ls) return;
+      const first = ls.group_first || defaultFirst(today);
+      const slots = lunchSlots(first);
+      const now = new Date();
+      ['A','B'].forEach(grp => {
+        const [h, m] = slots[grp].from.split(':').map(Number);
+        const lunchTime = new Date(now); lunchTime.setHours(h, m, 0, 0);
+        const diff = (lunchTime - now) / 60000;
+        const key = `auto-${grp}-${slots[grp].from}-${today}`;
+        if (diff > 0 && diff <= alertMinutes && !firedRef.current.has(key)) {
+          firedRef.current.add(key);
+          const mins = Math.ceil(diff);
+          broadcastNotif({
+            title: `🍽️ Group ${grp} Lunch in ${mins} min`,
+            body: `Group ${grp}: your lunch break starts at ${slots[grp].from}. Please get ready to head out!`,
+            type: 'lunch',
+            lunchGroup: grp,  // agents filter by this — only Group A or B sees their own alert
+          });
+        }
+      });
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, [alertMinutes]);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -574,7 +664,7 @@ function AgentApp({user,name,onLogout}){
 
   // Notification hooks
   useLunchReminder(lunchInfo);
-  useAgentNotifListener(user.id);
+  useAgentNotifListener(user.id, lunchInfo);
 
   const load = useCallback(async()=>{
     setLoading(true); setErr('');
@@ -822,6 +912,7 @@ function AgentApp({user,name,onLogout}){
 ══════════════════════════════════════════════════════════════ */
 function AdminApp({user,name,onLogout}){
   const [tab,setTab]=useState('dashboard');
+  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch
   const nav=[
     {id:'dashboard', n:'grid',     label:'Dashboard'},
     {id:'live',      n:'activity', label:'Live'},
@@ -970,26 +1061,12 @@ function ALive(){
     return()=>SB.removeChannel(ch);
   },[load]);
 
-  const remoteStart = async (agent) => {
+  const remoteStart=async(agent)=>{
     setRemoting(agent.user_id); setErr('');
-    const now = new Date().toISOString();
-    const { data, error } = await run(
-      SB.from('bt_logs').insert({ user_id: agent.user_id, agent_name: agent.agent_name, start_time: now }).select().single()
-    );
-    if (error) {
-      setErr('Remote break failed: ' + error.message);
-    } else {
-      setLive(p => [...p, data]);
-      // Push a real‑time notification to the agent
-      await run(
-        SB.from('bt_notifications').insert({
-          title: '⏱️ Break Started',
-          body: 'Your break was started remotely by an admin.',
-          type: 'break',
-          target_user_id: agent.user_id,
-        })
-      );
-    }
+    const now=new Date().toISOString();
+    const {data,error}=await run(SB.from('bt_logs').insert({user_id:agent.user_id,agent_name:agent.agent_name,start_time:now}).select().single());
+    if(error){setErr('Remote break failed: '+error.message);}
+    else{setLive(p=>[...p,data]);}
     setRemoting(null); setConfirm(null);
   };
 
@@ -1074,8 +1151,8 @@ function AClocks(){
   const [loading,setLoad]=useState(true);
   const [err,setErr]=useState('');
   const [rt,setRt]=useState(false);
-  const [clockingIn,setClockingIn]=useState(null);
-  const [confirmClock,setConfirmClock]=useState(null);
+  const [clockingIn,setClockingIn]=useState(null); // user_id being processed
+  const [confirmClock,setConfirmClock]=useState(null); // {user_id,agent_name}
 
   const load=useCallback(async()=>{
     setLoad(true);setErr('');
@@ -1096,6 +1173,12 @@ function AClocks(){
     return()=>SB.removeChannel(ch);
   },[load,date]);
 
+  /* Remote clock in — needs the user_id and display_name from Supabase Auth.
+     We look them up from auth.users via a simple approach: we use the agent_name
+     stored in existing clock records or fetch from a known list. Since we can't
+     query auth.users from the client directly, we use a workaround:
+     Admin types the agent name and we create the clock record with user_id from
+     the most recent existing record for that agent, or admin picks from a dropdown. */
   const remoteClockIn=async(agentName,userId)=>{
     setClockingIn(userId);setErr('');
     const now=new Date().toISOString();
@@ -1168,11 +1251,11 @@ function AClocks(){
   );
 }
 
-/* Modal for remote clock in */
+/* Modal for remote clock in — picks from ALL known agents, filters out already clocked in today */
 function RemoteClockInModal({date,onDone,onClose}){
-  const [allAgents,  setAllAgents]  = useState([]);
-  const [todayNames, setTodayNames] = useState([]);
-  const [available,  setAvailable]  = useState([]);
+  const [allAgents,  setAllAgents]  = useState([]); // everyone ever in bt_clocklogs
+  const [todayNames, setTodayNames] = useState([]); // names already clocked in today
+  const [available,  setAvailable]  = useState([]); // allAgents minus today
   const [selected,   setSelected]   = useState('');
   const [busy,       setBusy]       = useState(false);
   const [loading,    setLoading]    = useState(true);
@@ -1180,6 +1263,7 @@ function RemoteClockInModal({date,onDone,onClose}){
 
   useEffect(()=>{
     (async()=>{
+      // 1. All unique agents ever recorded — order by clock_in desc, no created_at needed
       const {data:hist} = await run(
         SB.from('bt_clocklogs')
           .select('user_id,agent_name')
@@ -1193,12 +1277,14 @@ function RemoteClockInModal({date,onDone,onClose}){
       });
       setAllAgents(unique);
 
+      // 2. Who is already clocked in today?
       const {data:today} = await run(
         SB.from('bt_clocklogs').select('agent_name').eq('date',date)
       );
       const todaySet = new Set((today||[]).map(r=>r.agent_name));
       setTodayNames([...todaySet]);
 
+      // 3. Available = in history but NOT already clocked in today
       const avail = unique.filter(a=>!todaySet.has(a.agent_name));
       setAvailable(avail);
       if(avail.length>0) setSelected(avail[0].user_id);
@@ -1254,11 +1340,11 @@ function RemoteClockInModal({date,onDone,onClose}){
 /* ── Admin Lunch Schedule ── */
 function ALunch(){
   const [date,    setDate]    = useState(todayISO());
-  const [row,     setRow]     = useState(null);
+  const [row,     setRow]     = useState(null);   // bt_lunch_schedule row
   const [grpA,    setGrpA]    = useState([]);
   const [grpB,    setGrpB]    = useState([]);
-  const [pool,    setPool]    = useState([]);
-  const [first,   setFirst]   = useState('A');
+  const [pool,    setPool]    = useState([]);     // clocked in but unassigned
+  const [first,   setFirst]   = useState('A');    // which group goes at 13:00
   const [loading, setLoad]    = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState('');
@@ -1266,35 +1352,47 @@ function ALunch(){
 
   const load=useCallback(async()=>{
     setLoad(true);setErr('');setSaved(false);
+
+    // Load existing schedule for the selected date
     const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',date).maybeSingle());
+
+    // Load agents clocked in on the selected date
     const {data:ck}=await run(SB.from('bt_clocklogs').select('agent_name').eq('date',date));
     const allClocked=[...new Set((ck||[]).map(r=>r.agent_name))];
 
     if(ls){
+      // Schedule already exists for this date — use it directly
       const a=ls.group_a||[];
       const b=ls.group_b||[];
       setRow(ls); setGrpA(a); setGrpB(b);
       setFirst(ls.group_first||defaultFirst(date));
+      // Any agent clocked in today but not yet assigned → pool
       setPool(allClocked.filter(n=>!a.includes(n)&&!b.includes(n)));
     } else {
+      // No schedule for this date — try to auto-fill from the most recent previous schedule
       const {data:prev}=await run(
         SB.from('bt_lunch_schedule')
           .select('*')
-          .lt('date', date)
+          .lt('date', date)          // any date before today
           .order('date',{ascending:false})
           .limit(1)
           .maybeSingle()
       );
+
       setRow(null);
       setFirst(defaultFirst(date));
+
       if(prev){
+        // Auto-fill: keep agents from previous groups if they're clocked in today
         const prevA = (prev.group_a||[]).filter(n=>allClocked.includes(n));
         const prevB = (prev.group_b||[]).filter(n=>allClocked.includes(n));
         const assigned = new Set([...prevA,...prevB]);
+        // Any new agent clocked in today who wasn't in yesterday's schedule → pool
         const newAgents = allClocked.filter(n=>!assigned.has(n));
         setGrpA(prevA); setGrpB(prevB);
         setPool(newAgents);
       } else {
+        // No previous schedule at all — everyone goes to pool
         setGrpA([]); setGrpB([]);
         setPool(allClocked);
       }
@@ -1343,6 +1441,8 @@ function ALunch(){
         </div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+
+      {/* First slot toggle */}
       <div className="sc" style={{marginBottom:14}}>
         <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-t">Rotation — who goes first today?</h2></div>
         <div style={{padding:'16px 18px',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
@@ -1355,9 +1455,11 @@ function ALunch(){
           <span style={{fontSize:12,color:'var(--mut)',marginLeft:8}}>Auto-rotates daily · override here if needed</span>
         </div>
       </div>
+
       {loading?<div className="es"><div className="spin"/></div>:(
         <>
           <div className="lunch-groups">
+            {/* Group A */}
             <div className="lunch-group-card grp-a">
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                 <div className="fc g8">
@@ -1377,6 +1479,8 @@ function ALunch(){
                 </div>
               ))}
             </div>
+
+            {/* Group B */}
             <div className="lunch-group-card grp-b">
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                 <div className="fc g8">
@@ -1397,6 +1501,8 @@ function ALunch(){
               ))}
             </div>
           </div>
+
+          {/* Unassigned pool */}
           {pool.length>0&&(
             <div className="lunch-group-card unset-pool" style={{borderRadius:14,padding:16,marginBottom:14}}>
               <div style={{fontSize:12,fontWeight:700,color:'var(--mut)',marginBottom:10}}>Unassigned — clocked in today ({pool.length})</div>
@@ -1410,6 +1516,7 @@ function ALunch(){
               ))}
             </div>
           )}
+
           {pool.length===0&&grpA.length===0&&grpB.length===0&&(
             <div className="es"><span className="es-ic"><Ic n="users" size={36} sw={1.2}/></span><p>No agents clocked in for {date} yet. Once agents clock in their names will appear here.</p></div>
           )}
@@ -1560,203 +1667,258 @@ function ALogs(){
   );
 }
 
-/* ── Admin Notifications (NEW) ── */
-function ANotifications() {
-  const [agents, setAgents] = useState([]);
-  const [target, setTarget] = useState('all');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [type, setType] = useState('info');
-  const [sending, setSending] = useState(false);
-  const [err, setErr] = useState('');
-  const [sent, setSent] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+/* ── Admin Notifications ── */
+const PRESETS = [
+  { key:'lunch_a',  icon:'utensils', iconCls:'lunch',  title:'Lunch — Group A',   body:"Group A: your lunch break starts now. Please head to the break room.",   recipientHint:'group_a' },
+  { key:'lunch_b',  icon:'utensils', iconCls:'break',  title:'Lunch — Group B',   body:"Group B: your lunch break starts now. Please head to the break room.",   recipientHint:'group_b' },
+  { key:'break',    icon:'coffee',   iconCls:'break',  title:'Take Your Break',    body:"It's time to take your 15-minute break. Please log it in BreakTrack.",  recipientHint:'all' },
+  { key:'clockin',  icon:'login2',   iconCls:'info',   title:'Clock In Reminder', body:"Your shift is starting. Please clock in via BreakTrack now.",            recipientHint:'all' },
+  { key:'return',   icon:'zap',      iconCls:'warn',   title:'Return to Desk',    body:"Your break time is up. Please return to your workstation.",              recipientHint:'all' },
+  { key:'meeting',  icon:'users',    iconCls:'custom', title:'Team Meeting',       body:"There is a team meeting starting shortly. Please wrap up and join.",     recipientHint:'all' },
+];
+
+// recipientMode: 'all' | 'group_a' | 'group_b' | 'custom'
+function ANotifications(){
+  const [agents,        setAgents]        = useState([]);   // [{user_id, agent_name}]
+  const [lunchGroups,   setLunchGroups]   = useState({ a:[], b:[] }); // names per group today
+  const [recipientMode, setRecipientMode] = useState('all');
+  const [customPicks,   setCustomPicks]   = useState(new Set()); // user_ids for 'custom' mode
+  const [msgTab,        setMsgTab]        = useState('presets');
+  const [customTitle,   setCustomTitle]   = useState('');
+  const [customBody,    setCustomBody]    = useState('');
+  const [alertMins,     setAlertMins]     = useState(5);
+  const [sentLog,       setSentLog]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [sending,       setSending]       = useState(false);
+  const [err,           setErr]           = useState('');
 
   useEffect(() => {
     (async () => {
-      const { data } = await run(
-        SB.from('bt_clocklogs')
-          .select('user_id,agent_name')
-          .order('clock_in', { ascending: false })
-          .limit(500)
-      );
-      const seen = new Set();
-      const unique = [];
-      (data || []).forEach(r => {
-        if (!seen.has(r.user_id)) {
-          seen.add(r.user_id);
-          unique.push(r);
-        }
-      });
+      const today = todayISO();
+      // All known agents
+      const { data: cl } = await run(SB.from('bt_clocklogs').select('user_id,agent_name').order('clock_in',{ascending:false}).limit(500));
+      const seen = new Set(); const unique = [];
+      (cl||[]).forEach(r => { if(!seen.has(r.user_id)){seen.add(r.user_id);unique.push(r);} });
       setAgents(unique);
-      if (unique.length > 0) setTarget(unique[0].user_id);
-    })();
-
-    (async () => {
-      const { data, error } = await run(
-        SB.from('bt_notifications')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(30)
-      );
-      if (!error) setHistory(data || []);
+      // Today's lunch groups
+      const { data: ls } = await run(SB.from('bt_lunch_schedule').select('group_a,group_b').eq('date',today).maybeSingle());
+      if (ls) setLunchGroups({ a: ls.group_a||[], b: ls.group_b||[] });
       setLoading(false);
     })();
   }, []);
 
-  const send = async () => {
-    if (!title.trim() || !body.trim()) { setErr('Title and body are required.'); return; }
-    setSending(true); setErr(''); setSent(false);
-    const payload = {
-      title: title.trim(),
-      body: body.trim(),
-      type,
-      target_user_id: target === 'all' ? null : target,
-    };
-    const { error } = await run(SB.from('bt_notifications').insert(payload));
-    if (error) {
-      setErr('Send failed: ' + error.message);
-    } else {
-      setSent(true);
-      setTitle('');
-      setBody('');
-      const { data } = await run(
-        SB.from('bt_notifications').select('*').order('created_at', { ascending: false }).limit(30)
-      );
-      setHistory(data || []);
-      setTimeout(() => setSent(false), 3000);
-    }
+  const toggleCustom = (uid) => setCustomPicks(s => { const n=new Set(s); n.has(uid)?n.delete(uid):n.add(uid); return n; });
+
+  // Resolve who actually gets the notification given current recipientMode
+  const resolveTargets = (overrideMode) => {
+    const mode = overrideMode || recipientMode;
+    if (mode === 'all')     return { lunchGroup: null, userIds: null, label: 'All agents' };
+    if (mode === 'group_a') return { lunchGroup: 'A',  userIds: null, label: 'Group A' };
+    if (mode === 'group_b') return { lunchGroup: 'B',  userIds: null, label: 'Group B' };
+    // custom: specific user_ids
+    const ids = [...customPicks];
+    const names = ids.map(uid => agents.find(a=>a.user_id===uid)?.agent_name||'?').join(', ');
+    return { lunchGroup: null, userIds: ids, label: names || 'No one selected' };
+  };
+
+  const doSend = async (title, body, type='custom', overrideMode=null) => {
+    if (!title.trim()) return;
+    const { lunchGroup, userIds, label } = resolveTargets(overrideMode);
+    if (recipientMode==='custom' && !overrideMode && customPicks.size===0) { setErr('Select at least one agent in Custom mode.'); return; }
+    setSending(true); setErr('');
+    try {
+      if (userIds) {
+        for (const uid of userIds) await broadcastNotif({ title, body, type, targetUserId: uid, lunchGroup });
+      } else {
+        await broadcastNotif({ title, body, type, targetUserId: null, lunchGroup });
+      }
+      setSentLog(p => [{ id:Date.now(), title, body, type, to:label, time:new Date() }, ...p].slice(0,30));
+      fireNotification({ title:'✓ Sent', body:`"${title}" → ${label}`, type:'info', duration:4000 });
+      if (msgTab==='custom') { setCustomTitle(''); setCustomBody(''); }
+    } catch(e) { setErr('Broadcast failed: '+e.message); }
     setSending(false);
   };
 
-  const typeOptions = [
-    { value: 'info', label: 'Info', icon: 'bell' },
-    { value: 'lunch', label: 'Lunch', icon: 'utensils' },
-    { value: 'break', label: 'Break', icon: 'coffee' },
-    { value: 'warn', label: 'Warning', icon: 'alert' },
-    { value: 'custom', label: 'Custom', icon: 'zap' },
+  const [autoEnabled, setAutoEnabled] = useState(true);
+
+  const modeOpts = [
+    { value:'all',     label:'All Agents' },
+    { value:'group_a', label:'Group A'    },
+    { value:'group_b', label:'Group B'    },
+    { value:'custom',  label:'Custom…'   },
   ];
+
+  const { label: recipientLabel } = resolveTargets();
 
   return (
     <div className="panel">
       <div className="phd">
-        <div>
-          <h1 className="pt">Notifications</h1>
-          <p className="ps">Push a real‑time alert + desktop notification to agents</p>
-        </div>
+        <div><h1 className="pt">Notifications</h1><p className="ps">Send real-time alerts — sound · toast · OS desktop notification</p></div>
       </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
 
-      {err && <div className="ebox"><Ic n="alert" size={14} /> {err}</div>}
+      {loading ? <div className="es"><div className="spin"/></div> : (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 300px',gap:20,alignItems:'start'}}>
 
-      <div className="sc" style={{ marginBottom: 20 }}>
-        <div className="sc-hd">
-          <span className="sc-ic"><Ic n="send" size={15} /></span>
-          <h2 className="sc-t">Compose</h2>
-        </div>
-        <div style={{ padding: '20px 24px' }}>
-          <div className="fg">
-            <label className="fl">Preset / Quick Send</label>
-            <div className="notif-grid">
-              {[
-                { t: '🍽️ Lunch Time!', b: 'Your lunch break starts now. Please go to the break room.', type: 'lunch' },
-                { t: '⚠️ Break Overdue', b: 'You have been on break for over 30 minutes.', type: 'warn' },
-                { t: '📋 Reminder', b: 'Please remember to clock in before taking a break.', type: 'info' },
-                { t: '🚨 All Hands', b: 'All agents please return from break immediately.', type: 'warn' },
-              ].map(p => (
-                <button key={p.t} className="notif-preset" onClick={() => { setTitle(p.t); setBody(p.b); setType(p.type); }}>
-                  <div className="notif-preset-icon" style={{ background: p.type==='lunch'?'var(--acc-d)':p.type==='warn'?'var(--wrn-d)':'var(--purp-d)' }}>
-                    <Ic n={p.type==='lunch'?'utensils':p.type==='warn'?'alert':'bell'} size={16} />
-                  </div>
-                  <div className="notif-preset-title">{p.t}</div>
-                  <div className="notif-preset-sub">{p.b}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* ══ LEFT COLUMN ══ */}
+          <div style={{display:'flex',flexDirection:'column',gap:20}}>
 
-          <div className="fg">
-            <label className="fl">Target</label>
-            <select className="fi" value={target} onChange={e => setTarget(e.target.value)}>
-              <option value="all">All agents</option>
-              {agents.map(a => (
-                <option key={a.user_id} value={a.user_id}>{a.agent_name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="fg">
-            <label className="fl">Type</label>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {typeOptions.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setType(opt.value)}
-                  style={{
-                    padding: '6px 14px', borderRadius: 20, border: '1.5px solid',
-                    background: type === opt.value ? 'var(--acc-d)' : 'var(--card)',
-                    color: type === opt.value ? 'var(--acc)' : 'var(--mut)',
-                    borderColor: type === opt.value ? 'var(--acc-r)' : 'var(--bdr)',
-                    fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}
-                >
-                  <Ic n={opt.icon} size={13} /> {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="fg">
-            <label className="fl">Title</label>
-            <input className="fi" value={title} onChange={e => setTitle(e.target.value)} placeholder="Notification title" />
-          </div>
-          <div className="fg">
-            <label className="fl">Body</label>
-            <input className="fi" value={body} onChange={e => setBody(e.target.value)} placeholder="Details…" />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
-            <button className="bp" onClick={send} disabled={sending || !title || !body}>
-              {sending ? <span className="spin-sm" /> : <Ic n="send" size={14} />} Send
-            </button>
-            {sent && <span style={{ color: 'var(--acc)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}><Ic n="check" size={14} /> Sent</span>}
-          </div>
-        </div>
-      </div>
-
-      <div className="sc">
-        <div className="sc-hd">
-          <span className="sc-ic"><Ic n="clock" size={15} /></span>
-          <h2 className="sc-t">Recent Notifications</h2>
-        </div>
-        {loading ? <div className="es"><div className="spin" /></div>
-          : history.length === 0 ? <div className="es"><span className="es-ic"><Ic n="bell" size={36} sw={1.2} /></span><p>No notifications sent yet</p></div>
-            : (
-              <div style={{ padding: '6px 10px' }}>
-                <div className="notif-history">
-                  {history.map(n => {
-                    const iconMap = { lunch: 'utensils', break: 'coffee', info: 'bell', warn: 'alert', custom: 'zap' };
-                    return (
-                      <div key={n.id} className="notif-hist-item">
-                        <div className="notif-hist-ic" style={{ background: n.type === 'lunch' ? 'var(--acc-d)' : n.type === 'warn' ? 'var(--wrn-d)' : 'var(--purp-d)' }}>
-                          <Ic n={iconMap[n.type] || 'bell'} size={14} col={n.type === 'lunch' ? 'var(--acc)' : n.type === 'warn' ? 'var(--wrn)' : 'var(--purp)'} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{n.title}</div>
-                          <div style={{ fontSize: 12, color: 'var(--mut)' }}>{n.body}</div>
-                          <div style={{ fontSize: 10, color: '#444', marginTop: 4 }}>
-                            {n.target_user_id ? `→ ${agents.find(a => a.user_id === n.target_user_id)?.agent_name || 'unknown'}` : '→ All'} · {new Date(n.created_at).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+            {/* ── AUTOMATED LUNCH ALERTS ── */}
+            <div style={{background:'var(--surf)',border:'1px solid var(--bdr)',borderRadius:14,padding:'18px 20px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div className="toast-ic lunch" style={{width:32,height:32,borderRadius:9,flexShrink:0}}><Ic n="utensils" size={14} sw={2}/></div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700}}>Automated Lunch Alerts</div>
+                  <div style={{fontSize:12,color:'var(--mut)',marginTop:1}}>Fires before each group's slot — only that group is notified</div>
                 </div>
+                {/* Toggle switch */}
+                <button onClick={()=>setAutoEnabled(v=>!v)} style={{
+                  width:44,height:24,borderRadius:12,border:'none',cursor:'pointer',flexShrink:0,
+                  background:autoEnabled?'var(--acc)':'var(--bdr)',
+                  position:'relative',transition:'background .2s',padding:0,
+                }}>
+                  <span style={{
+                    position:'absolute',top:3,left:autoEnabled?22:3,width:18,height:18,
+                    borderRadius:'50%',background:'#fff',transition:'left .2s',display:'block',
+                  }}/>
+                </button>
+                <span style={{fontSize:12,fontWeight:700,color:autoEnabled?'var(--acc)':'var(--mut)',minWidth:32}}>{autoEnabled?'On':'Off'}</span>
               </div>
-            )
-        }
-      </div>
+              {autoEnabled && (
+                <div style={{display:'flex',alignItems:'center',gap:10,marginTop:14,paddingTop:14,borderTop:'1px solid var(--bdr)',flexWrap:'wrap'}}>
+                  <span style={{fontSize:13,color:'var(--mut)'}}>Alert</span>
+                  <button className="nb" style={{width:26,height:26,fontSize:15}} onClick={()=>setAlertMins(n=>Math.max(1,n-1))}>−</button>
+                  <span style={{fontSize:20,fontWeight:800,color:'var(--acc)',minWidth:28,textAlign:'center'}}>{alertMins}</span>
+                  <button className="nb" style={{width:26,height:26,fontSize:15}} onClick={()=>setAlertMins(n=>Math.min(30,n+1))}>+</button>
+                  <span style={{fontSize:13,color:'var(--mut)'}}>minutes before lunch</span>
+                  <span style={{fontSize:11,color:'var(--mut)'}}>· requires a schedule saved for today</span>
+                </div>
+              )}
+            </div>
+
+            {/* ── RECIPIENTS ── */}
+            <div style={{background:'var(--surf)',border:'1px solid var(--bdr)',borderRadius:14,padding:'18px 20px'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--mut)',letterSpacing:.5,textTransform:'uppercase',marginBottom:12}}>Recipients</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                {modeOpts.map(o => (
+                  <button key={o.value} onClick={()=>setRecipientMode(o.value)}
+                    style={{padding:'7px 16px',borderRadius:8,border:'1.5px solid',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:'var(--font)',
+                      background: recipientMode===o.value ? (o.value==='group_b'?'var(--purp-d)':'var(--acc-d)') : 'var(--card)',
+                      color:      recipientMode===o.value ? (o.value==='group_b'?'var(--purp)':'var(--acc)') : 'var(--mut)',
+                      borderColor:recipientMode===o.value ? (o.value==='group_b'?'var(--purp-r)':'var(--acc-r)') : 'var(--bdr)',
+                    }}>
+                    {o.label}
+                    {o.value==='group_a'&&lunchGroups.a.length>0&&<span style={{fontSize:10,opacity:.7,marginLeft:5}}>({lunchGroups.a.length})</span>}
+                    {o.value==='group_b'&&lunchGroups.b.length>0&&<span style={{fontSize:10,opacity:.7,marginLeft:5}}>({lunchGroups.b.length})</span>}
+                  </button>
+                ))}
+                <span style={{fontSize:12,color:'var(--mut)',marginLeft:2}}>→ <strong style={{color:'var(--txt)'}}>{recipientLabel}</strong></span>
+              </div>
+
+              {recipientMode==='custom' && (
+                <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid var(--bdr)'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--mut)',letterSpacing:.5,textTransform:'uppercase',marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+                    Select agents
+                    {customPicks.size>0&&<button style={{background:'none',border:'none',color:'var(--acc)',cursor:'pointer',fontSize:11,fontWeight:700}} onClick={()=>setCustomPicks(new Set())}>Clear all</button>}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:6,maxHeight:200,overflowY:'auto'}}>
+                    {agents.length===0&&<div style={{fontSize:12,color:'var(--mut)',gridColumn:'1/-1'}}>No agents found yet.</div>}
+                    {agents.map(a=>{
+                      const on=customPicks.has(a.user_id);
+                      const grp=lunchGroups.a.includes(a.agent_name)?'A':lunchGroups.b.includes(a.agent_name)?'B':null;
+                      return(
+                        <div key={a.user_id} onClick={()=>toggleCustom(a.user_id)} style={{
+                          display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,cursor:'pointer',
+                          background:on?'var(--acc-d)':'var(--card)',border:'1px solid',borderColor:on?'var(--acc-r)':'var(--bdr)',transition:'all .12s',
+                        }}>
+                          <input type="checkbox" readOnly checked={on} style={{accentColor:'var(--acc)',width:13,height:13,pointerEvents:'none',flexShrink:0}}/>
+                          <div className="av" style={{width:22,height:22,fontSize:9,flexShrink:0}}>{ini(a.agent_name)}</div>
+                          <span style={{fontSize:12,fontWeight:500,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.agent_name}</span>
+                          {grp&&<span className={`badge ${grp==='A'?'b-a':'b-b'}`} style={{fontSize:9,padding:'1px 6px'}}>{grp}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── MESSAGE ── */}
+            <div style={{background:'var(--surf)',border:'1px solid var(--bdr)',borderRadius:14,padding:'18px 20px'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--mut)',letterSpacing:.5,textTransform:'uppercase',marginBottom:12}}>Message</div>
+              <div style={{display:'flex',gap:8,marginBottom:16}}>
+                <button onClick={()=>setMsgTab('presets')} className={msgTab==='presets'?'bp':'bs'} style={{fontSize:12,padding:'7px 16px'}}>Quick Presets</button>
+                <button onClick={()=>setMsgTab('custom')}  className={msgTab==='custom'?'bp':'bs'}  style={{fontSize:12,padding:'7px 16px'}}>Custom Message</button>
+              </div>
+
+              {msgTab==='presets' && (
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                  {PRESETS.map(p=>(
+                    <button key={p.key} className="notif-preset" disabled={sending}
+                      onClick={()=>doSend(p.title,p.body,p.iconCls,p.recipientHint!=='all'?p.recipientHint:null)}>
+                      <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
+                        <div className={`toast-ic ${p.iconCls}`} style={{width:28,height:28,borderRadius:7,flexShrink:0}}><Ic n={p.icon} size={13} sw={2}/></div>
+                        <span className="notif-preset-title">{p.title}</span>
+                      </div>
+                      <div className="notif-preset-sub">{p.body}</div>
+                      <div style={{marginTop:7,fontSize:10,color:'var(--mut)',fontWeight:600}}>
+                        → {p.recipientHint==='group_a'?'Group A only':p.recipientHint==='group_b'?'Group B only':'selected recipients'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {msgTab==='custom' && (
+                <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                  <div className="fg" style={{marginBottom:0}}>
+                    <label className="fl">Title</label>
+                    <input className="fi" placeholder="e.g. System Update" value={customTitle} onChange={e=>setCustomTitle(e.target.value)} maxLength={80}/>
+                  </div>
+                  <div className="fg" style={{marginBottom:0}}>
+                    <label className="fl">Message</label>
+                    <textarea className="fi" rows={4} placeholder="Write your message here…" value={customBody} onChange={e=>setCustomBody(e.target.value)} maxLength={300} style={{resize:'vertical',minHeight:90}}/>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:12}}>
+                    <button className="bp" onClick={()=>doSend(customTitle,customBody,'custom')} disabled={sending||!customTitle.trim()}>
+                      {sending?<span className="spin-sm"/>:<Ic n="send" size={14}/>} Send to {recipientLabel}
+                    </button>
+                    {sending&&<span style={{fontSize:12,color:'var(--mut)'}}>Sending…</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ══ RIGHT COLUMN — Sent Log ══ */}
+          <div className="sc" style={{position:'sticky',top:16}}>
+            <div className="sc-hd">
+              <span className="sc-ic"><Ic n="bell" size={15}/></span>
+              <h2 className="sc-t">Sent This Session</h2>
+              <span style={{marginLeft:'auto',fontSize:10,color:'var(--mut)'}}>clears on refresh</span>
+            </div>
+            {sentLog.length===0
+              ?<div className="es" style={{padding:'32px 20px'}}>
+                  <span className="es-ic"><Ic n="bell" size={32} sw={1.2}/></span>
+                  <p>Nothing sent yet</p>
+                </div>
+              :<div style={{padding:'10px 14px'}} className="notif-history">
+                {sentLog.map(h=>(
+                  <div key={h.id} className="notif-hist-item">
+                    <div className={`notif-hist-ic toast-ic ${h.type}`} style={{width:26,height:26,borderRadius:7,flexShrink:0}}><Ic n="bell" size={11} sw={2}/></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.title}</div>
+                      <div style={{fontSize:11,color:'var(--mut)',marginTop:1,lineHeight:1.4,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{h.body}</div>
+                      <div style={{fontSize:10,color:'var(--mut)',marginTop:4}}>→ {h.to} · {h.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            }
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }
