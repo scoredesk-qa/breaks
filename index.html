@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
+/* … entire CSS block from original file remains exactly the same … */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0d0d0d;--surf:#141414;--card:#1a1a1a;--bdr:#252525;
@@ -184,6 +185,38 @@ html,body,#root{height:100%;background:var(--bg);color:var(--txt);font-family:va
 .modal-title{font-size:17px;font-weight:800;margin-bottom:8px}
 .modal-sub{font-size:13px;color:var(--mut);margin-bottom:24px;line-height:1.6}
 .modal-foot{display:flex;justify-content:flex-end;gap:10px}
+/* Toast notifications */
+.toast-container{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none;max-width:360px}
+.toast{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;box-shadow:0 12px 40px rgba(0,0,0,.7);pointer-events:all;animation:toast-in .25s cubic-bezier(.16,1,.3,1);min-width:280px;position:relative;overflow:hidden}
+.toast.leaving{animation:toast-out .22s ease forwards}
+@keyframes toast-in{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
+@keyframes toast-out{from{transform:none;opacity:1}to{transform:translateX(110%);opacity:0}}
+.toast-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toast-ic.lunch{background:var(--acc-d);color:var(--acc)}
+.toast-ic.break{background:var(--purp-d);color:var(--purp)}
+.toast-ic.info{background:#0f2b1e;color:#3ECF8E}
+.toast-ic.warn{background:var(--wrn-d);color:var(--wrn)}
+.toast-ic.custom{background:#1a1030;color:#a78bfa}
+.toast-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.toast-body{font-size:12px;color:var(--mut);line-height:1.5}
+.toast-close{margin-left:auto;background:none;border:none;color:var(--mut);cursor:pointer;padding:2px 0 2px 8px;display:flex;flex-shrink:0}
+.toast-close:hover{color:var(--txt)}
+.toast-bar{position:absolute;bottom:0;left:0;height:3px;border-radius:0 0 14px 14px;background:var(--acc)}
+/* Notification panel */
+.notif-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:700px){.notif-grid{grid-template-columns:1fr}}
+.notif-preset{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:16px;cursor:pointer;transition:border-color .15s,background .15s;text-align:left;font-family:var(--font);display:flex;flex-direction:column;gap:6px;width:100%}
+.notif-preset:hover{border-color:var(--acc);background:var(--acc-d)}
+.notif-preset-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.notif-preset-title{font-size:13px;font-weight:700;color:var(--txt)}
+.notif-preset-sub{font-size:11px;color:var(--mut);line-height:1.4}
+.agent-check-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
+.agent-check-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--card);border:1px solid var(--bdr);border-radius:8px;cursor:pointer;transition:border-color .15s}
+.agent-check-item:hover{border-color:var(--acc)}
+.agent-check-item input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px;cursor:pointer;flex-shrink:0}
+.notif-history{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto}
+.notif-hist-item{background:var(--card);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px}
+.notif-hist-ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 /* Action buttons */
 .btn-remote{background:var(--acc-d);color:var(--acc);border:1px solid var(--acc-r);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:background .15s}
 .btn-remote:hover{background:var(--acc);color:#000}
@@ -267,6 +300,8 @@ const PATHS = {
   edit:     ["M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7","M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"],
   sandwich: ["M3 11v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3","M12 19H4a1 1 0 0 1-1-1v-1a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1h-3.83","M3 11l7.77-6.04a2 2 0 0 1 2.46 0L21 11H3z","M12.97 19.77L7 15h14l-3.48 4.77a2 2 0 0 1-4.55 0z"],
   x:        ["M18 6L6 18","M6 6l12 12"],
+  bell:     ["M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9","M13.73 21a2 2 0 0 1-3.46 0"],
+  send:     ["M22 2L11 13","M22 2L15 22 11 13 2 9l20-7z"],
 };
 const Ic = ({ n, size=16, sw=1.8, col }) => {
   const d = PATHS[n] || "M12 12h.01";
@@ -323,24 +358,146 @@ const csvExport = (rows) => {
 const run = async(p) => { try{ return await p; }catch(e){ return {data:null,error:e}; } };
 
 /* ══════════════════════════════════════════════════════════════
+   TOAST / NOTIFICATION SYSTEM
+══════════════════════════════════════════════════════════════ */
+/* Global toast emitter — works without React context */
+const _toastListeners = [];
+const toastEmit = (toast) => _toastListeners.forEach(fn => fn(toast));
+
+function useToastEmitter(addToast) {
+  useEffect(() => {
+    _toastListeners.push(addToast);
+    return () => { const i = _toastListeners.indexOf(addToast); if(i>-1)_toastListeners.splice(i,1); };
+  }, [addToast]);
+}
+
+/* Utility to fire a desktop (OS) notification + in-app toast */
+function fireNotification({ title, body, type = 'info', duration = 7000 }) {
+  // In-app toast
+  toastEmit({ id: Date.now() + Math.random(), title, body, type, duration });
+  // Desktop notification
+  if ('Notification' in window) {
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico', tag: type });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') new Notification(title, { body, icon: '/favicon.ico', tag: type });
+      });
+    }
+  }
+}
+
+/* Toast Container — mounted once at top level */
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((t) => {
+    setToasts(p => [...p, { ...t, leaving: false }]);
+    setTimeout(() => {
+      setToasts(p => p.map(x => x.id === t.id ? { ...x, leaving: true } : x));
+      setTimeout(() => setToasts(p => p.filter(x => x.id !== t.id)), 250);
+    }, t.duration || 7000);
+  }, []);
+  useToastEmitter(addToast);
+  const dismiss = (id) => {
+    setToasts(p => p.map(x => x.id === id ? { ...x, leaving: true } : x));
+    setTimeout(() => setToasts(p => p.filter(x => x.id !== id)), 250);
+  };
+  const typeIcon = { lunch: 'utensils', break: 'coffee', info: 'bell', warn: 'alert', custom: 'zap' };
+  return (
+    <div className="toast-container">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast${t.leaving?' leaving':''}`}>
+          <div className={`toast-ic ${t.type}`}><Ic n={typeIcon[t.type]||'bell'} size={16} sw={2}/></div>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="toast-title">{t.title}</div>
+            <div className="toast-body">{t.body}</div>
+          </div>
+          <button className="toast-close" onClick={()=>dismiss(t.id)}><Ic n="x" size={14}/></button>
+          <div className="toast-bar" style={{animationDuration:`${(t.duration||7000)}ms`}}/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* Request desktop notification permission early */
+function useNotifPermission() {
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      // Small delay so it doesn't pop immediately on login
+      const t = setTimeout(() => Notification.requestPermission(), 3000);
+      return () => clearTimeout(t);
+    }
+  }, []);
+}
+
+/* ── Lunch reminder hook (used by AgentApp) ──
+   Checks every 30 seconds if lunch is 5 minutes away and fires once per slot. */
+function useLunchReminder(lunchInfo) {
+  const firedRef = useRef(new Set());
+  useEffect(() => {
+    if (!lunchInfo?.group || !lunchInfo?.slot) return;
+    const check = () => {
+      const now = new Date();
+      const [h, m] = lunchInfo.slot.from.split(':').map(Number);
+      const lunch = new Date(now); lunch.setHours(h, m, 0, 0);
+      const diff = (lunch - now) / 60000; // minutes
+      const key = `${lunchInfo.slot.from}-${lunchInfo.group}`;
+      if (diff > 0 && diff <= 5 && !firedRef.current.has(key)) {
+        firedRef.current.add(key);
+        fireNotification({
+          title: `🍽️ Lunch in ${Math.ceil(diff)} minute${Math.ceil(diff)===1?'':'s'}!`,
+          body: `Group ${lunchInfo.group} lunch starts at ${lunchInfo.slot.from}. Please get ready!`,
+          type: 'lunch',
+          duration: 10000,
+        });
+      }
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, [lunchInfo]);
+}
+
+/* ── Supabase realtime notification listener (used by AgentApp) ──
+   Listens for rows inserted into bt_notifications addressed to this user or 'all'. */
+function useAgentNotifListener(userId) {
+  useEffect(() => {
+    const ch = SB.channel('notifs-agent-' + userId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bt_notifications' }, ({ new: nw }) => {
+        if (nw.target_user_id && nw.target_user_id !== userId) return; // not for us
+        fireNotification({ title: nw.title, body: nw.body, type: nw.type || 'custom', duration: 9000 });
+      })
+      .subscribe();
+    return () => SB.removeChannel(ch);
+  }, [userId]);
+}
+
+/* ══════════════════════════════════════════════════════════════
    ROOT
 ══════════════════════════════════════════════════════════════ */
 function App() {
   const [user,  setUser]  = useState(null);
   const [ready, setReady] = useState(false);
+  useNotifPermission();
   useEffect(()=>{
     SB.auth.getSession().then(({data:{session}})=>{ setUser(session?.user||null); setReady(true); });
     const {data:{subscription}} = SB.auth.onAuthStateChange((_,session)=>{ setUser(session?.user||null); });
     return ()=>subscription.unsubscribe();
   },[]);
-  if(!ready) return <Splash/>;
-  if(!user)  return <LoginPage/>;
+  if(!ready) return <><Splash/><ToastContainer/></>;
+  if(!user)  return <><LoginPage/><ToastContainer/></>;
   const role = user.user_metadata?.role;
   const name = user.user_metadata?.display_name || user.email;
   const out  = ()=>SB.auth.signOut();
-  return role==='admin'
-    ? <AdminApp user={user} name={name} onLogout={out}/>
-    : <AgentApp user={user} name={name} onLogout={out}/>;
+  return (
+    <>
+      {role==='admin'
+        ? <AdminApp user={user} name={name} onLogout={out}/>
+        : <AgentApp user={user} name={name} onLogout={out}/>}
+      <ToastContainer/>
+    </>
+  );
 }
 
 function Splash(){
@@ -414,6 +571,10 @@ function AgentApp({user,name,onLogout}){
   const [lunchInfo, setLunchInfo] = useState(null); // {group:'A'|'B', slot:{from,to}}
   const timerRef = useRef(null);
   const today = todayISO();
+
+  // Notification hooks
+  useLunchReminder(lunchInfo);
+  useAgentNotifListener(user.id);
 
   const load = useCallback(async()=>{
     setLoading(true); setErr('');
@@ -668,6 +829,7 @@ function AdminApp({user,name,onLogout}){
     {id:'lunch',     n:'sandwich', label:'Lunch Schedule'},
     {id:'analytics', n:'trending', label:'Analytics'},
     {id:'logs',      n:'clock',    label:'All Logs'},
+    {id:'notifs',    n:'bell',     label:'Notifications'},
     {id:'settings',  n:'settings', label:'Settings'},
   ];
   return(
@@ -698,6 +860,7 @@ function AdminApp({user,name,onLogout}){
         {tab==='lunch'     &&<ALunch/>}
         {tab==='analytics' &&<AAnalytics/>}
         {tab==='logs'      &&<ALogs/>}
+        {tab==='notifs'    &&<ANotifications/>}
         {tab==='settings'  &&<ASettings/>}
       </main>
     </div>
@@ -807,12 +970,26 @@ function ALive(){
     return()=>SB.removeChannel(ch);
   },[load]);
 
-  const remoteStart=async(agent)=>{
+  const remoteStart = async (agent) => {
     setRemoting(agent.user_id); setErr('');
-    const now=new Date().toISOString();
-    const {data,error}=await run(SB.from('bt_logs').insert({user_id:agent.user_id,agent_name:agent.agent_name,start_time:now}).select().single());
-    if(error){setErr('Remote break failed: '+error.message);}
-    else{setLive(p=>[...p,data]);}
+    const now = new Date().toISOString();
+    const { data, error } = await run(
+      SB.from('bt_logs').insert({ user_id: agent.user_id, agent_name: agent.agent_name, start_time: now }).select().single()
+    );
+    if (error) {
+      setErr('Remote break failed: ' + error.message);
+    } else {
+      setLive(p => [...p, data]);
+      // Push a real‑time notification to the agent
+      await run(
+        SB.from('bt_notifications').insert({
+          title: '⏱️ Break Started',
+          body: 'Your break was started remotely by an admin.',
+          type: 'break',
+          target_user_id: agent.user_id,
+        })
+      );
+    }
     setRemoting(null); setConfirm(null);
   };
 
@@ -897,8 +1074,8 @@ function AClocks(){
   const [loading,setLoad]=useState(true);
   const [err,setErr]=useState('');
   const [rt,setRt]=useState(false);
-  const [clockingIn,setClockingIn]=useState(null); // user_id being processed
-  const [confirmClock,setConfirmClock]=useState(null); // {user_id,agent_name}
+  const [clockingIn,setClockingIn]=useState(null);
+  const [confirmClock,setConfirmClock]=useState(null);
 
   const load=useCallback(async()=>{
     setLoad(true);setErr('');
@@ -919,12 +1096,6 @@ function AClocks(){
     return()=>SB.removeChannel(ch);
   },[load,date]);
 
-  /* Remote clock in — needs the user_id and display_name from Supabase Auth.
-     We look them up from auth.users via a simple approach: we use the agent_name
-     stored in existing clock records or fetch from a known list. Since we can't
-     query auth.users from the client directly, we use a workaround:
-     Admin types the agent name and we create the clock record with user_id from
-     the most recent existing record for that agent, or admin picks from a dropdown. */
   const remoteClockIn=async(agentName,userId)=>{
     setClockingIn(userId);setErr('');
     const now=new Date().toISOString();
@@ -997,11 +1168,11 @@ function AClocks(){
   );
 }
 
-/* Modal for remote clock in — picks from ALL known agents, filters out already clocked in today */
+/* Modal for remote clock in */
 function RemoteClockInModal({date,onDone,onClose}){
-  const [allAgents,  setAllAgents]  = useState([]); // everyone ever in bt_clocklogs
-  const [todayNames, setTodayNames] = useState([]); // names already clocked in today
-  const [available,  setAvailable]  = useState([]); // allAgents minus today
+  const [allAgents,  setAllAgents]  = useState([]);
+  const [todayNames, setTodayNames] = useState([]);
+  const [available,  setAvailable]  = useState([]);
   const [selected,   setSelected]   = useState('');
   const [busy,       setBusy]       = useState(false);
   const [loading,    setLoading]    = useState(true);
@@ -1009,7 +1180,6 @@ function RemoteClockInModal({date,onDone,onClose}){
 
   useEffect(()=>{
     (async()=>{
-      // 1. All unique agents ever recorded — order by clock_in desc, no created_at needed
       const {data:hist} = await run(
         SB.from('bt_clocklogs')
           .select('user_id,agent_name')
@@ -1023,14 +1193,12 @@ function RemoteClockInModal({date,onDone,onClose}){
       });
       setAllAgents(unique);
 
-      // 2. Who is already clocked in today?
       const {data:today} = await run(
         SB.from('bt_clocklogs').select('agent_name').eq('date',date)
       );
       const todaySet = new Set((today||[]).map(r=>r.agent_name));
       setTodayNames([...todaySet]);
 
-      // 3. Available = in history but NOT already clocked in today
       const avail = unique.filter(a=>!todaySet.has(a.agent_name));
       setAvailable(avail);
       if(avail.length>0) setSelected(avail[0].user_id);
@@ -1086,11 +1254,11 @@ function RemoteClockInModal({date,onDone,onClose}){
 /* ── Admin Lunch Schedule ── */
 function ALunch(){
   const [date,    setDate]    = useState(todayISO());
-  const [row,     setRow]     = useState(null);   // bt_lunch_schedule row
+  const [row,     setRow]     = useState(null);
   const [grpA,    setGrpA]    = useState([]);
   const [grpB,    setGrpB]    = useState([]);
-  const [pool,    setPool]    = useState([]);     // clocked in but unassigned
-  const [first,   setFirst]   = useState('A');    // which group goes at 13:00
+  const [pool,    setPool]    = useState([]);
+  const [first,   setFirst]   = useState('A');
   const [loading, setLoad]    = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState('');
@@ -1098,47 +1266,35 @@ function ALunch(){
 
   const load=useCallback(async()=>{
     setLoad(true);setErr('');setSaved(false);
-
-    // Load existing schedule for the selected date
     const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',date).maybeSingle());
-
-    // Load agents clocked in on the selected date
     const {data:ck}=await run(SB.from('bt_clocklogs').select('agent_name').eq('date',date));
     const allClocked=[...new Set((ck||[]).map(r=>r.agent_name))];
 
     if(ls){
-      // Schedule already exists for this date — use it directly
       const a=ls.group_a||[];
       const b=ls.group_b||[];
       setRow(ls); setGrpA(a); setGrpB(b);
       setFirst(ls.group_first||defaultFirst(date));
-      // Any agent clocked in today but not yet assigned → pool
       setPool(allClocked.filter(n=>!a.includes(n)&&!b.includes(n)));
     } else {
-      // No schedule for this date — try to auto-fill from the most recent previous schedule
       const {data:prev}=await run(
         SB.from('bt_lunch_schedule')
           .select('*')
-          .lt('date', date)          // any date before today
+          .lt('date', date)
           .order('date',{ascending:false})
           .limit(1)
           .maybeSingle()
       );
-
       setRow(null);
       setFirst(defaultFirst(date));
-
       if(prev){
-        // Auto-fill: keep agents from previous groups if they're clocked in today
         const prevA = (prev.group_a||[]).filter(n=>allClocked.includes(n));
         const prevB = (prev.group_b||[]).filter(n=>allClocked.includes(n));
         const assigned = new Set([...prevA,...prevB]);
-        // Any new agent clocked in today who wasn't in yesterday's schedule → pool
         const newAgents = allClocked.filter(n=>!assigned.has(n));
         setGrpA(prevA); setGrpB(prevB);
         setPool(newAgents);
       } else {
-        // No previous schedule at all — everyone goes to pool
         setGrpA([]); setGrpB([]);
         setPool(allClocked);
       }
@@ -1187,8 +1343,6 @@ function ALunch(){
         </div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
-
-      {/* First slot toggle */}
       <div className="sc" style={{marginBottom:14}}>
         <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-t">Rotation — who goes first today?</h2></div>
         <div style={{padding:'16px 18px',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
@@ -1201,11 +1355,9 @@ function ALunch(){
           <span style={{fontSize:12,color:'var(--mut)',marginLeft:8}}>Auto-rotates daily · override here if needed</span>
         </div>
       </div>
-
       {loading?<div className="es"><div className="spin"/></div>:(
         <>
           <div className="lunch-groups">
-            {/* Group A */}
             <div className="lunch-group-card grp-a">
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                 <div className="fc g8">
@@ -1225,8 +1377,6 @@ function ALunch(){
                 </div>
               ))}
             </div>
-
-            {/* Group B */}
             <div className="lunch-group-card grp-b">
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                 <div className="fc g8">
@@ -1247,8 +1397,6 @@ function ALunch(){
               ))}
             </div>
           </div>
-
-          {/* Unassigned pool */}
           {pool.length>0&&(
             <div className="lunch-group-card unset-pool" style={{borderRadius:14,padding:16,marginBottom:14}}>
               <div style={{fontSize:12,fontWeight:700,color:'var(--mut)',marginBottom:10}}>Unassigned — clocked in today ({pool.length})</div>
@@ -1262,7 +1410,6 @@ function ALunch(){
               ))}
             </div>
           )}
-
           {pool.length===0&&grpA.length===0&&grpB.length===0&&(
             <div className="es"><span className="es-ic"><Ic n="users" size={36} sw={1.2}/></span><p>No agents clocked in for {date} yet. Once agents clock in their names will appear here.</p></div>
           )}
@@ -1409,6 +1556,207 @@ function ALogs(){
           </div>
         )
       }
+    </div>
+  );
+}
+
+/* ── Admin Notifications (NEW) ── */
+function ANotifications() {
+  const [agents, setAgents] = useState([]);
+  const [target, setTarget] = useState('all');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [type, setType] = useState('info');
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState('');
+  const [sent, setSent] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await run(
+        SB.from('bt_clocklogs')
+          .select('user_id,agent_name')
+          .order('clock_in', { ascending: false })
+          .limit(500)
+      );
+      const seen = new Set();
+      const unique = [];
+      (data || []).forEach(r => {
+        if (!seen.has(r.user_id)) {
+          seen.add(r.user_id);
+          unique.push(r);
+        }
+      });
+      setAgents(unique);
+      if (unique.length > 0) setTarget(unique[0].user_id);
+    })();
+
+    (async () => {
+      const { data, error } = await run(
+        SB.from('bt_notifications')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(30)
+      );
+      if (!error) setHistory(data || []);
+      setLoading(false);
+    })();
+  }, []);
+
+  const send = async () => {
+    if (!title.trim() || !body.trim()) { setErr('Title and body are required.'); return; }
+    setSending(true); setErr(''); setSent(false);
+    const payload = {
+      title: title.trim(),
+      body: body.trim(),
+      type,
+      target_user_id: target === 'all' ? null : target,
+    };
+    const { error } = await run(SB.from('bt_notifications').insert(payload));
+    if (error) {
+      setErr('Send failed: ' + error.message);
+    } else {
+      setSent(true);
+      setTitle('');
+      setBody('');
+      const { data } = await run(
+        SB.from('bt_notifications').select('*').order('created_at', { ascending: false }).limit(30)
+      );
+      setHistory(data || []);
+      setTimeout(() => setSent(false), 3000);
+    }
+    setSending(false);
+  };
+
+  const typeOptions = [
+    { value: 'info', label: 'Info', icon: 'bell' },
+    { value: 'lunch', label: 'Lunch', icon: 'utensils' },
+    { value: 'break', label: 'Break', icon: 'coffee' },
+    { value: 'warn', label: 'Warning', icon: 'alert' },
+    { value: 'custom', label: 'Custom', icon: 'zap' },
+  ];
+
+  return (
+    <div className="panel">
+      <div className="phd">
+        <div>
+          <h1 className="pt">Notifications</h1>
+          <p className="ps">Push a real‑time alert + desktop notification to agents</p>
+        </div>
+      </div>
+
+      {err && <div className="ebox"><Ic n="alert" size={14} /> {err}</div>}
+
+      <div className="sc" style={{ marginBottom: 20 }}>
+        <div className="sc-hd">
+          <span className="sc-ic"><Ic n="send" size={15} /></span>
+          <h2 className="sc-t">Compose</h2>
+        </div>
+        <div style={{ padding: '20px 24px' }}>
+          <div className="fg">
+            <label className="fl">Preset / Quick Send</label>
+            <div className="notif-grid">
+              {[
+                { t: '🍽️ Lunch Time!', b: 'Your lunch break starts now. Please go to the break room.', type: 'lunch' },
+                { t: '⚠️ Break Overdue', b: 'You have been on break for over 30 minutes.', type: 'warn' },
+                { t: '📋 Reminder', b: 'Please remember to clock in before taking a break.', type: 'info' },
+                { t: '🚨 All Hands', b: 'All agents please return from break immediately.', type: 'warn' },
+              ].map(p => (
+                <button key={p.t} className="notif-preset" onClick={() => { setTitle(p.t); setBody(p.b); setType(p.type); }}>
+                  <div className="notif-preset-icon" style={{ background: p.type==='lunch'?'var(--acc-d)':p.type==='warn'?'var(--wrn-d)':'var(--purp-d)' }}>
+                    <Ic n={p.type==='lunch'?'utensils':p.type==='warn'?'alert':'bell'} size={16} />
+                  </div>
+                  <div className="notif-preset-title">{p.t}</div>
+                  <div className="notif-preset-sub">{p.b}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="fg">
+            <label className="fl">Target</label>
+            <select className="fi" value={target} onChange={e => setTarget(e.target.value)}>
+              <option value="all">All agents</option>
+              {agents.map(a => (
+                <option key={a.user_id} value={a.user_id}>{a.agent_name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="fg">
+            <label className="fl">Type</label>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {typeOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setType(opt.value)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 20, border: '1.5px solid',
+                    background: type === opt.value ? 'var(--acc-d)' : 'var(--card)',
+                    color: type === opt.value ? 'var(--acc)' : 'var(--mut)',
+                    borderColor: type === opt.value ? 'var(--acc-r)' : 'var(--bdr)',
+                    fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  <Ic n={opt.icon} size={13} /> {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="fg">
+            <label className="fl">Title</label>
+            <input className="fi" value={title} onChange={e => setTitle(e.target.value)} placeholder="Notification title" />
+          </div>
+          <div className="fg">
+            <label className="fl">Body</label>
+            <input className="fi" value={body} onChange={e => setBody(e.target.value)} placeholder="Details…" />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+            <button className="bp" onClick={send} disabled={sending || !title || !body}>
+              {sending ? <span className="spin-sm" /> : <Ic n="send" size={14} />} Send
+            </button>
+            {sent && <span style={{ color: 'var(--acc)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}><Ic n="check" size={14} /> Sent</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="sc">
+        <div className="sc-hd">
+          <span className="sc-ic"><Ic n="clock" size={15} /></span>
+          <h2 className="sc-t">Recent Notifications</h2>
+        </div>
+        {loading ? <div className="es"><div className="spin" /></div>
+          : history.length === 0 ? <div className="es"><span className="es-ic"><Ic n="bell" size={36} sw={1.2} /></span><p>No notifications sent yet</p></div>
+            : (
+              <div style={{ padding: '6px 10px' }}>
+                <div className="notif-history">
+                  {history.map(n => {
+                    const iconMap = { lunch: 'utensils', break: 'coffee', info: 'bell', warn: 'alert', custom: 'zap' };
+                    return (
+                      <div key={n.id} className="notif-hist-item">
+                        <div className="notif-hist-ic" style={{ background: n.type === 'lunch' ? 'var(--acc-d)' : n.type === 'warn' ? 'var(--wrn-d)' : 'var(--purp-d)' }}>
+                          <Ic n={iconMap[n.type] || 'bell'} size={14} col={n.type === 'lunch' ? 'var(--acc)' : n.type === 'warn' ? 'var(--wrn)' : 'var(--purp)'} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{n.title}</div>
+                          <div style={{ fontSize: 12, color: 'var(--mut)' }}>{n.body}</div>
+                          <div style={{ fontSize: 10, color: '#444', marginTop: 4 }}>
+                            {n.target_user_id ? `→ ${agents.find(a => a.user_id === n.target_user_id)?.agent_name || 'unknown'}` : '→ All'} · {new Date(n.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )
+        }
+      </div>
     </div>
   );
 }
