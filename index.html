@@ -1669,12 +1669,12 @@ function ALogs(){
 
 /* ── Admin Notifications ── */
 const PRESETS = [
-  { key:'lunch_a',  icon:'utensils', iconCls:'lunch',  title:'Lunch — Group A',   body:"Group A: your lunch break starts now. Please head to the break room.",   recipientHint:'group_a' },
-  { key:'lunch_b',  icon:'utensils', iconCls:'break',  title:'Lunch — Group B',   body:"Group B: your lunch break starts now. Please head to the break room.",   recipientHint:'group_b' },
+  { key:'lunch_a',  icon:'utensils', iconCls:'lunch',  title:'Lunch — Group A',   body:"Group A: your lunch break starts now. Please wrap up your call and do not take anymore calls.",   recipientHint:'group_a' },
+  { key:'lunch_b',  icon:'utensils', iconCls:'break',  title:'Lunch — Group B',   body:"Group B: your lunch break starts now. Please wrap up your call and do not take anymore calls",   recipientHint:'group_b' },
   { key:'break',    icon:'coffee',   iconCls:'break',  title:'Take Your Break',    body:"It's time to take your 15-minute break. Please log it in BreakTrack.",  recipientHint:'all' },
   { key:'clockin',  icon:'login2',   iconCls:'info',   title:'Clock In Reminder', body:"Your shift is starting. Please clock in via BreakTrack now.",            recipientHint:'all' },
-  { key:'return',   icon:'zap',      iconCls:'warn',   title:'Return to Desk',    body:"Your break time is up. Please return to your workstation.",              recipientHint:'all' },
-  { key:'meeting',  icon:'users',    iconCls:'custom', title:'Team Meeting',       body:"There is a team meeting starting shortly. Please wrap up and join.",     recipientHint:'all' },
+  { key:'return',   icon:'zap',      iconCls:'warn',   title:'Break Time',        body:"It's time for you to go on a break 😊",              recipientHint:'all' },
+  { key:'meeting',  icon:'users',    iconCls:'custom', title:'Team Meeting',       body:"There is a team meeting starting shortly. Please wrap up and join teams meeting.",     recipientHint:'all' },
 ];
 
 // recipientMode: 'all' | 'group_a' | 'group_b' | 'custom'
