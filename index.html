@@ -223,6 +223,25 @@ html,body,#root{height:100%;background:var(--bg);color:var(--txt);font-family:va
 .btn-edit{background:none;border:1px solid var(--bdr);border-radius:6px;color:var(--mut);padding:4px 10px;font-size:11px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .15s}
 .btn-edit:hover{border-color:var(--acc);color:var(--acc)}
 .type-sel{background:var(--card);border:1px solid var(--acc-r);border-radius:6px;padding:4px 8px;color:var(--txt);font-size:12px;font-weight:600;font-family:var(--font);outline:none;cursor:pointer}
+/* Swap request cards */
+.swap-req-card{background:var(--surf);border:1.5px solid rgba(234,179,8,.35);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:12px;animation:mslide .25s ease}
+.swap-req-card.incoming{border-color:var(--acc-r);background:var(--acc-d)}
+.swap-req-card.outgoing{border-color:rgba(167,139,250,.3);background:var(--purp-d)}
+.swap-req-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:3px 9px;border-radius:20px}
+.swap-req-badge.incoming{background:rgba(62,207,142,.15);color:var(--acc);border:1px solid var(--acc-r)}
+.swap-req-badge.outgoing{background:var(--purp-d);color:var(--purp);border:1px solid rgba(167,139,250,.3)}
+.swap-req-badge.pending{background:var(--wrn-d);color:var(--wrn);border:1px solid rgba(234,179,8,.3)}
+.swap-action-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-accept{background:#0f2b1e;color:var(--acc);border:1px solid var(--acc-r);border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s}
+.btn-accept:hover{background:rgba(62,207,142,.2)}
+.btn-decline{background:var(--dan-d);color:var(--dan);border:1px solid rgba(240,82,82,.25);border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s}
+.btn-decline:hover{background:rgba(240,82,82,.2)}
+.swap-who{font-size:14px;font-weight:700}
+.swap-detail{font-size:12px;color:var(--mut);line-height:1.5}
+/* Admin swap table */
+.swap-status-pending{color:var(--wrn);font-weight:700}
+.swap-status-accepted{color:var(--acc);font-weight:700}
+.swap-status-declined{color:var(--dan);font-weight:700}
 /* Lunch schedule admin */
 .lunch-groups{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .lunch-group-card{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:16px;min-height:120px}
@@ -301,6 +320,8 @@ const PATHS = {
   x:        ["M18 6L6 18","M6 6l12 12"],
   bell:     ["M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9","M13.73 21a2 2 0 0 1-3.46 0"],
   send:     ["M22 2L11 13","M22 2L15 22 11 13 2 9l20-7z"],
+  swap:     ["M7 16V4m0 0L3 8m4-4l4 4","M17 8v12m0 0l4-4m-4 4l-4-4"],
+  arrowlr:  ["M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"],
 };
 const Ic = ({ n, size=16, sw=1.8, col }) => {
   const d = PATHS[n] || "M12 12h.01";
@@ -466,6 +487,8 @@ function useNotifPermission() {
 ══════════════════════════════════════════════════════════════ */
 const BROADCAST_CHANNEL = 'bt_broadcast';
 const BROADCAST_EVENT   = 'notif';
+const SWAP_CHANNEL      = 'bt_swap';
+const SWAP_EVENT        = 'swap_request';
 
 /* Publish a notification to all agents (or a specific user_id) via Supabase Realtime broadcast */
 async function broadcastNotif({ title, body, type = 'custom', targetUserId = null, lunchGroup = null }) {
@@ -475,6 +498,42 @@ async function broadcastNotif({ title, body, type = 'custom', targetUserId = nul
   });
   await ch.send({ type:'broadcast', event: BROADCAST_EVENT, payload:{ title, body, type, targetUserId, lunchGroup } });
   SB.removeChannel(ch);
+}
+
+/* ── Broadcast a swap request/response via Realtime ── */
+async function broadcastSwap(payload) {
+  const ch = SB.channel(SWAP_CHANNEL);
+  await new Promise(res => { ch.subscribe(s => { if(s==='SUBSCRIBED') res(); }); });
+  await ch.send({ type:'broadcast', event: SWAP_EVENT, payload });
+  SB.removeChannel(ch);
+}
+
+/* ── Persist swap request to DB ── */
+async function createSwapRequest({ fromUserId, fromName, toUserId, toName, fromGroup, toGroup, date }) {
+  const { data, error } = await run(
+    SB.from('bt_swap_requests').insert({
+      from_user_id: fromUserId, from_name: fromName,
+      to_user_id: toUserId,   to_name: toName,
+      from_group: fromGroup,  to_group: toGroup,
+      date, status: 'pending',
+      created_at: new Date().toISOString(),
+    }).select().single()
+  );
+  return { data, error };
+}
+
+/* ── Agent: listen for incoming swap requests/responses ── */
+function useSwapListener(userId, onRequest) {
+  useEffect(() => {
+    const ch = SB.channel(SWAP_CHANNEL + '-' + userId)
+      .on('broadcast', { event: SWAP_EVENT }, ({ payload }) => {
+        if (payload.toUserId === userId || payload.fromUserId === userId) {
+          onRequest(payload);
+        }
+      })
+      .subscribe();
+    return () => SB.removeChannel(ch);
+  }, [userId]);
 }
 
 /* ── Agent: listen for broadcast notifications ── */
@@ -659,12 +718,35 @@ function AgentApp({user,name,onLogout}){
   const [loading,   setLoading]   = useState(true);
   const [err,       setErr]       = useState('');
   const [lunchInfo, setLunchInfo] = useState(null); // {group:'A'|'B', slot:{from,to}}
+  // Swap request state
+  const [incomingSwaps, setIncomingSwaps] = useState([]); // pending requests TO this agent
+  const [outgoingSwap,  setOutgoingSwap]  = useState(null); // request FROM this agent (pending)
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapBusy,      setSwapBusy]      = useState(false);
   const timerRef = useRef(null);
   const today = todayISO();
 
   // Notification hooks
   useLunchReminder(lunchInfo);
   useAgentNotifListener(user.id, lunchInfo);
+
+  // Swap listener
+  useSwapListener(user.id, useCallback((payload) => {
+    if (payload.action === 'request' && payload.toUserId === user.id) {
+      setIncomingSwaps(p => p.some(s=>s.id===payload.id) ? p : [...p, payload]);
+      fireNotification({ title: '🔄 Lunch Swap Request', body: `${payload.fromName} wants to swap lunch groups with you (${payload.fromGroup} ↔ ${payload.toGroup})`, type: 'custom', duration: 15000 });
+    }
+    if (payload.action === 'accepted' && payload.fromUserId === user.id) {
+      setOutgoingSwap(null);
+      // Reload lunch info to reflect the swap
+      load();
+      fireNotification({ title: '✅ Swap Accepted!', body: `${payload.toName} accepted your lunch swap request. Your schedule has been updated.`, type: 'info', duration: 10000 });
+    }
+    if (payload.action === 'declined' && payload.fromUserId === user.id) {
+      setOutgoingSwap(null);
+      fireNotification({ title: '❌ Swap Declined', body: `${payload.toName} declined your lunch swap request.`, type: 'warn', duration: 8000 });
+    }
+  }, [user.id]));
 
   const load = useCallback(async()=>{
     setLoading(true); setErr('');
@@ -693,11 +775,19 @@ function AgentApp({user,name,onLogout}){
         setLunchInfo({group:null, allA:grpA, allB:grpB});
       }
     } else { setLunchInfo(null); }
+    // Load any pending outgoing swap requests
+    const {data:mySwaps} = await run(SB.from('bt_swap_requests').select('*').eq('from_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}).limit(1));
+    if(mySwaps&&mySwaps.length>0) setOutgoingSwap(mySwaps[0]);
+    else setOutgoingSwap(null);
+    // Load pending incoming swap requests
+    const {data:incoming} = await run(SB.from('bt_swap_requests').select('*').eq('to_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}));
+    setIncomingSwaps(incoming||[]);
     setLoading(false);
   },[user.id,today,name]);
 
   useEffect(()=>{ load(); },[load]);
 
+  // Real-time: break logs
   useEffect(()=>{
     const ch = SB.channel('agent-rt-'+user.id)
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'bt_logs'},({new:nw})=>{
@@ -711,6 +801,42 @@ function AgentApp({user,name,onLogout}){
       .subscribe();
     return()=>SB.removeChannel(ch);
   },[user.id]);
+
+  // Real-time: lunch schedule — auto-refresh when admin saves changes
+  useEffect(()=>{
+    const ch = SB.channel('agent-lunch-rt-'+user.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},({new:nw})=>{
+        if(!nw||nw.date!==today) return;
+        const grpA = nw.group_a || [];
+        const grpB = nw.group_b || [];
+        const myGrp = grpA.includes(name) ? 'A' : grpB.includes(name) ? 'B' : null;
+        const first = nw.group_first || defaultFirst(today);
+        const slots = lunchSlots(first);
+        if(myGrp){
+          setLunchInfo({group:myGrp, slot:slots[myGrp], allA:grpA, allB:grpB, first, slots});
+        } else {
+          setLunchInfo({group:null, allA:grpA, allB:grpB});
+        }
+      })
+      .subscribe();
+    return()=>SB.removeChannel(ch);
+  },[user.id,today,name]);
+
+  // Real-time: swap requests
+  useEffect(()=>{
+    const ch = SB.channel('agent-swaps-rt-'+user.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},({eventType,new:nw})=>{
+        if(!nw) return;
+        if(nw.to_user_id===user.id && nw.status==='pending')
+          setIncomingSwaps(p=>p.some(s=>s.id===nw.id)?p.map(s=>s.id===nw.id?nw:s):[...p,nw]);
+        if(nw.to_user_id===user.id && nw.status!=='pending')
+          setIncomingSwaps(p=>p.filter(s=>s.id!==nw.id));
+        if(nw.from_user_id===user.id && nw.status==='pending') setOutgoingSwap(nw);
+        if(nw.from_user_id===user.id && nw.status!=='pending') { setOutgoingSwap(null); if(nw.status==='accepted') load(); }
+      })
+      .subscribe();
+    return()=>SB.removeChannel(ch);
+  },[user.id,today]);
 
   useEffect(()=>{
     const id=setInterval(async()=>{
@@ -760,12 +886,74 @@ function AgentApp({user,name,onLogout}){
     setActive(null); setTeamCount(c=>Math.max(0,c-1));
   };
 
+  // Swap: send request to another agent
+  const sendSwapRequest = async(targetAgent) => {
+    if(!lunchInfo?.group) return;
+    setSwapBusy(true);
+    const targetGroup = targetAgent.group;
+    const {data,error} = await createSwapRequest({
+      fromUserId: user.id, fromName: name,
+      toUserId: targetAgent.userId, toName: targetAgent.name,
+      fromGroup: lunchInfo.group, toGroup: targetGroup, date: today,
+    });
+    if(error){ setErr('Could not send swap request: '+error.message); setSwapBusy(false); return; }
+    setOutgoingSwap(data);
+    await broadcastSwap({ action:'request', id:data.id, fromUserId:user.id, fromName:name, toUserId:targetAgent.userId, toName:targetAgent.name, fromGroup:lunchInfo.group, toGroup:targetGroup, date:today });
+    setShowSwapModal(false);
+    setSwapBusy(false);
+    fireNotification({ title: '📤 Swap Request Sent', body: `Waiting for ${targetAgent.name} to respond.`, type: 'info', duration: 6000 });
+  };
+
+  const cancelSwapRequest = async() => {
+    if(!outgoingSwap) return;
+    await run(SB.from('bt_swap_requests').update({status:'cancelled'}).eq('id',outgoingSwap.id));
+    setOutgoingSwap(null);
+  };
+
+  // Swap: respond to incoming request
+  const respondToSwap = async(swapReq, accepted) => {
+    setSwapBusy(true);
+    const newStatus = accepted ? 'accepted' : 'declined';
+    await run(SB.from('bt_swap_requests').update({status:newStatus, responded_at:new Date().toISOString()}).eq('id',swapReq.id));
+    setIncomingSwaps(p=>p.filter(s=>s.id!==swapReq.id));
+
+    if(accepted) {
+      // Perform the actual group swap in bt_lunch_schedule
+      const {data:ls} = await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
+      if(ls) {
+        let newA = [...(ls.group_a||[])];
+        let newB = [...(ls.group_b||[])];
+        // Remove both from their current groups
+        newA = newA.filter(n=>n!==swapReq.from_name && n!==swapReq.to_name);
+        newB = newB.filter(n=>n!==swapReq.from_name && n!==swapReq.to_name);
+        // Put each in the other's group
+        if(swapReq.from_group==='A') { newB.push(swapReq.from_name); newA.push(swapReq.to_name); }
+        else { newA.push(swapReq.from_name); newB.push(swapReq.to_name); }
+        await run(SB.from('bt_lunch_schedule').update({group_a:newA,group_b:newB,updated_at:new Date().toISOString()}).eq('id',ls.id));
+        // Notify admin
+        broadcastNotif({ title:`🔄 Lunch Swap Completed`, body:`${swapReq.from_name} (Grp ${swapReq.from_group}) and ${swapReq.to_name} (Grp ${swapReq.to_group}) have swapped lunch groups.`, type:'info' });
+      }
+      // Notify the requester
+      await broadcastSwap({ action:'accepted', id:swapReq.id, fromUserId:swapReq.from_user_id, fromName:swapReq.from_name, toUserId:user.id, toName:name });
+      load();
+    } else {
+      await broadcastSwap({ action:'declined', id:swapReq.id, fromUserId:swapReq.from_user_id, fromName:swapReq.from_name, toUserId:user.id, toName:name });
+    }
+    setSwapBusy(false);
+  };
+
   const done=logs.filter(l=>l.end_time);
   const totalSec=done.reduce((s,l)=>s+(l.duration_secs||0),0);
   const predType=active?bType(Math.floor(elapsed/1000)):null;
   const atCap=teamCount>=maxB;
   const isClockedIn=clockRow?.clock_in&&!clockRow?.clock_out;
   const isClockedOut=clockRow?.clock_out;
+  // Other agents in the opposite group (for swap target selection)
+  const otherGroupAgents = lunchInfo?.group ? (
+    lunchInfo.group==='A'
+      ? (lunchInfo.allB||[]).map(n=>({name:n, group:'B', userId:null}))
+      : (lunchInfo.allA||[]).map(n=>({name:n, group:'A', userId:null}))
+  ) : [];
 
   return(
     <div className="ag-root">
@@ -788,6 +976,40 @@ function AgentApp({user,name,onLogout}){
 
         <LiveClock/>
 
+        {/* Incoming swap requests */}
+        {incomingSwaps.map(sr=>(
+          <div key={sr.id} className="swap-req-card incoming">
+            <div className="fc g8">
+              <span className="swap-req-badge incoming"><Ic n="swap" size={11}/> Swap Request</span>
+              <span style={{fontSize:11,color:'var(--mut)'}}>from {sr.from_name}</span>
+            </div>
+            <div className="swap-who">{sr.from_name} <span style={{color:'var(--mut)',fontWeight:400}}>wants to swap their</span> Group {sr.from_group} <span style={{color:'var(--mut)',fontWeight:400}}>for your</span> Group {sr.to_group}</div>
+            <div className="swap-detail">
+              If you accept: you move to Group {sr.from_group} · {sr.from_name} moves to Group {sr.to_group}. Admin will be notified automatically.
+            </div>
+            <div className="swap-action-row">
+              <button className="btn-accept" onClick={()=>respondToSwap(sr,true)} disabled={swapBusy}>
+                {swapBusy?<span className="spin-sm"/>:<Ic n="check" size={13}/>} Accept Swap
+              </button>
+              <button className="btn-decline" onClick={()=>respondToSwap(sr,false)} disabled={swapBusy}>
+                <Ic n="x" size={13}/> Decline
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Outgoing pending swap request */}
+        {outgoingSwap&&(
+          <div className="swap-req-card outgoing">
+            <div className="fc g8">
+              <span className="swap-req-badge pending"><Ic n="timer" size={11}/> Awaiting Response</span>
+            </div>
+            <div className="swap-who">Swap request sent to <span style={{color:'var(--purp)'}}>{outgoingSwap.to_name}</span></div>
+            <div className="swap-detail">You asked to swap Group {outgoingSwap.from_group} for Group {outgoingSwap.to_group}. Waiting for {outgoingSwap.to_name} to respond…</div>
+            <button className="btn-decline" style={{alignSelf:'flex-start'}} onClick={cancelSwapRequest}><Ic n="x" size={13}/> Cancel Request</button>
+          </div>
+        )}
+
         {/* Clock in/out */}
         <div className="clk-card">
           <div className="clk-info">
@@ -809,7 +1031,7 @@ function AgentApp({user,name,onLogout}){
         {/* Lunch schedule */}
         {lunchInfo && (
           <div className={`lunch-slot-card ${lunchInfo.group?'grp-'+lunchInfo.group.toLowerCase():'unset'}`}>
-            <div>
+            <div style={{flex:1}}>
               <div style={{fontSize:11,fontWeight:700,color:lunchInfo.group==='A'?'var(--acc)':lunchInfo.group==='B'?'var(--purp)':'var(--mut)',letterSpacing:1,textTransform:'uppercase',marginBottom:4}}>
                 {lunchInfo.group?`Group ${lunchInfo.group} — Your Lunch Slot`:'Lunch Schedule'}
               </div>
@@ -821,14 +1043,17 @@ function AgentApp({user,name,onLogout}){
               ) : <div style={{fontSize:13,color:'var(--mut)'}}>You are not assigned to a lunch group yet.</div>}
             </div>
             {lunchInfo.group && (
-              <div style={{textAlign:'right'}}>
-                <div style={{fontSize:11,color:'var(--mut)',marginBottom:6,fontWeight:600}}>FULL SCHEDULE</div>
-                <div style={{fontSize:12,color:'var(--mut)'}}>
-                  <span className="badge b-a" style={{marginRight:6}}>A</span>{lunchInfo.slots.A.from}–{lunchInfo.slots.A.to}
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10}}>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:11,color:'var(--mut)',marginBottom:6,fontWeight:600}}>FULL SCHEDULE</div>
+                  <div style={{fontSize:12,color:'var(--mut)'}}><span className="badge b-a" style={{marginRight:6}}>A</span>{lunchInfo.slots.A.from}–{lunchInfo.slots.A.to}</div>
+                  <div style={{fontSize:12,color:'var(--mut)',marginTop:4}}><span className="badge b-b" style={{marginRight:6}}>B</span>{lunchInfo.slots.B.from}–{lunchInfo.slots.B.to}</div>
                 </div>
-                <div style={{fontSize:12,color:'var(--mut)',marginTop:4}}>
-                  <span className="badge b-b" style={{marginRight:6}}>B</span>{lunchInfo.slots.B.from}–{lunchInfo.slots.B.to}
-                </div>
+                {!outgoingSwap && isClockedIn && (
+                  <button className="bs" style={{fontSize:12,padding:'6px 12px'}} onClick={()=>setShowSwapModal(true)}>
+                    <Ic n="swap" size={13}/> Request Swap
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -903,6 +1128,84 @@ function AgentApp({user,name,onLogout}){
           }
         </div>
       </div>
+
+      {/* Swap request modal */}
+      {showSwapModal&&lunchInfo?.group&&(
+        <SwapRequestModal
+          myName={name}
+          myGroup={lunchInfo.group}
+          otherGroup={lunchInfo.group==='A'?'B':'A'}
+          otherSlot={lunchInfo.group==='A'?lunchInfo.slots.B:lunchInfo.slots.A}
+          mySlot={lunchInfo.slot}
+          date={today}
+          onSend={sendSwapRequest}
+          onClose={()=>setShowSwapModal(false)}
+          busy={swapBusy}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Swap Request Modal ── */
+function SwapRequestModal({myName,myGroup,otherGroup,otherSlot,mySlot,date,onSend,onClose,busy}){
+  const [agents,setAgents]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState(null);
+  const [err,setErr]=useState('');
+
+  useEffect(()=>{
+    (async()=>{
+      // Load agents in the other group with their user_ids from bt_clocklogs
+      const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',date).maybeSingle());
+      if(!ls){setErr('No lunch schedule found for today.');setLoading(false);return;}
+      const otherNames = otherGroup==='A' ? (ls.group_a||[]) : (ls.group_b||[]);
+      if(otherNames.length===0){setErr(`No agents in Group ${otherGroup} to swap with.`);setLoading(false);return;}
+      // Look up user_ids from bt_clocklogs
+      const {data:ck}=await run(SB.from('bt_clocklogs').select('user_id,agent_name').eq('date',date).in('agent_name',otherNames));
+      const seen=new Set(); const list=[];
+      (ck||[]).forEach(r=>{ if(!seen.has(r.user_id)){seen.add(r.user_id);list.push({userId:r.user_id,name:r.agent_name,group:otherGroup});} });
+      setAgents(list);
+      if(list.length>0)setSelected(list[0].userId);
+      setLoading(false);
+    })();
+  },[date,otherGroup]);
+
+  const handleSend=()=>{
+    const ag=agents.find(a=>a.userId===selected);
+    if(ag) onSend(ag);
+  };
+
+  return(
+    <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box">
+        <div className="modal-title"><Ic n="swap" size={18}/> Request Lunch Swap</div>
+        <div className="modal-sub">
+          Ask a colleague in Group {otherGroup} to swap lunch slots with you.<br/>
+          <strong>Your slot:</strong> Group {myGroup} · {mySlot.from}–{mySlot.to}<br/>
+          <strong>Their slot:</strong> Group {otherGroup} · {otherSlot.from}–{otherSlot.to}
+        </div>
+        {err&&<div className="ebox" style={{marginBottom:12}}><Ic n="alert" size={14}/>{err}</div>}
+        {loading?<div style={{textAlign:'center',padding:16}}><div className="spin" style={{margin:'0 auto'}}/></div>
+         :agents.length===0&&!err?<div className="ebox"><Ic n="alert" size={14}/>No agents in Group {otherGroup} are clocked in today.</div>
+         :(
+          <div className="fg">
+            <label className="fl">Select agent to request swap ({agents.length} available)</label>
+            <select className="fi" value={selected||''} onChange={e=>setSelected(e.target.value)}>
+              {agents.map(a=><option key={a.userId} value={a.userId}>{a.name} (Group {a.group})</option>)}
+            </select>
+          </div>
+        )}
+        <div style={{background:'var(--card)',border:'1px solid var(--bdr)',borderRadius:8,padding:'10px 14px',fontSize:12,color:'var(--mut)',marginBottom:20,lineHeight:1.6}}>
+          If they accept: the swap happens automatically and admin is notified.
+        </div>
+        <div className="modal-foot">
+          <button className="bs" onClick={onClose}>Cancel</button>
+          <button className="bp" onClick={handleSend} disabled={busy||loading||agents.length===0||!selected}>
+            {busy?<span className="spin-sm"/>:<Ic n="send" size={14}/>} Send Request
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -918,6 +1221,7 @@ function AdminApp({user,name,onLogout}){
     {id:'live',      n:'activity', label:'Live'},
     {id:'clocks',    n:'sun',      label:'Clock In/Out'},
     {id:'lunch',     n:'sandwich', label:'Lunch Schedule'},
+    {id:'swaps',     n:'swap',     label:'Lunch Swaps'},
     {id:'analytics', n:'trending', label:'Analytics'},
     {id:'logs',      n:'clock',    label:'All Logs'},
     {id:'notifs',    n:'bell',     label:'Notifications'},
@@ -949,6 +1253,7 @@ function AdminApp({user,name,onLogout}){
         {tab==='live'      &&<ALive/>}
         {tab==='clocks'    &&<AClocks/>}
         {tab==='lunch'     &&<ALunch/>}
+        {tab==='swaps'     &&<ASwapRequests/>}
         {tab==='analytics' &&<AAnalytics/>}
         {tab==='logs'      &&<ALogs/>}
         {tab==='notifs'    &&<ANotifications/>}
@@ -1402,6 +1707,14 @@ function ALunch(){
 
   useEffect(()=>{load();},[load]);
 
+  // Real-time: when the schedule changes (e.g. swap auto-applied), reload
+  useEffect(()=>{
+    const ch=SB.channel('admin-lunch-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},()=>{ if(date===todayISO()) load(); })
+      .subscribe();
+    return()=>SB.removeChannel(ch);
+  },[date,load]);
+
   const move=(name,from,to)=>{
     const rem=arr=>arr.filter(n=>n!==name);
     if(from==='A')setGrpA(rem);
@@ -1521,6 +1834,96 @@ function ALunch(){
             <div className="es"><span className="es-ic"><Ic n="users" size={36} sw={1.2}/></span><p>No agents clocked in for {date} yet. Once agents clock in their names will appear here.</p></div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin Swap Requests ── */
+function ASwapRequests(){
+  const [swaps,setSwaps]=useState([]);
+  const [loading,setLoad]=useState(true);
+  const [err,setErr]=useState('');
+  const [rt,setRt]=useState(false);
+  const today=todayISO();
+
+  const load=useCallback(async()=>{
+    setLoad(true);setErr('');
+    const {data,error}=await run(
+      SB.from('bt_swap_requests').select('*').eq('date',today).order('created_at',{ascending:false})
+    );
+    if(error){setErr(error.message);}
+    else setSwaps(data||[]);
+    setLoad(false);
+  },[today]);
+
+  useEffect(()=>{
+    load();
+    const ch=SB.channel('admin-swaps-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},({eventType,new:nw,old:ol})=>{
+        if(eventType==='INSERT')setSwaps(p=>[nw,...p]);
+        if(eventType==='UPDATE')setSwaps(p=>p.map(r=>r.id===nw.id?nw:r));
+        if(eventType==='DELETE')setSwaps(p=>p.filter(r=>r.id!==ol.id));
+      }).subscribe(s=>setRt(s==='SUBSCRIBED'));
+    return()=>SB.removeChannel(ch);
+  },[load]);
+
+  const pending=swaps.filter(s=>s.status==='pending');
+  const completed=swaps.filter(s=>s.status!=='pending'&&s.status!=='cancelled');
+  const cancelled=swaps.filter(s=>s.status==='cancelled');
+
+  const statusEl=(s)=>{
+    if(s==='pending')return <span className="swap-status-pending">⏳ Pending</span>;
+    if(s==='accepted')return <span className="swap-status-accepted">✅ Accepted</span>;
+    if(s==='declined')return <span className="swap-status-declined">❌ Declined</span>;
+    if(s==='cancelled')return <span style={{color:'var(--mut)'}}>Cancelled</span>;
+    return <span>{s}</span>;
+  };
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Lunch Swap Requests</h1><p className="ps">Today's swap activity · auto-updates</p></div>
+        <div className="fc g10">
+          <span className="rtp"><span className="rtd"/>{rt?'Live':'Connecting…'}</span>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      <div className="sg3" style={{marginBottom:20}}>
+        <SC n="timer"    label="Pending"   val={pending.length}   wn={pending.length>0}/>
+        <SC n="check"    label="Accepted"  val={completed.filter(s=>s.status==='accepted').length} ac={completed.filter(s=>s.status==='accepted').length>0}/>
+        <SC n="activity" label="Declined"  val={completed.filter(s=>s.status==='declined').length}/>
+      </div>
+      {loading?<div className="es"><div className="spin"/></div>:swaps.length===0?(
+        <div className="es"><span className="es-ic"><Ic n="swap" size={36} sw={1.2}/></span><p>No swap requests today</p></div>
+      ):(
+        <div className="sc">
+          <div className="sc-hd"><span className="sc-ic"><Ic n="swap" size={15}/></span><h2 className="sc-t">All Swap Requests — Today</h2></div>
+          <table className="dt">
+            <thead><tr><th>From</th><th>To</th><th>Swap</th><th>Status</th><th>Time</th></tr></thead>
+            <tbody>
+              {swaps.map(s=>(
+                <tr key={s.id}>
+                  <td><AvC name={s.from_name}/></td>
+                  <td><AvC name={s.to_name}/></td>
+                  <td>
+                    <span className="badge b-a">Grp {s.from_group}</span>
+                    <span style={{color:'var(--mut)',margin:'0 6px'}}>↔</span>
+                    <span className="badge b-b">Grp {s.to_group}</span>
+                  </td>
+                  <td>{statusEl(s.status)}</td>
+                  <td style={{color:'var(--mut)',fontSize:12}}>{fmtT(s.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {pending.length>0&&(
+        <div className="awrn" style={{marginTop:16}}>
+          <Ic n="alert" size={15}/> {pending.length} swap request{pending.length>1?'s are':' is'} waiting for a response. No action needed — swaps are automatic when accepted.
+        </div>
       )}
     </div>
   );
