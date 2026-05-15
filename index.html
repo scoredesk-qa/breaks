@@ -724,29 +724,39 @@ function AgentApp({user,name,onLogout}){
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [swapBusy,      setSwapBusy]      = useState(false);
   const timerRef = useRef(null);
+  const outgoingSwapRef = useRef(null);
+  useEffect(()=>{ outgoingSwapRef.current = outgoingSwap; },[outgoingSwap]);
   const today = todayISO();
 
   // Notification hooks
   useLunchReminder(lunchInfo);
   useAgentNotifListener(user.id, lunchInfo);
 
-  // Swap listener
+  // Swap listener — receives broadcast events for immediate response UX
   useSwapListener(user.id, useCallback((payload) => {
     if (payload.action === 'request' && payload.toUserId === user.id) {
-      setIncomingSwaps(p => p.some(s=>s.id===payload.id) ? p : [...p, payload]);
-      fireNotification({ title: '🔄 Lunch Swap Request', body: `${payload.fromName} wants to swap lunch groups with you (${payload.fromGroup} ↔ ${payload.toGroup})`, type: 'custom', duration: 15000 });
+      // New incoming request — the postgres_changes sub will also catch it, but toast here for immediacy
+      fireNotification({ title: '🔄 Lunch Swap Request', body: `${payload.fromName} wants to swap lunch groups with you.`, type: 'custom', duration: 15000 });
     }
     if (payload.action === 'accepted' && payload.fromUserId === user.id) {
+      // Our request was accepted — update outgoing swap and reload lunch
       setOutgoingSwap(null);
-      // Reload lunch info to reflect the swap
-      load();
-      fireNotification({ title: '✅ Swap Accepted!', body: `${payload.toName} accepted your lunch swap request. Your schedule has been updated.`, type: 'info', duration: 10000 });
+      fireNotification({ title: '✅ Swap Accepted!', body: `${payload.toName} accepted. Your lunch group has been updated.`, type: 'info', duration: 10000 });
+      // Fetch fresh lunch schedule from DB
+      run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data:ls})=>{
+        if(!ls) return;
+        const grpA=ls.group_a||[]; const grpB=ls.group_b||[];
+        const myGrp=grpA.includes(name)?'A':grpB.includes(name)?'B':null;
+        const first=ls.group_first||defaultFirst(today); const slots=lunchSlots(first);
+        if(myGrp) setLunchInfo({group:myGrp,slot:slots[myGrp],allA:grpA,allB:grpB,first,slots});
+        else setLunchInfo({group:null,allA:grpA,allB:grpB});
+      });
     }
     if (payload.action === 'declined' && payload.fromUserId === user.id) {
       setOutgoingSwap(null);
-      fireNotification({ title: '❌ Swap Declined', body: `${payload.toName} declined your lunch swap request.`, type: 'warn', duration: 8000 });
+      fireNotification({ title: '❌ Swap Declined', body: `${payload.toName} declined your swap request.`, type: 'warn', duration: 8000 });
     }
-  }, [user.id]));
+  }, [user.id, today, name]));
 
   const load = useCallback(async()=>{
     setLoading(true); setErr('');
@@ -802,49 +812,86 @@ function AgentApp({user,name,onLogout}){
     return()=>SB.removeChannel(ch);
   },[user.id]);
 
-  // Real-time: lunch schedule — auto-refresh when admin saves changes
+  // Real-time: lunch schedule — call load() on any change so we always get fresh data
+  // (REPLICA IDENTITY may not be FULL on this table, so we don't trust the payload)
   useEffect(()=>{
     const ch = SB.channel('agent-lunch-rt-'+user.id)
-      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},({new:nw})=>{
-        if(!nw||nw.date!==today) return;
-        const grpA = nw.group_a || [];
-        const grpB = nw.group_b || [];
-        const myGrp = grpA.includes(name) ? 'A' : grpB.includes(name) ? 'B' : null;
-        const first = nw.group_first || defaultFirst(today);
-        const slots = lunchSlots(first);
-        if(myGrp){
-          setLunchInfo({group:myGrp, slot:slots[myGrp], allA:grpA, allB:grpB, first, slots});
-        } else {
-          setLunchInfo({group:null, allA:grpA, allB:grpB});
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},()=>{
+        // Re-fetch from DB to get the authoritative current state
+        run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data:nw})=>{
+          if(!nw) return;
+          const grpA = nw.group_a || [];
+          const grpB = nw.group_b || [];
+          const myGrp = grpA.includes(name) ? 'A' : grpB.includes(name) ? 'B' : null;
+          const first = nw.group_first || defaultFirst(today);
+          const slots = lunchSlots(first);
+          if(myGrp){
+            setLunchInfo({group:myGrp, slot:slots[myGrp], allA:grpA, allB:grpB, first, slots});
+          } else {
+            setLunchInfo({group:null, allA:grpA, allB:grpB});
+          }
+        });
+      })
+      .subscribe();
+    return()=>SB.removeChannel(ch);
+  },[user.id,today,name]);
+
+  // Real-time: swap requests — re-fetch on any change, fire toast for new incoming
+  useEffect(()=>{
+    const ch = SB.channel('agent-swaps-rt-'+user.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},async({eventType,new:nw})=>{
+        // Re-fetch pending incoming swaps
+        const {data:incoming} = await run(SB.from('bt_swap_requests').select('*').eq('to_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}));
+        setIncomingSwaps(prev => {
+          const newList = incoming||[];
+          // Fire toast for brand-new incoming requests
+          newList.forEach(sr => { if(!prev.some(p=>p.id===sr.id)) {
+            fireNotification({ title:'🔄 Lunch Swap Request', body:`${sr.from_name} wants to swap lunch groups with you.`, type:'custom', duration:15000 });
+          }});
+          return newList;
+        });
+        // Re-fetch outgoing
+        const {data:mySwaps} = await run(SB.from('bt_swap_requests').select('*').eq('from_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}).limit(1));
+        const hadOutgoing = !!outgoingSwapRef.current;
+        const newOutgoing = (mySwaps&&mySwaps.length>0) ? mySwaps[0] : null;
+        setOutgoingSwap(newOutgoing);
+        // If our outgoing just got accepted, reload lunch info
+        if(hadOutgoing && !newOutgoing && nw?.from_user_id===user.id && nw?.status==='accepted') {
+          fireNotification({ title:'✅ Swap Accepted!', body:`Your lunch group has been updated.`, type:'info', duration:10000 });
+          run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data:ls})=>{
+            if(!ls) return;
+            const grpA=ls.group_a||[]; const grpB=ls.group_b||[];
+            const myGrp=grpA.includes(name)?'A':grpB.includes(name)?'B':null;
+            const first=ls.group_first||defaultFirst(today); const slots=lunchSlots(first);
+            if(myGrp) setLunchInfo({group:myGrp,slot:slots[myGrp],allA:grpA,allB:grpB,first,slots});
+          });
+        }
+        if(hadOutgoing && !newOutgoing && nw?.from_user_id===user.id && nw?.status==='declined') {
+          fireNotification({ title:'❌ Swap Declined', body:`Your swap request was declined.`, type:'warn', duration:8000 });
         }
       })
       .subscribe();
     return()=>SB.removeChannel(ch);
   },[user.id,today,name]);
 
-  // Real-time: swap requests
   useEffect(()=>{
-    const ch = SB.channel('agent-swaps-rt-'+user.id)
-      .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},({eventType,new:nw})=>{
-        if(!nw) return;
-        if(nw.to_user_id===user.id && nw.status==='pending')
-          setIncomingSwaps(p=>p.some(s=>s.id===nw.id)?p.map(s=>s.id===nw.id?nw:s):[...p,nw]);
-        if(nw.to_user_id===user.id && nw.status!=='pending')
-          setIncomingSwaps(p=>p.filter(s=>s.id!==nw.id));
-        if(nw.from_user_id===user.id && nw.status==='pending') setOutgoingSwap(nw);
-        if(nw.from_user_id===user.id && nw.status!=='pending') { setOutgoingSwap(null); if(nw.status==='accepted') load(); }
-      })
-      .subscribe();
-    return()=>SB.removeChannel(ch);
-  },[user.id,today]);
-
-  useEffect(()=>{
+    // Poll team break count every 15s
     const id=setInterval(async()=>{
       const {data}=await run(SB.from('bt_logs').select('id').is('end_time',null));
       setTeamCount((data||[]).length);
     },15000);
-    return()=>clearInterval(id);
-  },[]);
+    // Poll lunch schedule every 30s as fallback (in case realtime misses changes)
+    const lunchPoll=setInterval(async()=>{
+      const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
+      if(!ls) return;
+      const grpA=ls.group_a||[]; const grpB=ls.group_b||[];
+      const myGrp=grpA.includes(name)?'A':grpB.includes(name)?'B':null;
+      const first=ls.group_first||defaultFirst(today); const slots=lunchSlots(first);
+      if(myGrp) setLunchInfo({group:myGrp,slot:slots[myGrp],allA:grpA,allB:grpB,first,slots});
+      else setLunchInfo(prev=>prev?{...prev,group:null,allA:grpA,allB:grpB}:null);
+    },30000);
+    return()=>{ clearInterval(id); clearInterval(lunchPoll); };
+  },[today,name]);
 
   useEffect(()=>{
     if(active){ const s=new Date(active.start_time).getTime(); timerRef.current=setInterval(()=>setElapsed(Date.now()-s),250); }
@@ -914,11 +961,12 @@ function AgentApp({user,name,onLogout}){
   const respondToSwap = async(swapReq, accepted) => {
     setSwapBusy(true);
     const newStatus = accepted ? 'accepted' : 'declined';
+    // 1. Update the swap request status
     await run(SB.from('bt_swap_requests').update({status:newStatus, responded_at:new Date().toISOString()}).eq('id',swapReq.id));
     setIncomingSwaps(p=>p.filter(s=>s.id!==swapReq.id));
 
     if(accepted) {
-      // Perform the actual group swap in bt_lunch_schedule
+      // 2. Perform the actual group swap in bt_lunch_schedule
       const {data:ls} = await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
       if(ls) {
         let newA = [...(ls.group_a||[])];
@@ -930,13 +978,20 @@ function AgentApp({user,name,onLogout}){
         if(swapReq.from_group==='A') { newB.push(swapReq.from_name); newA.push(swapReq.to_name); }
         else { newA.push(swapReq.from_name); newB.push(swapReq.to_name); }
         await run(SB.from('bt_lunch_schedule').update({group_a:newA,group_b:newB,updated_at:new Date().toISOString()}).eq('id',ls.id));
-        // Notify admin
-        broadcastNotif({ title:`🔄 Lunch Swap Completed`, body:`${swapReq.from_name} (Grp ${swapReq.from_group}) and ${swapReq.to_name} (Grp ${swapReq.to_group}) have swapped lunch groups.`, type:'info' });
+        // 3. Notify admin via the admin broadcast channel
+        broadcastNotif({ title:`🔄 Lunch Swap Done`, body:`${swapReq.from_name} (Grp ${swapReq.from_group}) ↔ ${swapReq.to_name} (Grp ${swapReq.to_group}) · schedule updated automatically.`, type:'info' });
+        // 4. Update our own lunch card immediately (the acceptor)
+        const myGrp = swapReq.from_group === 'A' ? 'B' : 'A'; // acceptor moves to requester's old group
+        // Actually recalculate: acceptor is to_name (us), we were in to_group, now in from_group
+        const acceptorNewGroup = swapReq.from_group; // we take the requester's group
+        const first = ls.group_first || defaultFirst(today);
+        const slots = lunchSlots(first);
+        setLunchInfo({group:acceptorNewGroup, slot:slots[acceptorNewGroup], allA:newA, allB:newB, first, slots});
       }
-      // Notify the requester
+      // 5. Broadcast directly to the requester so they update immediately
       await broadcastSwap({ action:'accepted', id:swapReq.id, fromUserId:swapReq.from_user_id, fromName:swapReq.from_name, toUserId:user.id, toName:name });
-      load();
     } else {
+      // Notify requester of decline
       await broadcastSwap({ action:'declined', id:swapReq.id, fromUserId:swapReq.from_user_id, fromName:swapReq.from_name, toUserId:user.id, toName:name });
     }
     setSwapBusy(false);
@@ -1712,7 +1767,9 @@ function ALunch(){
     const ch=SB.channel('admin-lunch-rt')
       .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},()=>{ if(date===todayISO()) load(); })
       .subscribe();
-    return()=>SB.removeChannel(ch);
+    // Polling fallback: re-check every 20s for today's date (catches cases where realtime misses)
+    const poll = setInterval(()=>{ if(date===todayISO()) load(); }, 20000);
+    return()=>{ SB.removeChannel(ch); clearInterval(poll); };
   },[date,load]);
 
   const move=(name,from,to)=>{
@@ -1861,11 +1918,12 @@ function ASwapRequests(){
     load();
     const ch=SB.channel('admin-swaps-rt')
       .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},({eventType,new:nw,old:ol})=>{
-        if(eventType==='INSERT')setSwaps(p=>[nw,...p]);
-        if(eventType==='UPDATE')setSwaps(p=>p.map(r=>r.id===nw.id?nw:r));
-        if(eventType==='DELETE')setSwaps(p=>p.filter(r=>r.id!==ol.id));
+        // Re-fetch on any change (safest approach regardless of REPLICA IDENTITY setting)
+        load();
       }).subscribe(s=>setRt(s==='SUBSCRIBED'));
-    return()=>SB.removeChannel(ch);
+    // Polling fallback every 15s
+    const poll = setInterval(load, 15000);
+    return()=>{ SB.removeChannel(ch); clearInterval(poll); };
   },[load]);
 
   const pending=swaps.filter(s=>s.status==='pending');
@@ -2369,6 +2427,15 @@ function ASettings(){
             <tr><td><BB type="Lunch Break"/></td><td>More than 50 minutes</td></tr>
           </tbody>
         </table>
+      </div>
+      <div className="sblk">
+        <h2 className="sh">Real-time setup (one-time)</h2>
+        <p className="sd">Run this in Supabase SQL Editor to enable instant live updates for lunch and swap tables. Without it, updates may take up to 30 seconds to appear.</p>
+        <div style={{background:'var(--card)',border:'1px solid var(--bdr)',borderRadius:8,padding:'12px 14px',fontFamily:'monospace',fontSize:12,color:'#888',lineHeight:2.2}}>
+          <span style={{color:'var(--acc)'}}>ALTER TABLE</span> bt_lunch_schedule <span style={{color:'var(--acc)'}}>REPLICA IDENTITY FULL</span>;<br/>
+          <span style={{color:'var(--acc)'}}>ALTER TABLE</span> bt_swap_requests <span style={{color:'var(--acc)'}}>REPLICA IDENTITY FULL</span>;<br/>
+          <span style={{color:'var(--acc)'}}>ALTER TABLE</span> bt_clocklogs <span style={{color:'var(--acc)'}}>REPLICA IDENTITY FULL</span>;
+        </div>
       </div>
       <div className="sblk">
         <h2 className="sh">Adding users</h2>
