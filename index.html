@@ -566,17 +566,28 @@ function useLunchReminder(lunchInfo) {
   useEffect(() => {
     if (!lunchInfo?.group || !lunchInfo?.slot) return;
     const check = () => {
-      const now = new Date();
+      const nowUTC = Date.now();
+      const nowDate = new Date(nowUTC);
       const [h, m] = lunchInfo.slot.from.split(':').map(Number);
-      const lunch = new Date(now); lunch.setHours(h, m, 0, 0);
-      const diff = (lunch - now) / 60000;
-      const key = lunchInfo.slot.from + '-' + lunchInfo.group;
+      // Casablanca is UTC+1 → subtract 1 hour for UTC
+      const lunchUTC = Date.UTC(
+        nowDate.getUTCFullYear(),
+        nowDate.getUTCMonth(),
+        nowDate.getUTCDate(),
+        h - 1,
+        m,
+        0,
+        0
+      );
+      const diff = (lunchUTC - nowUTC) / 60000;
+      const key = `${nowDate.toISOString().slice(0,10)}-${lunchInfo.slot.from}-${lunchInfo.group}`;
       if (diff > 0 && diff <= 5 && !firedRef.current.has(key)) {
         firedRef.current.add(key);
         fireNotification({
           title: `🍽️ Lunch in ${Math.ceil(diff)} min!`,
           body: `Group ${lunchInfo.group} — your lunch starts at ${lunchInfo.slot.from}. Get ready!`,
-          type: 'lunch', duration: 10000,
+          type: 'lunch',
+          duration: 10000,
         });
       }
     };
@@ -594,15 +605,26 @@ function useAdminLunchBroadcast(alertMinutes = 5) {
   useEffect(() => {
     const check = async () => {
       const today = todayISO();
-      const { data: ls } = await run(SB.from('bt_lunch_schedule').select('*').eq('date', today).maybeSingle());
+      const { data: ls } = await run(
+        SB.from('bt_lunch_schedule').select('*').eq('date', today).maybeSingle()
+      );
       if (!ls) return;
       const first = ls.group_first || defaultFirst(today);
       const slots = lunchSlots(first);
-      const now = new Date();
-      ['A','B'].forEach(grp => {
+      const nowUTC = Date.now();
+      const nowDate = new Date(nowUTC);
+      ['A', 'B'].forEach(grp => {
         const [h, m] = slots[grp].from.split(':').map(Number);
-        const lunchTime = new Date(now); lunchTime.setHours(h, m, 0, 0);
-        const diff = (lunchTime - now) / 60000;
+        const lunchUTC = Date.UTC(
+          nowDate.getUTCFullYear(),
+          nowDate.getUTCMonth(),
+          nowDate.getUTCDate(),
+          h - 1,
+          m,
+          0,
+          0
+        );
+        const diff = (lunchUTC - nowUTC) / 60000;
         const key = `auto-${grp}-${slots[grp].from}-${today}`;
         if (diff > 0 && diff <= alertMinutes && !firedRef.current.has(key)) {
           firedRef.current.add(key);
@@ -611,7 +633,7 @@ function useAdminLunchBroadcast(alertMinutes = 5) {
             title: `🍽️ Group ${grp} Lunch in ${mins} min`,
             body: `Group ${grp}: your lunch break starts at ${slots[grp].from}. Please get ready to head out!`,
             type: 'lunch',
-            lunchGroup: grp,  // agents filter by this — only Group A or B sees their own alert
+            lunchGroup: grp,
           });
         }
       });
