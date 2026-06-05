@@ -340,7 +340,7 @@ const tStr     = s  => { s=Math.max(0,s); const h=Math.floor(s/3600),m=Math.floo
 const tMs      = ms => tStr(Math.floor(ms/1000));
 const fmtT     = d  => d ? new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
 const fmtD     = d  => new Date(d).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
-const todayISO = ()  => new Date().toISOString().slice(0,10);
+const todayISO = ()  => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const ini      = n  => (n||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
 const durStr   = s  => {
   if(s==null||s===0) return '0s';
@@ -806,7 +806,12 @@ function AgentApp({user,name,onLogout}){
       } else {
         setLunchInfo({group:null, allA:grpA, allB:grpB});
       }
-    } else { setLunchInfo(null); }
+    } else {
+      // No DB row for today yet — use default rotation so agents still see their group
+      const first = defaultFirst(today);
+      const slots = lunchSlots(first);
+      setLunchInfo({ group: null, allA: [], allB: [], first, slots, isDefault: true });
+    }
     // Load any pending outgoing swap requests
     const {data:mySwaps} = await run(SB.from('bt_swap_requests').select('*').eq('from_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}).limit(1));
     if(mySwaps&&mySwaps.length>0) setOutgoingSwap(mySwaps[0]);
@@ -837,24 +842,29 @@ function AgentApp({user,name,onLogout}){
   // Real-time: lunch schedule — call load() on any change so we always get fresh data
   // (REPLICA IDENTITY may not be FULL on this table, so we don't trust the payload)
   useEffect(()=>{
+    // Helper: apply fetched schedule to agent state
+    const applySchedule = (ls) => {
+      if(!ls){
+        const first = defaultFirst(today); const slots = lunchSlots(first);
+        setLunchInfo(prev => prev?.group ? prev : { group:null, allA:[], allB:[], first, slots, isDefault:true });
+        return;
+      }
+      const grpA = ls.group_a || []; const grpB = ls.group_b || [];
+      const myGrp = grpA.includes(name) ? 'A' : grpB.includes(name) ? 'B' : null;
+      const first = ls.group_first || defaultFirst(today); const slots = lunchSlots(first);
+      if(myGrp) setLunchInfo({group:myGrp, slot:slots[myGrp], allA:grpA, allB:grpB, first, slots});
+      else setLunchInfo({group:null, allA:grpA, allB:grpB, first, slots});
+    };
+    const fetchAndApply = () =>
+      run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data})=>applySchedule(data));
+
     const ch = SB.channel('agent-lunch-rt-'+user.id)
       .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},()=>{
-        // Re-fetch from DB to get the authoritative current state
-        run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data:nw})=>{
-          if(!nw) return;
-          const grpA = nw.group_a || [];
-          const grpB = nw.group_b || [];
-          const myGrp = grpA.includes(name) ? 'A' : grpB.includes(name) ? 'B' : null;
-          const first = nw.group_first || defaultFirst(today);
-          const slots = lunchSlots(first);
-          if(myGrp){
-            setLunchInfo({group:myGrp, slot:slots[myGrp], allA:grpA, allB:grpB, first, slots});
-          } else {
-            setLunchInfo({group:null, allA:grpA, allB:grpB});
-          }
-        });
+        // Always re-fetch rather than trusting payload (REPLICA IDENTITY may not be FULL)
+        fetchAndApply();
       })
-      .subscribe();
+      // Re-fetch on reconnect so agents who were offline catch up immediately
+      .subscribe(status => { if(status === 'SUBSCRIBED') fetchAndApply(); });
     return()=>SB.removeChannel(ch);
   },[user.id,today,name]);
 
@@ -902,15 +912,23 @@ function AgentApp({user,name,onLogout}){
       const {data}=await run(SB.from('bt_logs').select('id').is('end_time',null));
       setTeamCount((data||[]).length);
     },15000);
-    // Poll lunch schedule every 30s as fallback (in case realtime misses changes)
-    const lunchPoll=setInterval(async()=>{
-      const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
-      if(!ls) return;
+    // Poll lunch schedule every 30s as a safety net — catches changes that slip past
+    // the realtime subscription (e.g. direct Supabase edits, brief network drops)
+    const applyLunchData = (ls) => {
+      if(!ls){
+        const first=defaultFirst(today); const slots=lunchSlots(first);
+        setLunchInfo(prev => prev?.group ? prev : { group:null, allA:[], allB:[], first, slots, isDefault:true });
+        return;
+      }
       const grpA=ls.group_a||[]; const grpB=ls.group_b||[];
       const myGrp=grpA.includes(name)?'A':grpB.includes(name)?'B':null;
       const first=ls.group_first||defaultFirst(today); const slots=lunchSlots(first);
       if(myGrp) setLunchInfo({group:myGrp,slot:slots[myGrp],allA:grpA,allB:grpB,first,slots});
-      else setLunchInfo(prev=>prev?{...prev,group:null,allA:grpA,allB:grpB}:null);
+      else setLunchInfo({group:null,allA:grpA,allB:grpB,first,slots});
+    };
+    const lunchPoll=setInterval(async()=>{
+      const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
+      applyLunchData(ls);
     },30000);
     return()=>{ clearInterval(id); clearInterval(lunchPoll); };
   },[today,name]);
@@ -1784,14 +1802,18 @@ function ALunch(){
 
   useEffect(()=>{load();},[load]);
 
-  // Real-time: when the schedule changes (e.g. swap auto-applied), reload
+  // Real-time: when the schedule changes (e.g. swap auto-applied or Supabase direct edit),
+  // reload — but filter to only the date being viewed so unrelated days don't trigger a refresh.
+  // No polling interval here — that was causing constant re-renders every 20s.
   useEffect(()=>{
     const ch=SB.channel('admin-lunch-rt')
-      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},()=>{ if(date===todayISO()) load(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},({new:nw,old:ol})=>{
+        const changedDate = nw?.date || ol?.date;
+        if(changedDate && changedDate !== date) return;
+        load();
+      })
       .subscribe();
-    // Polling fallback: re-check every 20s for today's date (catches cases where realtime misses)
-    const poll = setInterval(()=>{ if(date===todayISO()) load(); }, 20000);
-    return()=>{ SB.removeChannel(ch); clearInterval(poll); };
+    return()=>{ SB.removeChannel(ch); };
   },[date,load]);
 
   const move=(name,from,to)=>{
