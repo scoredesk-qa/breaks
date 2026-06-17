@@ -355,8 +355,8 @@ const BREAK_TYPES = ['Bathroom Break','Break','Lunch Break'];
 
 /* Lunch schedule helpers */
 const lunchSlots = (groupFirst) => ({
-  A: groupFirst==='A' ? {from:'13:00',to:'14:00'} : {from:'14:00',to:'15:00'},
-  B: groupFirst==='B' ? {from:'13:00',to:'14:00'} : {from:'14:00',to:'15:00'},
+  A: groupFirst==='A' ? {from:'12:00',to:'13:00'} : {from:'13:00',to:'14:00'},
+  B: groupFirst==='B' ? {from:'12:00',to:'13:00'} : {from:'13:00',to:'14:00'},
 });
 /* Auto rotate: even day => A first, odd day => B first */
 const defaultFirst = (dateStr) => {
@@ -1744,7 +1744,7 @@ function ALunch(){
   const [grpA,    setGrpA]    = useState([]);
   const [grpB,    setGrpB]    = useState([]);
   const [pool,    setPool]    = useState([]);     // clocked in but unassigned
-  const [first,   setFirst]   = useState('A');    // which group goes at 13:00
+  const [first,   setFirst]   = useState('A');    // which group goes at 12:00
   const [loading, setLoad]    = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState('');
@@ -1861,10 +1861,10 @@ function ALunch(){
         <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-t">Rotation — who goes first today?</h2></div>
         <div style={{padding:'16px 18px',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
           <button onClick={()=>setFirst('A')} style={{padding:'8px 20px',borderRadius:8,border:'1.5px solid',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:'var(--font)',background:first==='A'?'var(--acc-d)':'var(--card)',color:first==='A'?'var(--acc)':'var(--mut)',borderColor:first==='A'?'var(--acc-r)':'var(--bdr)'}}>
-            Group A first — 13:00
+            Group A first — 12:00
           </button>
           <button onClick={()=>setFirst('B')} style={{padding:'8px 20px',borderRadius:8,border:'1.5px solid',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:'var(--font)',background:first==='B'?'var(--purp-d)':'var(--card)',color:first==='B'?'var(--purp)':'var(--mut)',borderColor:first==='B'?'var(--purp-r)':'var(--bdr)'}}>
-            Group B first — 13:00
+            Group B first — 12:00
           </button>
           <span style={{fontSize:12,color:'var(--mut)',marginLeft:8}}>Auto-rotates daily · override here if needed</span>
         </div>
