@@ -272,6 +272,39 @@ html,body,#root{height:100%;background:var(--bg);color:var(--txt);font-family:va
   .sb-logo{justify-content:center;padding:12px}
   .panel{padding:18px 12px}
 }
+
+/* Phone-width refinements (on top of the 900px tablet rules above) */
+@media(max-width:560px){
+  html,body,#root{font-size:13px}
+  .panel{padding:14px 10px}
+  .phd{margin-bottom:16px;gap:8px}
+  .pt{font-size:18px}
+  .ps{font-size:12px}
+  .phr{gap:8px;width:100%}
+  .phr .si{flex:1;min-width:0}
+  .sg4,.sg3,.sg2{grid-template-columns:repeat(2,1fr);gap:8px}
+  .dbar{grid-template-columns:1fr 1fr;gap:8px}
+  .sc-card,.sc{border-radius:12px}
+  .sc-hd{padding:11px 14px}
+  /* Tables scroll horizontally instead of squeezing/wrapping unreadably */
+  .adm-main{-webkit-overflow-scrolling:touch}
+  .dt{font-size:12.5px}
+  .dt th,.dt td{padding:9px 10px}
+  .bs,.bp{padding:9px 14px;font-size:13px}
+  .sb{width:48px}
+  .clk-num{font-size:36px}
+  .clk-sep{font-size:32px}
+  .clk-day-val{font-size:36px}
+  .ag-body{padding:18px 12px}
+  .auth-card{padding:28px 22px}
+  .lunch-time{font-size:22px}
+  .tbig{font-size:44px}
+}
+/* Make every input/button a comfortable tap target on touch devices */
+@media(hover:none) and (pointer:coarse){
+  .bp,.bs,.ib,.btn-go,.btn-end,.btn-accept,.btn-decline,.btn-remote,.btn-edit,.fi,.si,.type-sel{min-height:40px}
+  .ib{min-width:40px}
+}
 </style>
 </head>
 <body>
@@ -288,6 +321,29 @@ const { useState, useEffect, useRef, useCallback } = React;
 const SB = supabase.createClient(window.BT_URL, window.BT_KEY, {
   auth: { persistSession: true, autoRefreshToken: true }
 });
+
+/* ── Auto-refresh safety net ──────────────────────────────────────────
+   Supabase Realtime pushes changes instantly when it's working, but it can
+   silently drop (phone screen locks, wifi/cell handoff, tab backgrounded,
+   Realtime not enabled on a table, RLS quirks, etc). This hook re-runs the
+   given load function on an interval AND immediately whenever the tab/app
+   becomes visible or regains focus again, so a screen never goes stale for
+   more than a few seconds even if the live socket dies quietly. */
+function useAutoRefresh(load, intervalMs = 6000){
+  useEffect(() => {
+    const id = intervalMs ? setInterval(() => { load(); }, intervalMs) : null;
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    window.addEventListener('online', onVis);
+    return () => {
+      if (id) clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
+      window.removeEventListener('online', onVis);
+    };
+  }, [load, intervalMs]);
+}
 
 /* ── Icons ── */
 const PATHS = {
@@ -1383,6 +1439,7 @@ function ADash(){
       }).subscribe(s=>setRt(s==='SUBSCRIBED'));
     return()=>SB.removeChannel(ch);
   },[load]);
+  useAutoRefresh(load, 8000);
   const today=todayISO();
   const active=logs.filter(l=>!l.end_time);
   const done=logs.filter(l=>l.end_time&&l.duration_secs!=null);
@@ -1460,6 +1517,7 @@ function ALive(){
       .subscribe(s=>setRt(s==='SUBSCRIBED'));
     return()=>SB.removeChannel(ch);
   },[load]);
+  useAutoRefresh(load, 5000);
 
   const remoteStart=async(agent)=>{
     setRemoting(agent.user_id); setErr('');
@@ -1572,6 +1630,7 @@ function AClocks(){
       }).subscribe(s=>setRt(s==='SUBSCRIBED'));
     return()=>SB.removeChannel(ch);
   },[load,date]);
+  useAutoRefresh(load, 8000);
 
   /* Remote clock in — needs the user_id and display_name from Supabase Auth.
      We look them up from auth.users via a simple approach: we use the agent_name
@@ -1815,6 +1874,7 @@ function ALunch(){
       .subscribe();
     return()=>{ SB.removeChannel(ch); };
   },[date,load]);
+  useAutoRefresh(load, null); // no polling here (breaks drag-and-drop); just refetch when tab/app regains focus
 
   const move=(name,from,to)=>{
     const rem=arr=>arr.filter(n=>n!==name);
@@ -1969,6 +2029,7 @@ function ASwapRequests(){
     const poll = setInterval(load, 15000);
     return()=>{ SB.removeChannel(ch); clearInterval(poll); };
   },[load]);
+  useAutoRefresh(load, null); // instant refetch on regaining focus, on top of the 15s poll above
 
   const pending=swaps.filter(s=>s.status==='pending');
   const completed=swaps.filter(s=>s.status!=='pending'&&s.status!=='cancelled');
@@ -2061,6 +2122,7 @@ function AAnalytics(){
     setLoad(false);
   },[today]);
   useEffect(()=>{load();},[load]);
+  useAutoRefresh(load, 10000); // no realtime channel on this screen, so poll + refetch-on-focus keeps it current
   return(
     <div className="panel">
       <div className="phd">
@@ -2106,8 +2168,9 @@ function ALogs(){
   const [editing,setEditing]=useState(null);
   const [saving,setSaving]=useState(null);
 
-  const load=()=>{ run(SB.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(500)).then(({data,error})=>{ if(error)setErr(error.message); setLogs(data||[]); setLoad(false); }); };
-  useEffect(()=>{load();},[]);
+  const load=useCallback(()=>{ run(SB.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(500)).then(({data,error})=>{ if(error)setErr(error.message); setLogs(data||[]); setLoad(false); }); },[]);
+  useEffect(()=>{load();},[load]);
+  useAutoRefresh(load, 10000); // no realtime channel on this screen, so poll + refetch-on-focus keeps it current
 
   const saveType=async(logId,newType)=>{
     setSaving(logId);
