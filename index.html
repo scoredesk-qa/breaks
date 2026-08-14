@@ -138,9 +138,10 @@ html,body,#root{height:100%;background:var(--bg);color:var(--txt);font-family:va
 /* Table */
 .dt{width:100%;border-collapse:collapse;font-size:13.5px}
 .dt th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap}
-.dt td{padding:11px 16px;border-bottom:1px solid #1c1c1c;vertical-align:middle}
+.dt td{padding:11px 16px;border-bottom:1px solid #1c1c1c;vertical-align:middle;white-space:nowrap}
 .dt tbody tr:last-child td{border-bottom:none}
 .dt tbody tr:hover td{background:rgba(255,255,255,.018)}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 /* Avatar */
 .av{width:28px;height:28px;border-radius:50%;background:var(--acc-d);color:var(--acc);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--acc-r)}
 .hdn{font-size:13px;font-weight:600;color:var(--mut)}
@@ -290,6 +291,7 @@ html,body,#root{height:100%;background:var(--bg);color:var(--txt);font-family:va
   .adm-main{-webkit-overflow-scrolling:touch}
   .dt{font-size:12.5px}
   .dt th,.dt td{padding:9px 10px}
+  .tbl-wrap{position:relative;border-radius:0 0 12px 12px;box-shadow:inset -14px 0 10px -12px rgba(0,0,0,.55)}
   .bs,.bp{padding:9px 14px;font-size:13px}
   .sb{width:48px}
   .clk-num{font-size:36px}
@@ -1123,7 +1125,7 @@ function AgentApp({user,name,onLogout}){
 
       <div className="ag-body">
         {err&&<div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
-        {atCap&&!active&&<div className="awrn"><Ic n="alert" size={15}/> All break slots are taken ({teamCount}/{maxB}). Wait for a colleague to return.</div>}
+        {atCap&&!active&&<div className="awrn"><Ic n="alert" size={15}/> {maxB<=0?'Breaks are paused right now — check with your supervisor.':`All break slots are taken (${teamCount}/${maxB}). Wait for a colleague to return.`}</div>}
 
         <LiveClock/>
 
@@ -1262,7 +1264,7 @@ function AgentApp({user,name,onLogout}){
           {loading?<div className="es"><div className="spin"/></div>
             :logs.length===0?<div className="es"><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No breaks yet today</p></div>
             :(
-              <table className="dt">
+              <div className="tbl-wrap"><table className="dt">
                 <thead><tr><th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
                 <tbody>
                   {logs.map(l=>(
@@ -1274,7 +1276,7 @@ function AgentApp({user,name,onLogout}){
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )
           }
         </div>
@@ -1547,10 +1549,10 @@ function ALive(){
           {live.length>0&&(
             <div className="sc" style={{marginBottom:16}}>
               <div className="sc-hd"><span className="ldot"/><h2 className="sc-t">On Break Now ({live.length})</h2></div>
-              <table className="dt">
+              <div className="tbl-wrap"><table className="dt">
                 <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th><th>Predicted Type</th></tr></thead>
                 <tbody>{live.map(l=><tr key={l.id}><td><AvC name={l.agent_name}/></td><td>{fmtT(l.start_time)}</td><td><LSec start={l.start_time}/></td><td><LType start={l.start_time}/></td></tr>)}</tbody>
-              </table>
+              </table></div>
             </div>
           )}
           {live.length===0&&<div className="es" style={{padding:'24px 20px'}}><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No agents on break right now</p></div>}
@@ -1563,7 +1565,7 @@ function ALive(){
             {available.length===0
               ?<div className="es" style={{padding:'24px 20px'}}><p>All clocked-in agents are already on break or none are clocked in yet.</p></div>
               :(
-                <table className="dt">
+                <div className="tbl-wrap"><table className="dt">
                   <thead><tr><th>Agent</th><th>Clocked In</th><th>Status</th><th>Action</th></tr></thead>
                   <tbody>
                     {available.map(a=>(
@@ -1580,7 +1582,7 @@ function ALive(){
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               )
             }
           </div>
@@ -1686,7 +1688,7 @@ function AClocks(){
           {rows.length===0
             ?<div className="es"><span className="es-ic"><Ic n="sun" size={36} sw={1.2}/></span><p>No clock records for this date</p></div>
             :(
-              <table className="dt">
+              <div className="tbl-wrap"><table className="dt">
                 <thead><tr><th>Agent</th><th>Clock In</th><th>Clock Out</th><th>Shift Duration</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                   {rows.map(r=>(
@@ -1700,7 +1702,7 @@ function AClocks(){
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )
           }
         </div>
@@ -2063,7 +2065,7 @@ function ASwapRequests(){
       ):(
         <div className="sc">
           <div className="sc-hd"><span className="sc-ic"><Ic n="swap" size={15}/></span><h2 className="sc-t">All Swap Requests — Today</h2></div>
-          <table className="dt">
+          <div className="tbl-wrap"><table className="dt">
             <thead><tr><th>From</th><th>To</th><th>Swap</th><th>Status</th><th>Time</th></tr></thead>
             <tbody>
               {swaps.map(s=>(
@@ -2080,7 +2082,7 @@ function ASwapRequests(){
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
       {pending.length>0&&(
@@ -2146,10 +2148,10 @@ function AAnalytics(){
           <div className="sc">
             <div className="sc-hd"><span className="sc-ic"><Ic n="users" size={15}/></span><h2 className="sc-t">Per Agent — Today</h2></div>
             {agents.length===0?<div className="es"><span className="es-ic"><Ic n="trending" size={36} sw={1.2}/></span><p>No completed breaks yet today</p></div>:(
-              <table className="dt">
+              <div className="tbl-wrap"><table className="dt">
                 <thead><tr><th>Agent</th><th>Breaks</th><th>Total Time</th><th>Avg</th><th>Lunch</th><th>Break</th><th>Bathroom</th></tr></thead>
                 <tbody>{agents.map(a=><tr key={a.name}><td><AvC name={a.name}/></td><td>{a.count}</td><td style={{fontWeight:600,color:'var(--acc)'}}>{durStr(a.total)}</td><td>{durStr(a.avg)}</td><td>{a.lunch||'—'}</td><td>{a.brk||'—'}</td><td>{a.bath||'—'}</td></tr>)}</tbody>
-              </table>
+              </table></div>
             )}
           </div>
         </>
@@ -2197,7 +2199,7 @@ function ALogs(){
         :filtered.length===0?<div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No records found</p></div>
         :(
           <div className="sc">
-            <table className="dt">
+            <div className="tbl-wrap"><table className="dt">
               <thead><tr><th>Agent</th><th>Date</th><th>Start</th><th>Return</th><th>Duration</th><th>Type</th><th></th></tr></thead>
               <tbody>
                 {filtered.map(l=>(
@@ -2227,7 +2229,7 @@ function ALogs(){
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )
       }
@@ -2513,11 +2515,11 @@ function ASettings(){
         <h2 className="sh">Max concurrent breaks</h2>
         <p className="sd">How many agents can be on break simultaneously. Adjust daily based on how many staff are working — no more than half the team at once.</p>
         <div className="num-wrap">
-          <button className="nb" onClick={()=>setMaxB(n=>Math.max(1,n-1))}>−</button>
+          <button className="nb" onClick={()=>setMaxB(n=>Math.max(0,n-1))}>−</button>
           <div className="nv">{maxB}</div>
           <button className="nb" onClick={()=>setMaxB(n=>n+1)}>+</button>
         </div>
-        <p style={{fontSize:12,color:'var(--mut)',marginTop:10}}>Agents are blocked from starting breaks when this limit is reached.</p>
+        <p style={{fontSize:12,color:'var(--mut)',marginTop:10}}>Agents are blocked from starting breaks when this limit is reached. Set to 0 to block all breaks (e.g. during a peak-call window).</p>
         <div style={{marginTop:18,display:'flex',alignItems:'center',gap:12}}>
           <button className="bp" onClick={save} disabled={busy}>{busy?<span className="spin-sm"/>:'Save'}</button>
           {ok&&<span style={{color:'var(--acc)',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:5}}><Ic n="check" size={14}/> Saved</span>}
@@ -2526,14 +2528,14 @@ function ASettings(){
       <div className="sblk">
         <h2 className="sh">Break type thresholds</h2>
         <p className="sd">Automatically assigned when an agent returns:</p>
-        <table className="dt" style={{marginTop:0}}>
+        <div className="tbl-wrap"><table className="dt" style={{marginTop:0}}>
           <thead><tr><th>Type</th><th>Duration</th></tr></thead>
           <tbody>
             <tr><td><BB type="Bathroom Break"/></td><td>Less than ~13 minutes</td></tr>
             <tr><td><BB type="Break"/></td><td>~13 minutes – 50 minutes</td></tr>
             <tr><td><BB type="Lunch Break"/></td><td>More than 50 minutes</td></tr>
           </tbody>
-        </table>
+        </table></div>
       </div>
       <div className="sblk">
         <h2 className="sh">Real-time setup (one-time)</h2>
@@ -2598,7 +2600,7 @@ function LType({start}){
 }
 function LT({logs,showDate}){
   return(
-    <table className="dt">
+    <div className="tbl-wrap"><table className="dt">
       <thead><tr><th>Agent</th>{showDate&&<th>Date</th>}<th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
       <tbody>
         {logs.map(l=>(
@@ -2612,7 +2614,7 @@ function LT({logs,showDate}){
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 }
 
