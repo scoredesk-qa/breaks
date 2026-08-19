@@ -1017,7 +1017,7 @@ function AgentApp({user,name,onLogout}){
     if((tc||[]).length>=maxB){setErr(`All ${maxB} break slots are taken. Please wait.`);return;}
     const now=new Date().toISOString();
     const {data,error}=await run(SB.from('bt_logs').insert({user_id:user.id,agent_name:name,start_time:now}).select().single());
-    if(error){setErr('Could not start break: '+error.message);return;}
+    if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Could not start break: '+error.message);return;}
     setActive(data); setLogs(p=>[data,...p]); setTeamCount(c=>c+1);
   };
   const endBreak = async()=>{
@@ -1523,9 +1523,14 @@ function ALive(){
 
   const remoteStart=async(agent)=>{
     setRemoting(agent.user_id); setErr('');
+    // Re-check the live count fresh from the DB right before inserting — the button's
+    // disabled state uses local `live`/`maxB`, which can lag a few seconds behind on a
+    // slow connection, so we can't trust it alone as the only guard.
+    const {data:tc}=await run(SB.from('bt_logs').select('id').is('end_time',null));
+    if((tc||[]).length>=maxB){ setErr(`All ${maxB} break slots are taken. Please wait.`); setRemoting(null); setConfirm(null); return; }
     const now=new Date().toISOString();
     const {data,error}=await run(SB.from('bt_logs').insert({user_id:agent.user_id,agent_name:agent.agent_name,start_time:now}).select().single());
-    if(error){setErr('Remote break failed: '+error.message);}
+    if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Remote break failed: '+error.message);}
     else{setLive(p=>[...p,data]);}
     setRemoting(null); setConfirm(null);
   };
