@@ -1,0 +1,3423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="theme-color" content="#17171c"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>BreakTrack</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2326262d'/%3E%3Ccircle cx='16' cy='16' r='10.5' fill='none' stroke='%23c9c9d2' stroke-width='2'/%3E%3Cline x1='16' y1='9' x2='16' y2='16' stroke='%23c9c9d2' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='16' x2='21' y2='18.5' stroke='%23c9c9d2' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='1.6' fill='%23c9c9d2'/%3E%3C/svg%3E"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.7/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.52.1/dist/umd/supabase.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* ── Mercury-style dark banking palette ── */
+  --bg:#17171c;--side:#17171c;
+  --surf:#1d1d23;              /* card */
+  --card:#26262d;              /* pill / input / icon-button fill */
+  --card2:#2e2e36;
+  --hover:#232329;
+  --bdr:#2b2b33;--bdr-lt:#393943;
+  --txt:#ededf1;--txt2:#c9c9d2;--mut:#9a9aa6;--mut2:#6c6c78;
+
+  --violet:#5266eb;--violet-hi:#6377f5;   /* primary action */
+  --link:#8e9cff;
+  /* group A / accent, group B, status */
+  --amber:#8e9cff;--amber-d:rgba(142,156,255,.12);--amber-r:rgba(142,156,255,.32);--amber-glow:rgba(142,156,255,.45);
+  --indigo:#d4a5f5;--indigo-d:rgba(212,165,245,.11);--indigo-r:rgba(212,165,245,.3);
+  --blue:#6cb0f5;--blue-d:rgba(108,176,245,.11);--blue-r:rgba(108,176,245,.3);
+  --green:#4fc79a;--green-d:rgba(79,199,154,.11);--green-r:rgba(79,199,154,.3);--green-glow:rgba(79,199,154,.45);
+  --red:#f0718b;--red-d:rgba(240,113,139,.11);--red-r:rgba(240,113,139,.3);
+
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'Inter',-apple-system,sans-serif;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --r-card:16px;
+}
+html,body,#root{min-height:100%;background:var(--bg);color:var(--txt);font-family:var(--font);font-size:15px;-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
+::selection{background:rgba(82,102,235,.5);color:#fff}
+:focus-visible{outline:2px solid var(--link);outline-offset:2px;border-radius:8px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2f2f38;border-radius:999px;border:3px solid var(--bg)}
+button{font-family:inherit;-webkit-tap-highlight-color:transparent}
+.mono,.tnum{font-variant-numeric:tabular-nums}
+.tnum{display:inline-flex;line-height:1}
+.tnum-d{display:inline-block;animation:flapIn .35s var(--ease)}
+@keyframes flapIn{0%{opacity:0;transform:translateY(-35%)}100%{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.tnum-d{animation:none}*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+.privacy .pv{filter:blur(7px);transition:filter .2s}
+.pv{transition:filter .2s}
+
+/* ── Loading ── */
+.spl{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:22px}
+.spin{width:22px;height:22px;border:2px solid var(--bdr-lt);border-top-color:var(--txt);border-radius:50%;animation:rot .8s linear infinite}
+.spin-sm{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
+.spin-sm.on-dark{border:2px solid rgba(255,255,255,.2);border-top-color:#fff}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ── Wordmark / org switcher ── */
+.wm{display:flex;align-items:center;gap:11px}
+.wm-icon{width:32px;height:32px;border-radius:9px;background:#2a2a32;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.wm.sm .wm-icon{width:30px;height:30px}
+.wm-t{font-size:15.5px;font-weight:500;color:var(--txt);letter-spacing:-.005em}
+.wm-t b{font-weight:500}
+
+/* ── Buttons ── */
+.bp{background:var(--violet);color:#fff;border:none;border-radius:999px;padding:9px 18px;font-size:15px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;transition:background .15s,transform .1s}
+.bp:hover:not(:disabled){background:var(--violet-hi)}
+.bp:active:not(:disabled){transform:scale(.98)}
+.bp:disabled{opacity:.4;cursor:not-allowed}
+.bp.full{width:100%;margin-top:8px;padding:12px 18px;border-radius:10px}
+.bp.blue{background:var(--violet)}
+.bs{background:var(--card);color:var(--txt);border:none;border-radius:999px;padding:9px 18px;font-size:15px;font-weight:400;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;transition:background .15s,transform .1s}
+.bs:hover:not(:disabled){background:var(--card2)}
+.bs:active:not(:disabled){transform:scale(.98)}
+.bs:disabled{opacity:.45;cursor:not-allowed}
+.bs svg,.bp svg{opacity:.9}
+.ib{background:none;border:none;border-radius:999px;color:var(--mut);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:8px;transition:color .15s,background .15s}
+.ib:hover{color:var(--txt);background:var(--card)}
+.icb{width:46px;height:46px;border-radius:999px;background:var(--card);border:none;color:var(--txt2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:background .15s,color .15s;flex-shrink:0}
+.icb:hover{background:var(--card2);color:var(--txt)}
+.icb.on{color:var(--link)}
+.icb .dot{position:absolute;top:11px;right:12px;width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 2px var(--card)}
+.icb.sm{width:40px;height:40px}
+.kb{width:30px;height:30px;border-radius:999px;background:none;border:none;color:var(--txt2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s}
+.kb:hover{background:var(--card)}
+.lnk{background:none;border:none;color:var(--link);font-size:15px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 0;transition:color .15s}
+.lnk:hover{color:#b3bdff}
+.btn-go{background:var(--violet);color:#fff;border:none;border-radius:999px;padding:12px 26px;font-size:15px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .15s}
+.btn-go:hover:not(:disabled){background:var(--violet-hi)}
+.btn-go:disabled{opacity:.4;cursor:not-allowed}
+.btn-end{background:var(--card);color:var(--txt);border:none;border-radius:999px;padding:12px 26px;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn-end:hover{background:var(--card2)}
+
+/* ── Forms ── */
+.fg{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
+.fl{font-size:13.5px;font-weight:400;color:var(--txt2)}
+.fi{background:var(--bg);border:1px solid var(--bdr-lt);border-radius:10px;padding:11px 14px;color:var(--txt);font-size:15px;font-family:var(--font);outline:none;width:100%;transition:border-color .15s,box-shadow .15s}
+.fi:focus{border-color:var(--link);box-shadow:0 0 0 3px rgba(142,156,255,.15)}
+.fi::placeholder{color:var(--mut2)}
+select.fi option,.type-sel option{background:#1d1d23}
+.iw{position:relative}
+.eb{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--mut);cursor:pointer;display:flex;padding:6px;border-radius:999px}
+.eb:hover{color:var(--txt);background:var(--card)}
+.si{background:var(--card);border:1px solid transparent;border-radius:999px;padding:9px 16px;color:var(--txt);font-size:14px;font-family:var(--font);outline:none;width:200px;transition:border-color .15s}
+.si:focus{border-color:var(--bdr-lt)}
+.si::placeholder{color:var(--mut2)}
+.si[type=date]{color-scheme:dark}
+.aerr{display:flex;align-items:center;gap:8px;color:var(--red);font-size:14px;background:var(--red-d);border-radius:10px;padding:11px 14px;margin-bottom:12px}
+.awrn{display:flex;align-items:center;gap:10px;color:#f7b3c1;font-size:14px;background:var(--red-d);border:1px solid var(--red-r);border-radius:12px;padding:13px 16px}
+
+/* ── Auth ── */
+.auth-bg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.auth-card{background:var(--surf);border:1px solid var(--bdr);border-radius:18px;padding:40px 36px 34px;width:100%;max-width:420px;animation:mslide .4s var(--ease)}
+.auth-logo{margin-bottom:28px}
+.auth-h{font-size:28px;font-weight:400;letter-spacing:-.01em;margin-bottom:6px}
+.auth-s{color:var(--mut);font-size:15px;margin-bottom:28px}
+.eyebrow{display:none}
+
+/* ── Connection instrument ── */
+.instr{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--txt2);border-radius:999px;padding:6px 12px 6px 10px;background:var(--card)}
+.instr .lite{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--mut2)}
+.instr.live .lite{background:var(--green);animation:pulseL 2s ease-in-out infinite}
+.instr.connecting .lite{background:#e8b75c;animation:pulseL 1s ease-in-out infinite}
+.instr.offline{color:var(--red)}
+.instr.offline .lite{background:var(--red)}
+.instr .syncedAt{color:var(--mut);margin-left:2px}
+@keyframes pulseL{0%,100%{box-shadow:0 0 0 0 rgba(79,199,154,.55)}70%{box-shadow:0 0 0 6px rgba(79,199,154,0)}}
+
+/* ══ App shell ══ */
+.shell{display:flex;min-height:100vh}
+.side{width:340px;flex-shrink:0;background:var(--side);border-right:1px solid var(--bdr);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow-y:auto;z-index:30}
+.side-org{height:94px;padding:0 34px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);flex-shrink:0}
+.side-org .chev{color:var(--txt2)}
+.side-nav{padding:34px 18px 24px;display:flex;flex-direction:column;gap:6px;flex:1}
+.side-sec{font-size:14.5px;color:var(--mut);padding:34px 12px 14px}
+.ni{background:none;border:none;border-radius:10px;height:52px;padding:0 16px 0 18px;display:flex;align-items:center;gap:22px;color:var(--txt);font-size:17px;font-weight:400;cursor:pointer;text-align:left;width:100%;transition:background .15s}
+.ni svg{color:var(--txt2);flex-shrink:0}
+.ni:hover{background:var(--hover)}
+.ni.on{background:#26262d}
+.ni.on svg{color:var(--link)}
+.ni .nbadge{margin-left:auto;min-width:34px;height:30px;padding:0 9px;border-radius:7px;background:#262a45;color:#b9c2ff;font-size:14px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.side-ft{padding:18px 30px 26px;border-top:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.side-ft .muted{font-size:13px;color:var(--mut)}
+.scrim{display:none}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{height:94px;padding:0 120px 0 120px;display:flex;align-items:center;gap:24px;position:sticky;top:0;z-index:20;background:rgba(23,23,28,.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.top-menu{display:none}
+.srch{flex:1;position:relative;max-width:890px}
+.srch-in{width:100%;height:58px;border-radius:12px;border:1px solid var(--bdr-lt);background:transparent;padding:0 90px 0 62px;color:var(--txt);font-size:17px;font-family:var(--font);outline:none;transition:border-color .15s,background .15s}
+.srch-in::placeholder{color:var(--mut)}
+.srch-in:focus{border-color:#4a4a57;background:#1b1b21}
+.srch>svg{position:absolute;left:22px;top:50%;transform:translateY(-50%);color:var(--txt2);pointer-events:none}
+.kbd{position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;gap:4px;pointer-events:none}
+.kbd span{min-width:24px;height:24px;border-radius:5px;background:#2b2b33;color:var(--mut);font-size:12.5px;display:flex;align-items:center;justify-content:center;padding:0 5px}
+.srch-pop{position:absolute;left:0;right:0;top:calc(100% + 8px);background:#202027;border:1px solid var(--bdr-lt);border-radius:14px;padding:8px;box-shadow:0 24px 60px rgba(0,0,0,.5);animation:pop .16s var(--ease);max-height:420px;overflow:auto}
+.srch-h{font-size:12.5px;color:var(--mut);padding:8px 12px 6px}
+.srch-it{display:flex;align-items:center;gap:14px;width:100%;background:none;border:none;color:var(--txt);font-size:15px;padding:11px 12px;border-radius:9px;cursor:pointer;text-align:left}
+.srch-it svg{color:var(--txt2)}
+.srch-it.act,.srch-it:hover{background:var(--card)}
+.srch-it .hint{margin-left:auto;color:var(--mut);font-size:13px}
+.srch-empty{padding:18px 12px;color:var(--mut);font-size:14px}
+.mv{height:58px;border-radius:999px;border:1px solid var(--bdr-lt);background:none;color:var(--txt);font-size:17px;padding:0 26px 0 30px;display:inline-flex;align-items:center;gap:14px;cursor:pointer;white-space:nowrap;transition:background .15s}
+.mv:hover{background:var(--hover)}
+.top-ic{display:flex;align-items:center;gap:22px}
+.avb{width:58px;height:58px;border-radius:999px;border:none;cursor:pointer;background:linear-gradient(145deg,#e9e9ee,#b9b9c4);color:#1b1b21;font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.clockpill{height:46px;border-radius:999px;background:var(--card);padding:0 18px;display:inline-flex;align-items:center;gap:10px;color:var(--txt2);font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.clockpill b{font-weight:500;color:var(--txt)}
+
+/* ── Dropdown menu ── */
+.mn{position:relative;display:inline-flex}
+.mn-pop{position:absolute;top:calc(100% + 8px);min-width:240px;background:#202027;border:1px solid var(--bdr-lt);border-radius:14px;padding:6px;box-shadow:0 24px 60px rgba(0,0,0,.5);z-index:60;animation:pop .16s var(--ease)}
+.mn-pop.right{right:0}.mn-pop.left{left:0}
+@keyframes pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+.mn-it{display:flex;align-items:center;gap:12px;width:100%;background:none;border:none;color:var(--txt);font-size:14.5px;padding:10px 12px;border-radius:9px;cursor:pointer;text-align:left;white-space:nowrap}
+.mn-it svg{color:var(--txt2)}
+.mn-it:hover{background:var(--card)}
+.mn-it.danger{color:var(--red)}.mn-it.danger svg{color:var(--red)}
+.mn-hd{padding:10px 12px 10px;border-bottom:1px solid var(--bdr);margin-bottom:6px}
+.mn-hd b{display:block;font-weight:500;font-size:15px}
+.mn-hd span{font-size:13px;color:var(--mut)}
+
+/* ══ Page ══ */
+.page{padding:44px 120px 90px;max-width:1660px;width:100%}
+.hello{font-size:40px;font-weight:400;letter-spacing:-.015em;line-height:1.15;margin-bottom:10px}
+.hello-s{color:var(--mut);font-size:15px;margin-bottom:34px}
+.acts{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:34px}
+.acts .bp,.acts .bs{height:47px;padding:0 22px;font-size:18px;gap:12px}
+.acts-r{margin-left:auto;display:flex;align-items:center;gap:14px}
+.cust{background:none;border:none;color:var(--txt);font-size:17px;display:inline-flex;gap:10px;align-items:center;cursor:pointer;padding:8px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-bottom:56px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:34px}
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r-card);position:relative;min-width:0}
+.card-p{padding:34px 36px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-t{font-size:19px;font-weight:400;color:var(--txt);display:flex;align-items:center;gap:12px}
+.card-ctl{display:flex;align-items:center;gap:10px}
+.vbadge{width:30px;height:30px;border-radius:999px;background:#2a2e4d;display:inline-flex;align-items:center;justify-content:center;color:#9aa6ff}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulseL 2s ease-in-out infinite;display:inline-block}
+
+/* Money-style number: large figure, raised small decimals */
+.amt{display:inline-flex;align-items:flex-start;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.amt-s{font-size:.52em;margin-left:.08em;margin-top:.14em;letter-spacing:0}
+.big{font-size:40px;font-weight:400;line-height:1.1;margin-top:8px}
+.mid{font-size:26px;font-weight:400;line-height:1.2}
+
+/* Balance-card chart */
+.bal{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.bal-top{padding:30px 36px 0;display:flex;justify-content:space-between;gap:16px}
+.bal-sub{padding:26px 36px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.rng{background:none;border:none;color:var(--txt);font-size:19px;display:inline-flex;align-items:center;gap:10px;cursor:pointer;padding:4px 0}
+.inout{display:flex;align-items:center;gap:22px;font-size:19px;font-variant-numeric:tabular-nums}
+.inout>span{display:inline-flex;align-items:center;gap:8px}
+.up{color:var(--green)}.dn{color:var(--red)}
+.seg{display:inline-flex;border:1px solid var(--bdr-lt);border-radius:12px;overflow:hidden;height:58px;background:#1a1a20}
+.seg button{width:60px;border:none;background:none;color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.seg button+button{border-left:1px solid var(--bdr-lt)}
+.seg button.on{background:#25252c;color:var(--link)}
+.ch{position:relative;margin-top:22px;flex:1;min-height:270px;display:flex;flex-direction:column;cursor:crosshair}
+.ch svg{display:block;flex:1}
+.ch-x{display:flex;justify-content:space-around;padding:14px 60px 20px;border-top:1px solid var(--bdr);font-size:15.5px;color:var(--mut);background:var(--surf)}
+.ch-tip{position:absolute;top:6px;transform:translateX(-50%);background:#26262e;border:1px solid var(--bdr-lt);border-radius:10px;padding:8px 12px;font-size:13.5px;pointer-events:none;white-space:nowrap;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+.ch-tip b{display:block;font-weight:500;font-size:15px;margin-top:2px;font-variant-numeric:tabular-nums}
+.ch-tip span{color:var(--mut)}
+.ch-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:14px;pointer-events:none}
+.tview{margin-top:22px;flex:1;max-height:330px;overflow:auto;border-top:1px solid var(--bdr)}
+
+/* Account-style list */
+.acc{padding:30px 24px 22px}
+.acc .card-hd{padding:0 12px 18px}
+.acc-row{position:relative;display:flex;align-items:center;gap:18px;padding:12px 12px;border-radius:10px;min-height:64px;cursor:default;transition:background .12s}
+.acc-row:hover{background:var(--hover)}
+.acc-ic{width:42px;height:42px;border-radius:999px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--txt);background:#26262d;box-shadow:inset 0 0 0 1.5px #55555f}
+.acc-ic.brk{box-shadow:inset 0 0 0 1.5px var(--link);color:#c6cdff;background:#23253a}
+.acc-ic.lun{box-shadow:inset 0 0 0 1.5px var(--indigo);color:var(--indigo);background:#2a2331}
+.acc-ic.bth{box-shadow:inset 0 0 0 1.5px var(--blue);color:var(--blue);background:#1f2833}
+.acc-ic.more{box-shadow:none;background:#2a2a32;color:var(--txt2);font-size:13px}
+.acc-n{flex:1;min-width:0;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:10px}
+.acc-n small{font-size:13px;color:var(--mut)}
+.acc-v{font-size:19px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.acc-v.mut{color:var(--mut);font-size:16px}
+.acc-row.link{cursor:pointer}
+.acc-tip{position:absolute;right:-50px;bottom:calc(100% - 14px);background:#26262e;border:1px solid var(--bdr-lt);border-radius:10px;padding:14px 18px;min-width:290px;z-index:15;box-shadow:0 18px 40px rgba(0,0,0,.45);opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .15s,transform .15s}
+.acc-row:hover .acc-tip{opacity:1;transform:none}
+.acc-tip div{display:flex;justify-content:space-between;gap:24px;font-size:15.5px;line-height:1.9;font-variant-numeric:tabular-nums}
+.acc-tip div span:first-child{color:var(--txt2)}
+.acc-tip hr{border:none;border-top:1px solid var(--bdr-lt);margin:8px 0}
+.acc-empty{padding:40px 12px;color:var(--mut);font-size:15px;text-align:center}
+
+/* On-break-now card + team tiles */
+.onb-row{min-height:74px}
+.onb-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+.onb-bar{height:4px;border-radius:999px;background:#303038;overflow:hidden;max-width:260px}
+.onb-bar i{display:block;height:100%;border-radius:999px;background:var(--link);transition:width 1s linear}
+.onb-bar.lun i{background:var(--indigo)}.onb-bar.bth i{background:var(--blue)}
+.onb-r{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.onb-r small{font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums}
+.onb-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:36px 12px;text-align:center;font-size:17px}
+.onb-empty span{font-size:14px;color:var(--mut)}
+.acc .card-hd{align-items:flex-start}
+.onb,.acc{display:flex;flex-direction:column}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:0 12px;margin-bottom:22px}
+.tiles>div{background:#212128;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tiles>div>span{font-size:13.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tiles b{font-weight:400;font-size:21px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.acc-n .badge{flex-shrink:0}
+.onb-mid .acc-n{flex-wrap:wrap;white-space:normal;row-gap:4px}
+.top3-h{font-size:14px;color:var(--mut);padding:0 12px 6px}
+.top3{min-height:58px}
+.top3 .onb-mid{gap:7px}
+
+/* Summary cards */
+.sm{padding:34px 36px 30px;display:flex;flex-direction:column}
+.sm .card-hd{min-height:48px}
+.sm-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+.sm-cols.two{grid-template-columns:1fr 1fr 1fr}
+.sm-l{font-size:16.5px;color:var(--txt2);margin-bottom:10px}
+.sm-v{font-size:19px;font-variant-numeric:tabular-nums}
+.sm-v .amt-s{font-size:.62em}
+.sm-hr{border:none;border-top:1px solid var(--bdr-lt);margin:30px 0 24px}
+.sm-ft{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:auto}
+.sm-ft .sm-l{display:flex;align-items:center;gap:7px}
+.bar{height:10px;border-radius:999px;background:#3a3a44;overflow:hidden;margin-top:26px;display:flex}
+.bar i{display:block;height:100%;background:var(--violet);border-radius:999px;transition:width .5s var(--ease)}
+.bar i.full{background:var(--red)}
+.legend{display:flex;align-items:center;gap:22px;margin-top:14px;font-size:15px;color:var(--txt2);flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.legend i{width:7px;height:7px;border-radius:50%;display:inline-block;background:var(--violet)}
+.legend i.f{background:#6b6b78}
+.legend .r{margin-left:auto}
+.pay{height:48px;padding:0 24px;border-radius:999px;background:var(--card);border:none;color:var(--txt);font-size:18px;cursor:pointer;transition:background .15s}
+.pay:hover{background:var(--card2)}
+.fab{position:fixed;right:40px;bottom:30px;width:72px;height:72px;border-radius:999px;background:#25252c;border:1px solid var(--bdr-lt);color:var(--link);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:25;box-shadow:0 14px 40px rgba(0,0,0,.45);transition:background .15s,transform .15s}
+.fab:hover{background:#2c2c34;transform:translateY(-1px)}
+.fab.spinning svg{animation:rot .8s linear infinite}
+
+/* Slot stepper */
+.stepper{display:inline-flex;align-items:center;gap:2px;background:var(--card);border-radius:999px;padding:4px}
+.stepper button{width:40px;height:40px;border-radius:999px;border:none;background:none;color:var(--txt);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.stepper button:hover:not(:disabled){background:var(--card2)}
+.stepper button:disabled{opacity:.35;cursor:not-allowed}
+.stepper span{min-width:30px;text-align:center;font-size:18px;font-variant-numeric:tabular-nums;justify-content:center}
+
+/* Agent: centred single-column page */
+.solo>.top{padding-left:max(20px,calc((100% - 1320px)/2));padding-right:max(20px,calc((100% - 1320px)/2))}
+.solo>.page{max-width:1400px;margin:0 auto;padding-left:40px;padding-right:40px}
+
+/* Agent break timer card */
+.timer{padding:34px 36px 30px;display:flex;flex-direction:column}
+.timer.on{border-color:rgba(142,156,255,.35);background:radial-gradient(ellipse 70% 60% at 20% 0%,rgba(82,102,235,.12),transparent 70%),var(--surf)}
+.timer-big{font-size:68px;font-weight:400;letter-spacing:-.02em;line-height:1;margin:34px 0 14px;font-variant-numeric:tabular-nums}
+.timer-big.idle{color:var(--txt2)}
+.timer-sub{color:var(--mut);font-size:16px;line-height:1.5;margin-bottom:28px}
+.timer .btn-go{align-self:flex-start;height:52px;padding:0 30px;font-size:17px}
+.tbar{margin:-4px 0 28px}
+.tbar-track{position:relative;display:flex;gap:4px;height:8px}
+.tbar-track span{background:#34343d;border-radius:999px}
+.tbar-track i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,var(--violet),#8e9cff);transition:width 1s linear}
+.tbar-l{display:flex;gap:4px;margin-top:9px;font-size:13px;color:var(--mut)}
+.tstats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:auto;padding-top:26px;border-top:1px solid var(--bdr-lt)}
+.timer .btn-go+.tstats{margin-top:34px}
+
+/* Notices (swap requests etc.) */
+.notice{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:20px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:18px}
+.notice.hi{border-color:rgba(142,156,255,.35);background:linear-gradient(0deg,rgba(82,102,235,.06),rgba(82,102,235,.06)),var(--surf)}
+.notice-b{flex:1;min-width:240px}
+.notice-t{font-size:16px;margin-bottom:4px}
+.notice-s{font-size:14px;color:var(--mut);line-height:1.5}
+.notice-a{display:flex;gap:10px}
+
+/* ══ Legacy admin pages (restyled) ══ */
+.panel{padding:44px 120px 90px;max-width:1660px}
+.phd{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:34px;flex-wrap:wrap;gap:14px}
+.pt{font-size:40px;font-weight:400;letter-spacing:-.015em;line-height:1.15}
+.ps{font-size:15px;color:var(--mut);margin-top:8px}
+.phr{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sg4{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:20px}
+.sg3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:20px}
+.sg2{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:20px}
+.stat{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r-card);padding:24px 26px;display:flex;flex-direction:column;gap:10px}
+.stat-hd{display:flex;align-items:center;justify-content:space-between}
+.stic{width:40px;height:40px;border-radius:999px;background:var(--card);color:var(--txt2);display:flex;align-items:center;justify-content:center}
+.stat.ac .stic{color:var(--green)}
+.stat.wn .stic{color:var(--red)}
+.stv{font-size:30px;font-weight:400;letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin-top:6px}
+.stl{font-size:15px;color:var(--txt2)}
+.sc{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r-card);overflow:hidden}
+.sc-hd{padding:22px 26px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sc-t{font-size:18px;font-weight:400}
+.sc-ic{color:var(--txt2);display:flex}
+.ldot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulseL 2s ease-in-out infinite;flex-shrink:0}
+.dt{width:100%;border-collapse:collapse;font-size:15px}
+.dt th{text-align:left;padding:14px 26px;font-size:13.5px;font-weight:400;color:var(--mut);border-bottom:1px solid var(--bdr);white-space:nowrap}
+.dt td{padding:15px 26px;border-bottom:1px solid var(--bdr);vertical-align:middle;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dt tbody tr:last-child td{border-bottom:none}
+.dt tbody tr{transition:background .12s}
+.dt tbody tr:hover td{background:var(--hover)}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.av{width:34px;height:34px;border-radius:999px;background:#26262d;color:var(--txt);font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 0 0 1.5px #4d4d58}
+.hdn{font-size:15px;color:var(--txt2)}
+.fc{display:flex;align-items:center}
+.g4{gap:4px}.g6{gap:6px}.g8{gap:8px}.g10{gap:10px}
+.es{padding:48px 20px;text-align:center;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:12px;font-size:15px}
+.es-ic{width:60px;height:60px;border-radius:999px;background:var(--card);display:flex;align-items:center;justify-content:center;color:var(--txt2)}
+.es-ic svg{width:24px;height:24px}
+.act{color:var(--link)}
+.badge{display:inline-flex;align-items:center;gap:7px;font-size:13px;padding:4px 10px;border-radius:999px;background:var(--card);color:var(--txt2);white-space:nowrap}
+.badge::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--mut)}
+.b-on,.b-brk,.b-a{background:var(--amber-d);color:#bcc5ff}
+.b-on::before,.b-brk::before,.b-a::before{background:var(--amber)}
+.b-on::before{animation:pulseL 1.6s ease-in-out infinite}
+.b-done,.b-in{background:var(--green-d);color:var(--green)}
+.b-done::before,.b-in::before{background:var(--green)}
+.b-lunch,.b-b{background:var(--indigo-d);color:var(--indigo)}
+.b-lunch::before,.b-b::before{background:var(--indigo)}
+.b-bath{background:var(--blue-d);color:var(--blue)}
+.b-bath::before{background:var(--blue)}
+.b-out{background:var(--card);color:var(--mut)}
+.b-out::before{background:var(--mut2)}
+.sblk{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r-card);padding:28px 30px;margin-bottom:20px}
+.sh{font-size:18px;font-weight:400;margin-bottom:8px}
+.sd{font-size:15px;color:var(--mut);margin-bottom:18px;line-height:1.55}
+.num-wrap{display:flex;align-items:center;gap:14px}
+.nb{width:40px;height:40px;background:var(--card);border:none;border-radius:999px;color:var(--txt);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:background .15s}
+.nb:hover{background:var(--card2)}
+.nv{font-size:34px;font-weight:400;min-width:54px;text-align:center;font-variant-numeric:tabular-nums}
+.codebox{background:var(--bg);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--mut);line-height:2;overflow-x:auto}
+.codebox b{color:var(--link);font-weight:500}
+.ebox{background:var(--red-d);border-radius:12px;padding:14px 18px;color:#f7b3c1;font-size:14.5px;line-height:1.55;margin-bottom:18px;display:flex;align-items:flex-start;gap:10px}
+.modal-bg{position:fixed;inset:0;background:rgba(8,8,11,.7);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{background:#1f1f26;border:1px solid var(--bdr-lt);border-radius:18px;padding:30px;width:100%;max-width:460px;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:mslide .25s var(--ease)}
+@keyframes mslide{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+.modal-title{font-size:22px;font-weight:400;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.modal-sub{font-size:15px;color:var(--mut);margin-bottom:24px;line-height:1.6}
+.modal-sub strong{color:var(--txt2);font-weight:500}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px}
+.toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none;max-width:380px}
+.toast{background:#23232a;border:1px solid var(--bdr-lt);border-radius:14px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.55);pointer-events:all;animation:toast-in .3s var(--ease);min-width:290px;position:relative;overflow:hidden}
+.toast.leaving{animation:toast-out .2s ease forwards}
+@keyframes toast-in{from{transform:translateY(-8px);opacity:0}to{transform:none;opacity:1}}
+@keyframes toast-out{to{transform:translateY(-6px);opacity:0}}
+.toast-ic{width:36px;height:36px;border-radius:999px!important;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toast-ic.lunch{background:var(--indigo-d);color:var(--indigo)}
+.toast-ic.break{background:var(--amber-d);color:var(--amber)}
+.toast-ic.info{background:var(--green-d);color:var(--green)}
+.toast-ic.warn{background:var(--red-d);color:var(--red)}
+.toast-ic.custom{background:var(--card);color:var(--link)}
+.toast-title{font-size:15px;font-weight:500;margin-bottom:3px}
+.toast-body{font-size:14px;color:var(--mut);line-height:1.45}
+.toast-close{margin-left:auto;background:none;border:none;color:var(--mut);cursor:pointer;padding:2px 0 2px 8px;display:flex;flex-shrink:0}
+.toast-close:hover{color:var(--txt)}
+.toast-bar{position:absolute;bottom:0;left:0;height:2px;background:var(--violet)}
+.notif-preset{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:18px;cursor:pointer;transition:background .15s,border-color .15s;text-align:left;display:flex;flex-direction:column;gap:8px;width:100%;color:inherit}
+.notif-preset:hover{background:var(--hover);border-color:var(--bdr-lt)}
+.notif-preset-title{font-size:15px;font-weight:500}
+.notif-preset-sub{font-size:13.5px;color:var(--mut);line-height:1.45}
+.notif-history{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}
+.notif-hist-item{background:var(--bg);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px}
+.btn-remote{background:var(--card);color:var(--txt);border:none;border-radius:999px;padding:7px 14px;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .15s}
+.btn-remote:hover{background:var(--card2)}
+.btn-remote:disabled{opacity:.4;cursor:not-allowed}
+.btn-edit{background:none;border:1px solid var(--bdr-lt);border-radius:999px;color:var(--txt2);padding:5px 12px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s}
+.btn-edit:hover{background:var(--card);color:var(--txt)}
+.type-sel{background:var(--card);border:1px solid var(--bdr-lt);border-radius:8px;padding:5px 8px;color:var(--txt);font-size:13.5px;font-family:var(--font);outline:none;cursor:pointer}
+.swap-req-card{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+.swap-req-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 10px;border-radius:999px}
+.swap-req-badge.incoming{background:var(--amber-d);color:#bcc5ff}
+.swap-req-badge.outgoing{background:var(--indigo-d);color:var(--indigo)}
+.swap-req-badge.pending{background:var(--card);color:var(--txt2)}
+.swap-action-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn-accept{background:var(--violet);color:#fff;border:none;border-radius:999px;padding:9px 18px;font-size:14.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .15s}
+.btn-accept:hover{background:var(--violet-hi)}
+.btn-decline{background:var(--card);color:var(--txt);border:none;border-radius:999px;padding:9px 18px;font-size:14.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .15s}
+.btn-decline:hover{background:var(--card2)}
+.btn-accept:disabled,.btn-decline:disabled{opacity:.4;cursor:not-allowed}
+.swap-who{font-size:16px;line-height:1.45}
+.swap-detail{font-size:14px;color:var(--mut);line-height:1.5}
+.lunch-groups{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+.lunch-group-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r-card);padding:22px;min-height:120px}
+.lunch-group-card.unset-pool{border-style:dashed}
+.agent-chip{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;margin-bottom:4px;transition:background .12s}
+.agent-chip:hover{background:var(--hover)}
+.chip-move{margin-left:auto;background:var(--card);border:none;border-radius:999px;color:var(--txt2);font-size:12.5px;padding:4px 11px;cursor:pointer;white-space:nowrap;transition:background .15s}
+.chip-move:hover{background:var(--card2);color:var(--txt)}
+
+/* ══ Responsive ══ */
+@media(max-width:1500px){
+  .side{width:280px}.side-org{padding:0 26px}
+  .top,.page,.panel{padding-left:56px;padding-right:56px}
+  .grid2,.grid3{gap:24px}
+}
+@media(max-width:1200px){
+  .grid2{grid-template-columns:1fr}
+  .grid3{grid-template-columns:1fr 1fr}
+  .grid3>.card:last-child{grid-column:1/-1}
+  .sg4{grid-template-columns:repeat(2,1fr)}
+  .acc-tip{right:12px}
+}
+@media(max-width:960px){
+  .side{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .25s var(--ease);width:300px}
+  .side.open{transform:none;box-shadow:30px 0 80px rgba(0,0,0,.5)}
+  .scrim.open{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:29}
+  .top-menu{display:inline-flex}
+  .top{height:76px;gap:12px;padding:0 20px}
+  .srch-in{height:48px;font-size:15px}
+  .mv,.avb{height:48px}.avb{width:48px}
+  .mv{padding:0 18px;font-size:15px}
+  .top-ic{gap:10px}
+  .icb{width:44px;height:44px}
+  .page,.panel{padding:28px 20px 70px}
+  .sg3{grid-template-columns:repeat(2,1fr)}
+  .lunch-groups{grid-template-columns:1fr}
+}
+@media(max-width:680px){
+  html,body,#root{font-size:14px}
+  .top .kbd,.top .mn:has(.mv),.top-ic .hide-s,.clockpill .hide-s{display:none}
+  .top{padding:0 16px;gap:10px}
+  .srch{min-width:0}
+  .srch-in{padding:0 12px 0 44px}
+  .srch>svg{left:14px}
+  .top-ic{gap:8px}
+  .top .icb{width:42px;height:42px}
+  .avb{width:42px;height:42px;font-size:14px}
+  .clockpill{height:42px;padding:0 12px}
+  .hello,.pt{font-size:30px}
+  .acts{gap:10px}
+  .acts .bp,.acts .bs{height:42px;font-size:15px;padding:0 16px}
+  .acts-r{margin-left:0;width:100%}
+  .grid3{grid-template-columns:1fr}
+  .grid2{margin-bottom:24px}
+  .card-p,.sm{padding:24px 22px}
+  .bal-top{padding:24px 22px 0}.bal-sub{padding:18px 22px 0}
+  .big{font-size:34px}
+  .inout,.rng{font-size:16px}
+  .seg{height:46px}.seg button{width:48px}
+  .ch-x{padding:12px 16px 16px;font-size:13px}
+  .acc{padding:22px 12px 16px}
+  .acc-n,.acc-v{font-size:16px}
+  .tiles{grid-template-columns:1fr 1fr}
+  .onb-bar{max-width:none}
+  .acc-tip{display:none}
+  .sm-cols{gap:8px}.sm-l{font-size:14px}.sm-v{font-size:16px}
+  .sg4,.sg3,.sg2{grid-template-columns:1fr 1fr;gap:12px}
+  .stat{padding:18px}
+  .stv{font-size:24px}
+  .dt{font-size:14px}.dt th,.dt td{padding:12px 16px}
+  .fab{right:18px;bottom:18px;width:58px;height:58px}
+  .solo>.page{padding-left:16px;padding-right:16px}
+  .timer{padding:24px 22px}
+  .timer-big{font-size:48px;margin-top:24px}
+  .tstats{grid-template-columns:1fr 1fr}
+  .timer .btn-go{align-self:stretch;justify-content:center}
+  .auth-card{padding:30px 22px}
+  .instr .syncedAt{display:none}
+  .phr{width:100%}.phr .si{flex:1;min-width:0}
+}
+@media(hover:none) and (pointer:coarse){
+  .bp,.bs,.ib,.btn-go,.btn-end,.btn-accept,.btn-decline,.btn-remote,.btn-edit,.fi,.si,.type-sel{min-height:42px}
+  .ib,.kb{min-width:42px;min-height:42px}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  window.BT_URL = 'https://bmfwgyruomldxebinwcr.supabase.co';
+  window.BT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw';
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const SB = supabase.createClient(window.BT_URL, window.BT_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+
+/* ── Auto-refresh safety net ──────────────────────────────────────────
+   Supabase Realtime pushes changes instantly when it's working, but it can
+   silently drop (phone screen locks, wifi/cell handoff, tab backgrounded,
+   Realtime not enabled on a table, RLS quirks, etc). This hook re-runs the
+   given load function on an interval AND immediately whenever the tab/app
+   becomes visible or regains focus again, so a screen never goes stale for
+   more than a few seconds even if the live socket dies quietly. */
+function useAutoRefresh(load, intervalMs = 6000){
+  useEffect(() => {
+    const id = intervalMs ? setInterval(() => { load(); }, intervalMs) : null;
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    window.addEventListener('online', onVis);
+    return () => {
+      if (id) clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
+      window.removeEventListener('online', onVis);
+    };
+  }, [load, intervalMs]);
+}
+
+/* ── Global "last synced" clock — bumped every time any screen finishes a
+   successful load, read by the connection instrument so agent and admin
+   both show an honest "how fresh is what I'm looking at" readout. ── */
+let _lastSync = Date.now();
+const _syncListeners = [];
+function bumpSync(){ _lastSync = Date.now(); _syncListeners.forEach(fn => fn(_lastSync)); }
+function useLastSync(){
+  const [t,setT] = useState(_lastSync);
+  useEffect(() => { _syncListeners.push(setT); return () => { const i=_syncListeners.indexOf(setT); if(i>-1)_syncListeners.splice(i,1); }; }, []);
+  return t;
+}
+
+/* ── Live connection instrument — reads the real Supabase Realtime socket
+   state (not just "did my one channel's callback fire"), so the pill in
+   the header tells the truth about whether this screen can currently
+   receive live updates at all. ── */
+function useConnectionState(){
+  const [state, setState] = useState('connecting');
+  useEffect(() => {
+    const check = () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) { setState('offline'); return; }
+      try {
+        const cs = SB.realtime && SB.realtime.connectionState ? SB.realtime.connectionState() : null;
+        if (cs === 'open') setState('live');
+        else if (cs === 'connecting') setState('connecting');
+        else setState('connecting');
+      } catch(e) { setState('connecting'); }
+    };
+    check();
+    const id = setInterval(check, 2500);
+    window.addEventListener('online', check);
+    window.addEventListener('offline', check);
+    return () => { clearInterval(id); window.removeEventListener('online', check); window.removeEventListener('offline', check); };
+  }, []);
+  return state;
+}
+
+function agoStr(ts){
+  const s = Math.max(0, Math.round((Date.now()-ts)/1000));
+  if (s < 3) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  return `${Math.floor(s/60)}m ago`;
+}
+
+function ConnInstrument({compact}){
+  const conn = useConnectionState();
+  const lastSync = useLastSync();
+  const [, force] = useState(0);
+  useEffect(() => { const id = setInterval(() => force(n=>n+1), 4000); return () => clearInterval(id); }, []);
+  const label = conn === 'live' ? 'Live' : conn === 'offline' ? 'Offline' : 'Reconnecting…';
+  return (
+    <span className={`instr ${conn}`} title="Realtime connection status">
+      <span className="lite"/>{label}
+      {!compact && <span className="syncedAt">· synced {agoStr(lastSync)}</span>}
+    </span>
+  );
+}
+
+/* ── Ticker digits — the engineered "this number just changed" motif.
+   Re-keying each character on change forces React to remount it, which
+   triggers the CSS flap-in animation — a cheap, honest way to make a
+   live readout visibly announce its own updates instead of silently
+   swapping text. ── */
+function TNum({value, className, mono=true}){
+  const str = String(value);
+  return (
+    <span className={`tnum ${className||''}`} style={mono?{}:{fontFamily:'inherit'}}>
+      {str.split('').map((c,i) => <span key={i+'|'+c} className="tnum-d">{c}</span>)}
+    </span>
+  );
+}
+
+/* ── Icons ── */
+const PATHS = {
+  zap:      "M13 2L3 14h9l-1 8 10-12h-9z",
+  logout:   ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
+  coffee:   ["M18 8h1a4 4 0 0 1 0 8h-1","M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z","M6 1v3","M10 1v3","M14 1v3"],
+  timer:    ["M10 2h4","M12 14l4-4","M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"],
+  clock:    ["M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z","M12 6v6l4 2"],
+  play:     "M5 3l14 9-14 9V3z",
+  stop:     "M6 6h12v12H6z",
+  users:    ["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
+  grid:     ["M3 3h7v7H3z","M14 3h7v7h-7z","M14 14h7v7h-7z","M3 14h7v7H3z"],
+  settings: ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"],
+  chevron:  "M9 18l6-6-6-6",
+  download: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","M7 10l5 5 5-5","M12 15V3"],
+  eye:      ["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z","M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"],
+  eyeoff:   ["M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94","M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19","M1 1l22 22","M10.59 10.59A3 3 0 0 0 14.83 15"],
+  alert:    ["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z","M12 9v4","M12 17h.01"],
+  check:    ["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4L12 14.01l-3-3"],
+  activity: "M22 12h-4l-3 9L9 3l-3 9H2",
+  trending: ["M23 6l-9.5 9.5-5-5L1 18","M17 6h6v6"],
+  refresh:  ["M23 4v6h-6","M1 20v-6h6","M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"],
+  login2:   ["M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4","M10 17l5-5-5-5","M15 12H3"],
+  logoff:   ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
+  sun:      ["M12 2v2","M12 20v2","M4.93 4.93l1.41 1.41","M17.66 17.66l1.41 1.41","M2 12h2","M20 12h2","M6.34 17.66l-1.41 1.41","M19.07 4.93l-1.41 1.41","M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
+  moon:     ["M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"],
+  utensils: ["M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2","M7 2v20","M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"],
+  edit:     ["M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7","M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"],
+  sandwich: ["M3 11v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3","M12 19H4a1 1 0 0 1-1-1v-1a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1h-3.83","M3 11l7.77-6.04a2 2 0 0 1 2.46 0L21 11H3z","M12.97 19.77L7 15h14l-3.48 4.77a2 2 0 0 1-4.55 0z"],
+  x:        ["M18 6L6 18","M6 6l12 12"],
+  bell:     ["M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9","M13.73 21a2 2 0 0 1-3.46 0"],
+  send:     ["M22 2L11 13","M22 2L15 22 11 13 2 9l20-7z"],
+  swap:     ["M7 16V4m0 0L3 8m4-4l4 4","M17 8v12m0 0l4-4m-4 4l-4-4"],
+  arrowlr:  ["M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"],
+  tower:    ["M12 2l6 7h-4v13h-4V9H6z","M9 22h6"],
+  strip:    ["M3 6h18","M3 12h18","M3 18h11"],
+  home:     ["M3 10.5L12 3l9 7.5","M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"],
+  bars:     ["M4 20V4","M4 20h16","M8.5 16v-4","M12.5 16V9","M16.5 16v-6"],
+  list:     ["M9 6h11","M9 12h11","M9 18h11","M4.5 6h.01","M4.5 12h.01","M4.5 18h.01"],
+  search:   ["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z","M20 20l-4-4"],
+  chevdown: "M6 9l6 6 6-6",
+  more:     ["M12 5h.01","M12 12h.01","M12 19h.01"],
+  plus:     ["M12 5v14","M5 12h14"],
+  menu:     ["M4 7h16","M4 12h16","M4 17h16"],
+  arrowur:  ["M7 17L17 7","M8 7h9v9"],
+  arrowdr:  ["M7 7l10 10","M17 8v9H8"],
+  table:    ["M3 5h18v14H3z","M3 10h18","M3 15h18","M12 10v9"],
+  drop:     "M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11z",
+};
+const Ic = ({ n, size=16, sw=1.8, col }) => {
+  const d = PATHS[n] || "M12 12h.01";
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={col||"currentColor"} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
+      style={{display:'inline-block',flexShrink:0,verticalAlign:'middle'}}>
+      {Array.isArray(d) ? d.map((p,i)=><path key={i} d={p}/>) : <path d={d}/>}
+    </svg>
+  );
+};
+
+/* ── Helpers ── */
+const pad      = n  => String(n).padStart(2,'0');
+const tStr     = s  => { s=Math.max(0,s); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60; return h>0?`${h}:${pad(m)}:${pad(sec)}`:`${pad(m)}:${pad(sec)}`; };
+const tMs      = ms => tStr(Math.floor(ms/1000));
+const fmtT     = d  => d ? new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
+const fmtD     = d  => new Date(d).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+const todayISO = ()  => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const ini      = n  => (n||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+const durStr   = s  => {
+  if(s==null||s===0) return '0s';
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;
+  if(h>0) return `${h}h ${m}m`;
+  if(m>0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+};
+const bType = s => { if(s==null)return null; if(s>=3000)return'Lunch Break'; if(s>=800)return'Break'; return'Bathroom Break'; };
+const BCLS  = {'Lunch Break':'b-lunch','Break':'b-brk','Bathroom Break':'b-bath'};
+const BREAK_TYPES = ['Bathroom Break','Break','Lunch Break'];
+
+/* Lunch schedule helpers */
+/* First lunch hour comes from bt_settings.lunch_start (default 12) */
+let _lunchStart = 12;
+const fmtH = h => `${String(((h%24)+24)%24).padStart(2,'0')}:00`;
+async function loadLunchStart(){
+  const {data} = await run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle());
+  const v = data && data.lunch_start!=null ? parseInt(data.lunch_start,10) : 12;
+  if (isNaN(v) || v===_lunchStart) return false;
+  _lunchStart = v; return true;
+}
+const lunchSlots = (groupFirst) => {
+  const early={from:fmtH(_lunchStart),to:fmtH(_lunchStart+1)}, late={from:fmtH(_lunchStart+1),to:fmtH(_lunchStart+2)};
+  return { A: groupFirst==='A'?early:late, B: groupFirst==='B'?early:late };
+};
+/* Auto rotate: even day => A first, odd day => B first */
+const defaultFirst = (dateStr) => {
+  const day = parseInt(dateStr.slice(8,10));
+  return day % 2 === 0 ? 'A' : 'B';
+};
+
+const csvExport = (rows) => {
+  const h = 'Agent,Date,Start,Return,Duration,Type\n';
+  const b = rows.map(r=>{
+    const d = r.end_time?Math.round((new Date(r.end_time)-new Date(r.start_time))/1000):0;
+    return `"${r.agent_name}","${fmtD(r.start_time)}","${fmtT(r.start_time)}","${fmtT(r.end_time)}","${durStr(d)}","${r.break_type||''}"`;
+  }).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([h+b],{type:'text/csv'}));
+  a.download=`breaks-${todayISO()}.csv`;a.click();
+};
+
+const run = async(p) => { try{ return await p; }catch(e){ return {data:null,error:e}; } };
+
+/* ══════════════════════════════════════════════════════════════
+   TOAST / NOTIFICATION SYSTEM
+══════════════════════════════════════════════════════════════ */
+
+/* ── Web Audio notification sounds ── */
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _audioCtx;
+}
+function playNotifSound(type = 'info') {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const presets = {
+      lunch:  [{ f:660, t:0,    d:0.12, g:0.5 }, { f:880, t:0.13, d:0.12, g:0.5 }, { f:1100, t:0.26, d:0.2, g:0.6 }],
+      break:  [{ f:520, t:0,    d:0.15, g:0.4 }, { f:660, t:0.18, d:0.2,  g:0.4 }],
+      warn:   [{ f:440, t:0,    d:0.1,  g:0.5 }, { f:340, t:0.13, d:0.1,  g:0.5 }, { f:440, t:0.26, d:0.15, g:0.5 }],
+      info:   [{ f:600, t:0,    d:0.1,  g:0.3 }, { f:800, t:0.12, d:0.15, g:0.3 }],
+      custom: [{ f:500, t:0,    d:0.1,  g:0.35}, { f:700, t:0.13, d:0.1,  g:0.35}, { f:900, t:0.26, d:0.2, g:0.4 }],
+    };
+    const notes = presets[type] || presets.info;
+    const now = ctx.currentTime;
+    notes.forEach(({ f, t, d, g }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, now + t);
+      gain.gain.setValueAtTime(0, now + t);
+      gain.gain.linearRampToValueAtTime(g, now + t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+      osc.start(now + t);
+      osc.stop(now + t + d + 0.01);
+    });
+  } catch(e) { /* audio blocked — silent fail */ }
+}
+
+/* ── Global toast emitter — works without React context ── */
+const _toastListeners = [];
+const toastEmit = (toast) => _toastListeners.forEach(fn => fn(toast));
+
+function useToastEmitter(addToast) {
+  useEffect(() => {
+    _toastListeners.push(addToast);
+    return () => { const i = _toastListeners.indexOf(addToast); if(i>-1)_toastListeners.splice(i,1); };
+  }, [addToast]);
+}
+
+/* ── Master fire function: in-app toast + OS desktop notification + sound ── */
+function fireNotification({ title, body, type = 'info', duration = 7000 }) {
+  playNotifSound(type);
+  toastEmit({ id: Date.now() + Math.random(), title, body, type, duration });
+  if ('Notification' in window) {
+    const show = () => new Notification(title, { body, tag: type + '-' + Date.now() });
+    if (Notification.permission === 'granted') show();
+    else if (Notification.permission !== 'denied') Notification.requestPermission().then(p => { if(p==='granted') show(); });
+  }
+}
+
+/* ── Toast Container ── */
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((t) => {
+    setToasts(p => [...p, { ...t, leaving: false }]);
+    setTimeout(() => {
+      setToasts(p => p.map(x => x.id === t.id ? { ...x, leaving: true } : x));
+      setTimeout(() => setToasts(p => p.filter(x => x.id !== t.id)), 260);
+    }, t.duration || 7000);
+  }, []);
+  useToastEmitter(addToast);
+  const dismiss = (id) => {
+    setToasts(p => p.map(x => x.id === id ? { ...x, leaving: true } : x));
+    setTimeout(() => setToasts(p => p.filter(x => x.id !== id)), 260);
+  };
+  const typeIcon = { lunch:'utensils', break:'coffee', info:'bell', warn:'alert', custom:'zap' };
+  return (
+    <div className="toast-container">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast${t.leaving?' leaving':''}`}>
+          <div className={`toast-ic ${t.type}`}><Ic n={typeIcon[t.type]||'bell'} size={16} sw={2}/></div>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="toast-title">{t.title}</div>
+            <div className="toast-body">{t.body}</div>
+          </div>
+          <button className="toast-close" onClick={()=>dismiss(t.id)}><Ic n="x" size={14}/></button>
+          <div className="toast-bar" style={{animationDuration:`${t.duration||7000}ms`}}/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Request OS permission early ── */
+function useNotifPermission() {
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      const t = setTimeout(() => Notification.requestPermission(), 2500);
+      return () => clearTimeout(t);
+    }
+  }, []);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SUPABASE REALTIME BROADCAST CHANNEL
+   Admins publish to 'bt_broadcast'; agents receive.
+   Nothing is written to the database.
+══════════════════════════════════════════════════════════════ */
+const BROADCAST_CHANNEL = 'bt_broadcast';
+const BROADCAST_EVENT   = 'notif';
+const SWAP_CHANNEL      = 'bt_swap';
+const SWAP_EVENT        = 'swap_request';
+
+/* Publish a notification to all agents (or a specific user_id) via Supabase Realtime broadcast */
+async function broadcastNotif({ title, body, type = 'custom', targetUserId = null, lunchGroup = null }) {
+  const ch = SB.channel(BROADCAST_CHANNEL);
+  await new Promise(res => {
+    ch.subscribe(status => { if(status === 'SUBSCRIBED') res(); });
+  });
+  await ch.send({ type:'broadcast', event: BROADCAST_EVENT, payload:{ title, body, type, targetUserId, lunchGroup } });
+  SB.removeChannel(ch);
+}
+
+/* ── Broadcast a swap request/response via Realtime ── */
+async function broadcastSwap(payload) {
+  const ch = SB.channel(SWAP_CHANNEL);
+  await new Promise(res => { ch.subscribe(s => { if(s==='SUBSCRIBED') res(); }); });
+  await ch.send({ type:'broadcast', event: SWAP_EVENT, payload });
+  SB.removeChannel(ch);
+}
+
+/* ── Persist swap request to DB ── */
+async function createSwapRequest({ fromUserId, fromName, toUserId, toName, fromGroup, toGroup, date }) {
+  const { data, error } = await run(
+    SB.from('bt_swap_requests').insert({
+      from_user_id: fromUserId, from_name: fromName,
+      to_user_id: toUserId,   to_name: toName,
+      from_group: fromGroup,  to_group: toGroup,
+      date, status: 'pending',
+      created_at: new Date().toISOString(),
+    }).select().single()
+  );
+  return { data, error };
+}
+
+/* ── Agent: listen for incoming swap requests/responses ── */
+function useSwapListener(userId, onRequest) {
+  useEffect(() => {
+    const ch = SB.channel(SWAP_CHANNEL + '-' + userId)
+      .on('broadcast', { event: SWAP_EVENT }, ({ payload }) => {
+        if (payload.toUserId === userId || payload.fromUserId === userId) {
+          onRequest(payload);
+        }
+      })
+      .subscribe();
+    return () => SB.removeChannel(ch);
+  }, [userId]);
+}
+
+/* ── Agent: listen for broadcast notifications ── */
+/* lunchInfo is passed in so we can filter lunch broadcasts to the right group */
+function useAgentNotifListener(userId, lunchInfo) {
+  useEffect(() => {
+    const ch = SB.channel(BROADCAST_CHANNEL)
+      .on('broadcast', { event: BROADCAST_EVENT }, ({ payload }) => {
+        // Filter by specific user if targeted
+        if (payload.targetUserId && payload.targetUserId !== userId) return;
+        // Filter lunch broadcasts: only show if agent is in the notified group
+        if (payload.lunchGroup) {
+          const myGroup = lunchInfo?.group || null;
+          if (!myGroup || myGroup !== payload.lunchGroup) return;
+        }
+        fireNotification({ title: payload.title, body: payload.body, type: payload.type || 'custom', duration: 9000 });
+      })
+      .subscribe();
+    return () => SB.removeChannel(ch);
+  }, [userId, lunchInfo?.group]);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LUNCH REMINDER HOOKS
+══════════════════════════════════════════════════════════════ */
+
+/* Agent: 5-min personal reminder based on their own lunch slot */
+function useLunchReminder(lunchInfo) {
+  const firedRef = useRef(new Set());
+  useEffect(() => {
+    if (!lunchInfo?.group || !lunchInfo?.slot) return;
+    const check = () => {
+      const nowUTC = Date.now();
+      const nowDate = new Date(nowUTC);
+      const [h, m] = lunchInfo.slot.from.split(':').map(Number);
+      // Casablanca is UTC+1 → subtract 1 hour for UTC
+      const lunchUTC = Date.UTC(
+        nowDate.getUTCFullYear(),
+        nowDate.getUTCMonth(),
+        nowDate.getUTCDate(),
+        h - 1,
+        m,
+        0,
+        0
+      );
+      const diff = (lunchUTC - nowUTC) / 60000;
+      const key = `${nowDate.toISOString().slice(0,10)}-${lunchInfo.slot.from}-${lunchInfo.group}`;
+      if (diff > 0 && diff <= 5 && !firedRef.current.has(key)) {
+        firedRef.current.add(key);
+        fireNotification({
+          title: `🍽️ Lunch in ${Math.ceil(diff)} min!`,
+          body: `Group ${lunchInfo.group} — your lunch starts at ${lunchInfo.slot.from}. Get ready!`,
+          type: 'lunch',
+          duration: 10000,
+        });
+      }
+    };
+    check();
+    const id = setInterval(check, 20000);
+    return () => clearInterval(id);
+  }, [lunchInfo]);
+}
+
+/* Admin: automated broadcast to ALL agents at the exact scheduled lunch times.
+   Reads today's lunch schedule from Supabase once per minute and fires broadcasts
+   at configured alert times (default 5 min before each group's slot). */
+function useAdminLunchBroadcast(alertMinutes = 5) {
+  const firedRef = useRef(new Set());
+  useEffect(() => {
+    const check = async () => {
+      const today = todayISO();
+      const { data: ls } = await run(
+        SB.from('bt_lunch_schedule').select('*').eq('date', today).maybeSingle()
+      );
+      if (!ls) return;
+      const first = ls.group_first || defaultFirst(today);
+      const slots = lunchSlots(first);
+      const nowUTC = Date.now();
+      const nowDate = new Date(nowUTC);
+      ['A', 'B'].forEach(grp => {
+        const [h, m] = slots[grp].from.split(':').map(Number);
+        const lunchUTC = Date.UTC(
+          nowDate.getUTCFullYear(),
+          nowDate.getUTCMonth(),
+          nowDate.getUTCDate(),
+          h - 1,
+          m,
+          0,
+          0
+        );
+        const diff = (lunchUTC - nowUTC) / 60000;
+        const key = `auto-${grp}-${slots[grp].from}-${today}`;
+        if (diff > 0 && diff <= alertMinutes && !firedRef.current.has(key)) {
+          firedRef.current.add(key);
+          const mins = Math.ceil(diff);
+          broadcastNotif({
+            title: `🍽️ Group ${grp} Lunch in ${mins} min`,
+            body: `Group ${grp}: your lunch break starts at ${slots[grp].from}. Please get ready to head out!`,
+            type: 'lunch',
+            lunchGroup: grp,
+          });
+        }
+      });
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => clearInterval(id);
+  }, [alertMinutes]);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ROOT
+══════════════════════════════════════════════════════════════ */
+function App() {
+  const [user,  setUser]  = useState(null);
+  const [ready, setReady] = useState(false);
+  useNotifPermission();
+  useEffect(()=>{
+    Promise.all([SB.auth.getSession(), loadLunchStart()]).then(([{data:{session}}])=>{ setUser(session?.user||null); setReady(true); });
+    const {data:{subscription}} = SB.auth.onAuthStateChange((_,session)=>{ setUser(session?.user||null); });
+    return ()=>subscription.unsubscribe();
+  },[]);
+  const [,bumpApp]=useState(0);
+  useEffect(()=>{ const id=setInterval(()=>loadLunchStart().then(c=>c&&bumpApp(n=>n+1)),30000); return()=>clearInterval(id); },[]);
+  if(!ready) return <><Splash/><ToastContainer/></>;
+  if(!user)  return <><LoginPage/><ToastContainer/></>;
+  const role = user.user_metadata?.role;
+  const name = user.user_metadata?.display_name || user.email;
+  const out  = ()=>SB.auth.signOut();
+  return (
+    <>
+      {role==='admin'
+        ? <AdminApp user={user} name={name} onLogout={out}/>
+        : <AgentApp user={user} name={name} onLogout={out}/>}
+      <ToastContainer/>
+    </>
+  );
+}
+
+function Splash(){
+  return(
+    <div className="spl">
+      <div className="wm">
+        <div className="wm-icon"><Ic n="tower" size={16} col="#c9c9d2" sw={2}/></div>
+        <span className="wm-t">BreakTrack</span>
+      </div>
+      <div className="spin"/>
+    </div>
+  );
+}
+
+/* ── Login ── */
+function LoginPage(){
+  const [email,setEmail]=useState('');
+  const [pass,setPass]=useState('');
+  const [show,setShow]=useState(false);
+  const [err,setErr]=useState('');
+  const [busy,setBusy]=useState(false);
+  const go=async()=>{
+    if(!email||!pass)return;
+    setBusy(true);setErr('');
+    const{error}=await SB.auth.signInWithPassword({email:email.trim(),password:pass});
+    if(error){setErr(error.message);setBusy(false);}
+  };
+  return(
+    <div className="auth-bg">
+      <div className="auth-card">
+        <div className="auth-logo">
+          <div className="wm">
+            <div className="wm-icon"><Ic n="tower" size={16} col="#c9c9d2" sw={2}/></div>
+            <span className="wm-t">BreakTrack</span>
+          </div>
+        </div>
+        <h1 className="auth-h">Log in to BreakTrack</h1>
+        <p className="auth-s">Sign in to check into your shift</p>
+        <div className="fg">
+          <label className="fl">Email</label>
+          <input className="fi" type="email" placeholder="you@company.com" value={email}
+            onChange={e=>{setEmail(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&go()} autoFocus/>
+        </div>
+        <div className="fg">
+          <label className="fl">Password</label>
+          <div className="iw">
+            <input className="fi" type={show?'text':'password'} placeholder="••••••••" value={pass}
+              onChange={e=>{setPass(e.target.value);setErr('')}} onKeyDown={e=>e.key==='Enter'&&go()} style={{paddingRight:44}}/>
+            <button className="eb" onClick={()=>setShow(s=>!s)}><Ic n={show?'eyeoff':'eye'} size={15}/></button>
+          </div>
+        </div>
+        {err&&<div className="aerr"><Ic n="alert" size={14}/> {err}</div>}
+        <button className="bp full" onClick={go} disabled={busy||!email||!pass}>
+          {busy?<span className="spin-sm"/>:'Sign in'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AGENT
+══════════════════════════════════════════════════════════════ */
+function AgentApp({user,name,onLogout}){
+  const [clockRow,  setClockRow]  = useState(null);
+  const [active,    setActive]    = useState(null);
+  const [logs,      setLogs]      = useState([]);
+  const [elapsed,   setElapsed]   = useState(0);
+  const [maxB,      setMaxB]      = useState(3);
+  const [teamCount, setTeamCount] = useState(0);
+  const [loading,   setLoading]   = useState(true);
+  const [err,       setErr]       = useState('');
+  const [lunchInfo, setLunchInfo] = useState(null); // {group:'A'|'B', slot:{from,to}}
+  // Swap request state
+  const [incomingSwaps, setIncomingSwaps] = useState([]); // pending requests TO this agent
+  const [outgoingSwap,  setOutgoingSwap]  = useState(null); // request FROM this agent (pending)
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapBusy,      setSwapBusy]      = useState(false);
+  const timerRef = useRef(null);
+  const outgoingSwapRef = useRef(null);
+  useEffect(()=>{ outgoingSwapRef.current = outgoingSwap; },[outgoingSwap]);
+  const today = todayISO();
+
+  // Notification hooks
+  useLunchReminder(lunchInfo);
+  useAgentNotifListener(user.id, lunchInfo);
+
+  // Swap listener — receives broadcast events for immediate response UX
+  useSwapListener(user.id, useCallback((payload) => {
+    if (payload.action === 'request' && payload.toUserId === user.id) {
+      // New incoming request — the postgres_changes sub will also catch it, but toast here for immediacy
+      fireNotification({ title: '🔄 Lunch Swap Request', body: `${payload.fromName} wants to swap lunch groups with you.`, type: 'custom', duration: 15000 });
+    }
+    if (payload.action === 'accepted' && payload.fromUserId === user.id) {
+      // Our request was accepted — update outgoing swap and reload lunch
+      setOutgoingSwap(null);
+      fireNotification({ title: '✅ Swap Accepted!', body: `${payload.toName} accepted. Your lunch group has been updated.`, type: 'info', duration: 10000 });
+      // Fetch fresh lunch schedule from DB
+      run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data:ls})=>{
+        if(!ls) return;
+        const grpA=ls.group_a||[]; const grpB=ls.group_b||[];
+        const myGrp=grpA.includes(name)?'A':grpB.includes(name)?'B':null;
+        const first=ls.group_first||defaultFirst(today); const slots=lunchSlots(first);
+        if(myGrp) setLunchInfo({group:myGrp,slot:slots[myGrp],allA:grpA,allB:grpB,first,slots});
+        else setLunchInfo({group:null,allA:grpA,allB:grpB});
+      });
+    }
+    if (payload.action === 'declined' && payload.fromUserId === user.id) {
+      setOutgoingSwap(null);
+      fireNotification({ title: '❌ Swap Declined', body: `${payload.toName} declined your swap request.`, type: 'warn', duration: 8000 });
+    }
+  }, [user.id, today, name]));
+
+  const load = useCallback(async()=>{
+    setLoading(true); setErr('');
+    const {data:cr} = await run(SB.from('bt_clocklogs').select('*').eq('user_id',user.id).eq('date',today).maybeSingle());
+    setClockRow(cr||null);
+    const {data:bl,error:e2} = await run(SB.from('bt_logs').select('*').eq('user_id',user.id).gte('start_time',today+'T00:00:00.000Z').order('start_time',{ascending:false}));
+    if(e2){setErr(e2.message);setLoading(false);return;}
+    setLogs(bl||[]);
+    const openBreak = (bl||[]).find(l=>!l.end_time);
+    setActive(openBreak||null);
+    const {data:cfg} = await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
+    if(cfg) setMaxB(cfg.max_concurrent_breaks);
+    const {data:tc} = await run(SB.from('bt_logs').select('id').is('end_time',null));
+    setTeamCount((tc||[]).length);
+    // Lunch schedule
+    const {data:ls} = await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
+    if(ls){
+      const grpA = ls.group_a || [];
+      const grpB = ls.group_b || [];
+      const myGrp = grpA.includes(name) ? 'A' : grpB.includes(name) ? 'B' : null;
+      if(myGrp){
+        const first = ls.group_first || defaultFirst(today);
+        const slots = lunchSlots(first);
+        setLunchInfo({group:myGrp, slot:slots[myGrp], allA:grpA, allB:grpB, first, slots});
+      } else {
+        setLunchInfo({group:null, allA:grpA, allB:grpB});
+      }
+    } else {
+      // No DB row for today yet — use default rotation so agents still see their group
+      const first = defaultFirst(today);
+      const slots = lunchSlots(first);
+      setLunchInfo({ group: null, allA: [], allB: [], first, slots, isDefault: true });
+    }
+    // Load any pending outgoing swap requests
+    const {data:mySwaps} = await run(SB.from('bt_swap_requests').select('*').eq('from_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}).limit(1));
+    if(mySwaps&&mySwaps.length>0) setOutgoingSwap(mySwaps[0]);
+    else setOutgoingSwap(null);
+    // Load pending incoming swap requests
+    const {data:incoming} = await run(SB.from('bt_swap_requests').select('*').eq('to_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}));
+    setIncomingSwaps(incoming||[]);
+    setLoading(false);
+    bumpSync();
+  },[user.id,today,name]);
+
+  useEffect(()=>{ load(); },[load]);
+
+  // Real-time: break logs — re-fetches team count/logs whenever the socket (re)connects,
+  // so a dropped-and-restored connection never leaves this screen showing stale state.
+  useEffect(()=>{
+    const ch = SB.channel('agent-rt-'+user.id)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bt_logs'},({new:nw})=>{
+        if(nw.user_id!==user.id) setTeamCount(c=>c+1);
+        else setLogs(p=>p.some(l=>l.id===nw.id)?p:[nw,...p]);
+        bumpSync();
+      })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bt_logs'},({new:nw})=>{
+        if(nw.user_id!==user.id){ if(nw.end_time) setTeamCount(c=>Math.max(0,c-1)); }
+        else setLogs(p=>p.map(l=>l.id===nw.id?nw:l));
+        bumpSync();
+      })
+      .subscribe(status => { if(status === 'SUBSCRIBED') load(); });
+    return()=>SB.removeChannel(ch);
+  },[user.id]);
+
+  // Real-time: lunch schedule — call load() on any change so we always get fresh data
+  // (REPLICA IDENTITY may not be FULL on this table, so we don't trust the payload)
+  useEffect(()=>{
+    // Helper: apply fetched schedule to agent state
+    const applySchedule = (ls) => {
+      if(!ls){
+        const first = defaultFirst(today); const slots = lunchSlots(first);
+        setLunchInfo(prev => prev?.group ? prev : { group:null, allA:[], allB:[], first, slots, isDefault:true });
+        return;
+      }
+      const grpA = ls.group_a || []; const grpB = ls.group_b || [];
+      const myGrp = grpA.includes(name) ? 'A' : grpB.includes(name) ? 'B' : null;
+      const first = ls.group_first || defaultFirst(today); const slots = lunchSlots(first);
+      if(myGrp) setLunchInfo({group:myGrp, slot:slots[myGrp], allA:grpA, allB:grpB, first, slots});
+      else setLunchInfo({group:null, allA:grpA, allB:grpB, first, slots});
+    };
+    const fetchAndApply = () =>
+      run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data})=>{applySchedule(data); bumpSync();});
+
+    const ch = SB.channel('agent-lunch-rt-'+user.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},()=>{
+        // Always re-fetch rather than trusting payload (REPLICA IDENTITY may not be FULL)
+        fetchAndApply();
+      })
+      // Re-fetch on reconnect so agents who were offline catch up immediately
+      .subscribe(status => { if(status === 'SUBSCRIBED') fetchAndApply(); });
+    return()=>SB.removeChannel(ch);
+  },[user.id,today,name]);
+
+  // Real-time: swap requests — re-fetch on any change, fire toast for new incoming
+  useEffect(()=>{
+    const ch = SB.channel('agent-swaps-rt-'+user.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},async({eventType,new:nw})=>{
+        // Re-fetch pending incoming swaps
+        const {data:incoming} = await run(SB.from('bt_swap_requests').select('*').eq('to_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}));
+        setIncomingSwaps(prev => {
+          const newList = incoming||[];
+          // Fire toast for brand-new incoming requests
+          newList.forEach(sr => { if(!prev.some(p=>p.id===sr.id)) {
+            fireNotification({ title:'🔄 Lunch Swap Request', body:`${sr.from_name} wants to swap lunch groups with you.`, type:'custom', duration:15000 });
+          }});
+          return newList;
+        });
+        // Re-fetch outgoing
+        const {data:mySwaps} = await run(SB.from('bt_swap_requests').select('*').eq('from_user_id',user.id).eq('date',today).eq('status','pending').order('created_at',{ascending:false}).limit(1));
+        const hadOutgoing = !!outgoingSwapRef.current;
+        const newOutgoing = (mySwaps&&mySwaps.length>0) ? mySwaps[0] : null;
+        setOutgoingSwap(newOutgoing);
+        bumpSync();
+        // If our outgoing just got accepted, reload lunch info
+        if(hadOutgoing && !newOutgoing && nw?.from_user_id===user.id && nw?.status==='accepted') {
+          fireNotification({ title:'✅ Swap Accepted!', body:`Your lunch group has been updated.`, type:'info', duration:10000 });
+          run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()).then(({data:ls})=>{
+            if(!ls) return;
+            const grpA=ls.group_a||[]; const grpB=ls.group_b||[];
+            const myGrp=grpA.includes(name)?'A':grpB.includes(name)?'B':null;
+            const first=ls.group_first||defaultFirst(today); const slots=lunchSlots(first);
+            if(myGrp) setLunchInfo({group:myGrp,slot:slots[myGrp],allA:grpA,allB:grpB,first,slots});
+          });
+        }
+        if(hadOutgoing && !newOutgoing && nw?.from_user_id===user.id && nw?.status==='declined') {
+          fireNotification({ title:'❌ Swap Declined', body:`Your swap request was declined.`, type:'warn', duration:8000 });
+        }
+      })
+      .subscribe(status => { if(status==='SUBSCRIBED'){ /* resync happens via the effect above on mount */ } });
+    return()=>SB.removeChannel(ch);
+  },[user.id,today,name]);
+
+  useEffect(()=>{
+    // Poll team break count every 8s (tightened from 15s so a dropped realtime
+    // socket never leaves the agent staring at a stale team-capacity number)
+    const id=setInterval(async()=>{
+      const {data}=await run(SB.from('bt_logs').select('id').is('end_time',null));
+      setTeamCount((data||[]).length);
+    },8000);
+    // Poll lunch schedule every 20s as a safety net — catches changes that slip past
+    // the realtime subscription (e.g. direct Supabase edits, brief network drops)
+    const applyLunchData = (ls) => {
+      if(!ls){
+        const first=defaultFirst(today); const slots=lunchSlots(first);
+        setLunchInfo(prev => prev?.group ? prev : { group:null, allA:[], allB:[], first, slots, isDefault:true });
+        return;
+      }
+      const grpA=ls.group_a||[]; const grpB=ls.group_b||[];
+      const myGrp=grpA.includes(name)?'A':grpB.includes(name)?'B':null;
+      const first=ls.group_first||defaultFirst(today); const slots=lunchSlots(first);
+      if(myGrp) setLunchInfo({group:myGrp,slot:slots[myGrp],allA:grpA,allB:grpB,first,slots});
+      else setLunchInfo({group:null,allA:grpA,allB:grpB,first,slots});
+    };
+    const lunchPoll=setInterval(async()=>{
+      const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
+      applyLunchData(ls);
+    },20000);
+    return()=>{ clearInterval(id); clearInterval(lunchPoll); };
+  },[today,name]);
+
+  useEffect(()=>{
+    if(active){ const s=new Date(active.start_time).getTime(); timerRef.current=setInterval(()=>setElapsed(Date.now()-s),250); }
+    else{ clearInterval(timerRef.current); setElapsed(0); }
+    return()=>clearInterval(timerRef.current);
+  },[active]);
+
+  const clockIn = async()=>{
+    setErr('');
+    const now=new Date().toISOString();
+    const {data,error}=await run(SB.from('bt_clocklogs').insert({user_id:user.id,agent_name:name,clock_in:now,date:today}).select().single());
+    if(error){setErr('Clock-in failed: '+error.message);return;}
+    setClockRow(data);
+  };
+  const clockOut = async()=>{
+    if(!clockRow)return; setErr('');
+    const now=new Date().toISOString();
+    const {data,error}=await run(SB.from('bt_clocklogs').update({clock_out:now}).eq('id',clockRow.id).select().single());
+    if(error){setErr('Clock-out failed: '+error.message);return;}
+    setClockRow(data);
+  };
+  const startBreak = async()=>{
+    setErr('');
+    const {data:tc}=await run(SB.from('bt_logs').select('id').is('end_time',null));
+    if((tc||[]).length>=maxB){setErr(`All ${maxB} break slots are taken. Please wait.`);return;}
+    const now=new Date().toISOString();
+    const {data,error}=await run(SB.from('bt_logs').insert({user_id:user.id,agent_name:name,start_time:now}).select().single());
+    if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Could not start break: '+error.message);return;}
+    setActive(data); setLogs(p=>[data,...p]); setTeamCount(c=>c+1);
+  };
+  const endBreak = async()=>{
+    if(!active)return; setErr('');
+    const now=new Date().toISOString();
+    const durSecs=Math.round((new Date(now)-new Date(active.start_time))/1000);
+    const bt=bType(durSecs);
+    const {error}=await run(SB.from('bt_logs').update({end_time:now,duration_secs:durSecs,break_type:bt}).eq('id',active.id));
+    if(error){setErr('Could not end break: '+error.message);return;}
+    setLogs(p=>p.map(l=>l.id===active.id?{...l,end_time:now,duration_secs:durSecs,break_type:bt}:l));
+    setActive(null); setTeamCount(c=>Math.max(0,c-1));
+  };
+
+  // Swap: send request to another agent
+  const sendSwapRequest = async(targetAgent) => {
+    if(!lunchInfo?.group) return;
+    setSwapBusy(true);
+    const targetGroup = targetAgent.group;
+    const {data,error} = await createSwapRequest({
+      fromUserId: user.id, fromName: name,
+      toUserId: targetAgent.userId, toName: targetAgent.name,
+      fromGroup: lunchInfo.group, toGroup: targetGroup, date: today,
+    });
+    if(error){ setErr('Could not send swap request: '+error.message); setSwapBusy(false); return; }
+    setOutgoingSwap(data);
+    await broadcastSwap({ action:'request', id:data.id, fromUserId:user.id, fromName:name, toUserId:targetAgent.userId, toName:targetAgent.name, fromGroup:lunchInfo.group, toGroup:targetGroup, date:today });
+    setShowSwapModal(false);
+    setSwapBusy(false);
+    fireNotification({ title: '📤 Swap Request Sent', body: `Waiting for ${targetAgent.name} to respond.`, type: 'info', duration: 6000 });
+  };
+
+  const cancelSwapRequest = async() => {
+    if(!outgoingSwap) return;
+    await run(SB.from('bt_swap_requests').update({status:'cancelled'}).eq('id',outgoingSwap.id));
+    setOutgoingSwap(null);
+  };
+
+  // Swap: respond to incoming request
+  const respondToSwap = async(swapReq, accepted) => {
+    setSwapBusy(true);
+    const newStatus = accepted ? 'accepted' : 'declined';
+    // 1. Update the swap request status
+    await run(SB.from('bt_swap_requests').update({status:newStatus, responded_at:new Date().toISOString()}).eq('id',swapReq.id));
+    setIncomingSwaps(p=>p.filter(s=>s.id!==swapReq.id));
+
+    if(accepted) {
+      // 2. Perform the actual group swap in bt_lunch_schedule
+      const {data:ls} = await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
+      if(ls) {
+        let newA = [...(ls.group_a||[])];
+        let newB = [...(ls.group_b||[])];
+        // Remove both from their current groups
+        newA = newA.filter(n=>n!==swapReq.from_name && n!==swapReq.to_name);
+        newB = newB.filter(n=>n!==swapReq.from_name && n!==swapReq.to_name);
+        // Put each in the other's group
+        if(swapReq.from_group==='A') { newB.push(swapReq.from_name); newA.push(swapReq.to_name); }
+        else { newA.push(swapReq.from_name); newB.push(swapReq.to_name); }
+        await run(SB.from('bt_lunch_schedule').update({group_a:newA,group_b:newB,updated_at:new Date().toISOString()}).eq('id',ls.id));
+        // 3. Notify admin via the admin broadcast channel
+        broadcastNotif({ title:`🔄 Lunch Swap Done`, body:`${swapReq.from_name} (Grp ${swapReq.from_group}) ↔ ${swapReq.to_name} (Grp ${swapReq.to_group}) · schedule updated automatically.`, type:'info' });
+        // 4. Update our own lunch card immediately (the acceptor)
+        const acceptorNewGroup = swapReq.from_group; // we take the requester's group
+        const first = ls.group_first || defaultFirst(today);
+        const slots = lunchSlots(first);
+        setLunchInfo({group:acceptorNewGroup, slot:slots[acceptorNewGroup], allA:newA, allB:newB, first, slots});
+      }
+      // 5. Broadcast directly to the requester so they update immediately
+      await broadcastSwap({ action:'accepted', id:swapReq.id, fromUserId:swapReq.from_user_id, fromName:swapReq.from_name, toUserId:user.id, toName:name });
+    } else {
+      // Notify requester of decline
+      await broadcastSwap({ action:'declined', id:swapReq.id, fromUserId:swapReq.from_user_id, fromName:swapReq.from_name, toUserId:user.id, toName:name });
+    }
+    setSwapBusy(false);
+  };
+
+  const done=logs.filter(l=>l.end_time);
+  const totalSec=done.reduce((s,l)=>s+(l.duration_secs||0),0);
+  const predType=active?bType(Math.floor(elapsed/1000)):null;
+  const atCap=teamCount>=maxB;
+  const isClockedIn=clockRow?.clock_in&&!clockRow?.clock_out;
+  const isClockedOut=clockRow?.clock_out;
+  // Other agents in the opposite group (for swap target selection)
+  const otherGroupAgents = lunchInfo?.group ? (
+    lunchInfo.group==='A'
+      ? (lunchInfo.allB||[]).map(n=>({name:n, group:'B', userId:null}))
+      : (lunchInfo.allA||[]).map(n=>({name:n, group:'A', userId:null}))
+  ) : [];
+
+  const [showAll,setShowAll]=useState(false);
+  const [nowA,setNowA]=useState(Date.now());
+  useEffect(()=>{ const id=setInterval(()=>setNowA(Date.now()),1000); return()=>clearInterval(id); },[]);
+  const todaySec=logs.reduce((s,l)=>s+secOf(l,nowA),0);
+  const avgMine=done.length?Math.round(totalSec/done.length):0;
+  const breakDisabled=atCap||loading||!isClockedIn;
+  const breakHint=!isClockedIn?(isClockedOut?'Your shift has ended for today':'Clock in first to take breaks')
+    :maxB<=0?'Breaks are paused right now — check with your supervisor'
+    :atCap?`All ${maxB} break slots are in use — wait for a colleague to return`:null;
+  const listed=showAll?logs:logs.slice(0,5);
+  const shiftSec=clockRow?.clock_in?Math.round(((clockRow.clock_out?new Date(clockRow.clock_out).getTime():nowA)-new Date(clockRow.clock_in).getTime())/1000):0;
+  const pct=maxB>0?Math.min(100,teamCount/maxB*100):100;
+  const elSec=Math.floor(elapsed/1000);
+  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';
+
+  return(
+    <div className="main solo" style={{minHeight:'100vh'}}>
+      <header className="top">
+        <div className="wm" style={{marginRight:'auto'}}>
+          <div className="wm-icon"><Ic n="tower" size={16} col="#c9c9d2" sw={1.8}/></div>
+          <span className="wm-t">BreakTrack</span>
+        </div>
+        <div className="top-ic">
+          <ClockPill/>
+          <span className="hide-s"><ConnInstrument compact/></span>
+          <AvatarMenu name={name} role={lunchInfo?.group?`Agent · Group ${lunchInfo.group}`:'Agent'} onLogout={onLogout}
+            extra={<MI n="refresh" onClick={load}>Refresh</MI>}/>
+        </div>
+      </header>
+
+      <div className="page">
+        {err&&<div className="aerr"><Ic n="alert" size={15}/> {err}</div>}
+
+        {incomingSwaps.map(sr=>(
+          <div key={sr.id} className="notice hi">
+            <div className="acc-ic brk"><Ic n="swap" size={17}/></div>
+            <div className="notice-b">
+              <div className="notice-t">{sr.from_name} wants to swap lunch groups</div>
+              <div className="notice-s">You'd move to Group {sr.from_group} and {sr.from_name} to Group {sr.to_group}. Admin is notified automatically.</div>
+            </div>
+            <div className="notice-a">
+              <button className="bs" onClick={()=>respondToSwap(sr,false)} disabled={swapBusy}>Decline</button>
+              <button className="bp" onClick={()=>respondToSwap(sr,true)} disabled={swapBusy}>{swapBusy?<span className="spin-sm"/>:<Ic n="check" size={15}/>} Accept</button>
+            </div>
+          </div>
+        ))}
+        {outgoingSwap&&(
+          <div className="notice">
+            <div className="acc-ic"><Ic n="timer" size={17}/></div>
+            <div className="notice-b">
+              <div className="notice-t">Swap request sent to {outgoingSwap.to_name}</div>
+              <div className="notice-s">Group {outgoingSwap.from_group} ↔ Group {outgoingSwap.to_group} · waiting for a response…</div>
+            </div>
+            <button className="bs" onClick={cancelSwapRequest}>Cancel request</button>
+          </div>
+        )}
+
+        <h1 className="hello">Welcome, {firstName(name)}</h1>
+        <p className="hello-s">{new Date(nowA).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'})}{isClockedIn?` · on shift since ${hhmm(clockRow.clock_in)}`:''}</p>
+
+        <div className="acts">
+          {!clockRow&&<button className="bp" onClick={clockIn}><Ic n="login2" size={16}/> Clock in</button>}
+          {isClockedIn&&<button className="bs" onClick={clockOut}><Ic n="logoff" size={16}/> Clock out</button>}
+          {lunchInfo?.group&&!outgoingSwap&&isClockedIn&&<button className="bs" onClick={()=>setShowSwapModal(true)}><Ic n="swap" size={16}/> Swap lunch</button>}
+          <button className="bs" onClick={load}><Ic n="refresh" size={16}/> Refresh</button>
+          <div className="acts-r"><ConnInstrument/></div>
+        </div>
+
+        <div className="grid2">
+          {/* Break timer — the one thing an agent needs */}
+          <div className={`card timer${active?' on':''}`}>
+            <div className="card-hd">
+              <div className="card-t">
+                {active?'On break':'Break timer'}
+                {active?<span className={`badge ${BCLS[predType]||'b-on'}`}>{predType}</span>:<span className={`badge ${breakHint?'b-out':'b-in'}`}>{breakHint?'Unavailable':'Available'}</span>}
+              </div>
+            </div>
+            <div className={`timer-big${active?'':' idle'}`}>{active?<DurAmt s={elSec}/>:idleWord}</div>
+            <div className="timer-sub">{active?`Started at ${fmtT(active.start_time)} · logged automatically when you return`:breakHint||'Your break will be timed and logged automatically'}</div>
+            {active&&(
+              <div className="tbar">
+                <div className="tbar-track">
+                  <span style={{flex:13}}/><span style={{flex:37}}/><span style={{flex:10}}/>
+                  <i style={{width:`${Math.min(100,elSec/3600*100)}%`}}/>
+                </div>
+                <div className="tbar-l"><span style={{flex:13}}>Bathroom</span><span style={{flex:37}}>Break · 13m+</span><span style={{flex:10,textAlign:'right'}}>Lunch · 50m+</span></div>
+              </div>
+            )}
+            {!active
+              ?<button className="btn-go" onClick={startBreak} disabled={breakDisabled}><Ic n="play" size={17} sw={2.2}/> Start break</button>
+              :<button className="btn-go" onClick={endBreak}><Ic n="stop" size={17} sw={2.2}/> Return from break</button>}
+            <div className="tstats">
+              <div><div className="sm-l">Breaks today</div><div className="sm-v"><TNum value={done.length}/></div></div>
+              <div><div className="sm-l">Total</div><div className="sm-v">{durStr(todaySec)}</div></div>
+              <div><div className="sm-l">Average</div><div className="sm-v">{durStr(avgMine)}</div></div>
+              <div><div className="sm-l">Team out</div><div className="sm-v"><TNum value={teamCount}/><span style={{color:'var(--mut)'}}>/{maxB}</span></div></div>
+            </div>
+          </div>
+
+          <div className="card acc">
+            <div className="card-hd">
+              <div className="card-t">Today's breaks</div>
+              <div className="card-ctl">
+                <Kebab><MI n="refresh" onClick={load}>Refresh</MI></Kebab>
+              </div>
+            </div>
+            {loading?<div className="es"><div className="spin"/></div>
+             :logs.length===0?<div className="acc-empty">No breaks yet today.<br/>They'll be timed and logged automatically.</div>
+             :listed.map(l=>{
+                const s=secOf(l,nowA); const t=l.break_type||bType(s);
+                const cls=t==='Lunch Break'?'lun':t==='Bathroom Break'?'bth':'brk';
+                return (
+                  <div key={l.id} className="acc-row">
+                    <div className={`acc-ic ${cls}`}><Ic n={t==='Lunch Break'?'utensils':t==='Bathroom Break'?'drop':'coffee'} size={17}/></div>
+                    <div className="acc-n">{l.end_time?t:<>{t} <span className="badge b-on">Live</span></>} <small>{hhmm(l.start_time)}{l.end_time?` – ${hhmm(l.end_time)}`:''}</small></div>
+                    <div className="acc-v"><DurAmt s={s}/></div>
+                    <div className="acc-tip">
+                      <div><span>Started</span><span>{fmtT(l.start_time)}</span></div>
+                      <div><span>Returned</span><span>{l.end_time?fmtT(l.end_time):'—'}</span></div>
+                      <hr/>
+                      <div><span>Duration</span><span>{durStr(s)}</span></div>
+                    </div>
+                  </div>
+                );
+              })}
+            {logs.length>5&&(
+              <div className="acc-row link" onClick={()=>setShowAll(v=>!v)}>
+                <div className="acc-ic more">{showAll?<Ic n="chevdown" size={16}/>:`+${logs.length-5}`}</div>
+                <div className="acc-n">{showAll?'Show less':'View all breaks'}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid3">
+          <div className="card sm">
+            <div className="card-hd">
+              <div>
+                <div className="card-t">Shift</div>
+                <div className="mid" style={{marginTop:8}}>{clockRow?.clock_in?<DurAmt s={shiftSec}/>:<span style={{color:'var(--mut)'}}>Not started</span>}</div>
+              </div>
+              <div className="card-ctl"><span className={`badge ${isClockedIn?'b-in':'b-out'}`}>{isClockedIn?'On shift':isClockedOut?'Ended':'Off'}</span></div>
+            </div>
+            <div className="sm-cols">
+              <div><div className="sm-l">Clock in</div><div className="sm-v">{clockRow?.clock_in?hhmm(clockRow.clock_in):'–'}</div></div>
+              <div><div className="sm-l">Clock out</div><div className="sm-v">{clockRow?.clock_out?hhmm(clockRow.clock_out):'–'}</div></div>
+              <div><div className="sm-l">On break</div><div className="sm-v">{durStr(todaySec)}</div></div>
+            </div>
+            <hr className="sm-hr"/>
+            <div className="sm-ft">
+              <div><div className="sm-l"><Ic n="clock" size={14}/> Status</div><div className="sm-v">{isClockedIn?'Working':isClockedOut?'Shift ended':'Not clocked in'}</div></div>
+              {!clockRow&&<button className="pay" onClick={clockIn}>Clock in</button>}
+              {isClockedIn&&<button className="pay" onClick={clockOut}>Clock out</button>}
+            </div>
+          </div>
+
+          <div className="card sm">
+            <div className="card-hd">
+              <div>
+                <div className="card-t">Lunch{lunchInfo?.group?` · Group ${lunchInfo.group}`:''}</div>
+                <div className="mid" style={{marginTop:8}}>{lunchInfo?.group?<Amt main={lunchInfo.slot.from} sup={`–${lunchInfo.slot.to}`}/>:<span style={{color:'var(--mut)'}}>Unassigned</span>}</div>
+              </div>
+              {lunchInfo?.group&&!outgoingSwap&&isClockedIn&&<div className="card-ctl"><button className="icb sm" onClick={()=>setShowSwapModal(true)} title="Request swap"><Ic n="swap" size={17}/></button></div>}
+            </div>
+            <div className="sm-cols">
+              <div><div className="sm-l">Group A</div><div className="sm-v">{lunchInfo?.slots?`${lunchInfo.slots.A.from}`:'–'}</div></div>
+              <div><div className="sm-l">Group B</div><div className="sm-v">{lunchInfo?.slots?`${lunchInfo.slots.B.from}`:'–'}</div></div>
+              <div><div className="sm-l">First</div><div className="sm-v">{lunchInfo?.first?`Group ${lunchInfo.first}`:'–'}</div></div>
+            </div>
+            <hr className="sm-hr"/>
+            <div className="sm-ft">
+              <div><div className="sm-l">Swap</div><div className="sm-v">{outgoingSwap?'Pending':incomingSwaps.length?`${incomingSwaps.length} incoming`:'None'}</div></div>
+              {lunchInfo?.group&&!outgoingSwap&&isClockedIn&&<button className="lnk" onClick={()=>setShowSwapModal(true)}>Request <Ic n="chevron" size={15}/></button>}
+            </div>
+          </div>
+
+          <div className="card sm">
+            <div className="card-hd">
+              <div>
+                <div className="card-t">Team on break</div>
+                <div className="mid" style={{marginTop:8}}><Amt main={<TNum value={teamCount}/>} sup={`/${maxB}`}/></div>
+              </div>
+            </div>
+            <div className="bar"><i className={atCap?'full':''} style={{width:`${pct}%`}}/></div>
+            <div className="legend">
+              <span>On break <i/></span><span>Free <i className="f"/></span>
+              <span className="r">{Math.max(0,maxB-teamCount)} available</span>
+            </div>
+            <hr className="sm-hr"/>
+            <div className="sm-ft">
+              <div><div className="sm-l"><Ic n="refresh" size={14}/> Live</div><div className="sm-v">Updates instantly</div></div>
+              {!active
+                ?<button className="pay" onClick={startBreak} disabled={breakDisabled} style={breakDisabled?{opacity:.45,cursor:'not-allowed'}:null}>Start</button>
+                :<button className="pay" onClick={endBreak}>Return</button>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showSwapModal&&lunchInfo?.group&&(
+        <SwapRequestModal
+          myName={name}
+          myGroup={lunchInfo.group}
+          otherGroup={lunchInfo.group==='A'?'B':'A'}
+          otherSlot={lunchInfo.group==='A'?lunchInfo.slots.B:lunchInfo.slots.A}
+          mySlot={lunchInfo.slot}
+          date={today}
+          onSend={sendSwapRequest}
+          onClose={()=>setShowSwapModal(false)}
+          busy={swapBusy}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Swap Request Modal ── */
+function SwapRequestModal({myName,myGroup,otherGroup,otherSlot,mySlot,date,onSend,onClose,busy}){
+  const [agents,setAgents]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState(null);
+  const [err,setErr]=useState('');
+
+  useEffect(()=>{
+    (async()=>{
+      // Load agents in the other group with their user_ids from bt_clocklogs
+      const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',date).maybeSingle());
+      if(!ls){setErr('No lunch schedule found for today.');setLoading(false);return;}
+      const otherNames = otherGroup==='A' ? (ls.group_a||[]) : (ls.group_b||[]);
+      if(otherNames.length===0){setErr(`No agents in Group ${otherGroup} to swap with.`);setLoading(false);return;}
+      // Look up user_ids from bt_clocklogs
+      const {data:ck}=await run(SB.from('bt_clocklogs').select('user_id,agent_name').eq('date',date).in('agent_name',otherNames));
+      const seen=new Set(); const list=[];
+      (ck||[]).forEach(r=>{ if(!seen.has(r.user_id)){seen.add(r.user_id);list.push({userId:r.user_id,name:r.agent_name,group:otherGroup});} });
+      setAgents(list);
+      if(list.length>0)setSelected(list[0].userId);
+      setLoading(false);
+    })();
+  },[date,otherGroup]);
+
+  const handleSend=()=>{
+    const ag=agents.find(a=>a.userId===selected);
+    if(ag) onSend(ag);
+  };
+
+  return(
+    <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box">
+        <div className="modal-title"><Ic n="swap" size={18}/> Request Lunch Swap</div>
+        <div className="modal-sub">
+          Ask a colleague in Group {otherGroup} to swap lunch slots with you.<br/>
+          <strong>Your slot:</strong> Group {myGroup} · {mySlot.from}–{mySlot.to}<br/>
+          <strong>Their slot:</strong> Group {otherGroup} · {otherSlot.from}–{otherSlot.to}
+        </div>
+        {err&&<div className="ebox" style={{marginBottom:12}}><Ic n="alert" size={14}/>{err}</div>}
+        {loading?<div style={{textAlign:'center',padding:16}}><div className="spin" style={{margin:'0 auto'}}/></div>
+         :agents.length===0&&!err?<div className="ebox"><Ic n="alert" size={14}/>No agents in Group {otherGroup} are clocked in today.</div>
+         :(
+          <div className="fg">
+            <label className="fl">Select agent to request swap ({agents.length} available)</label>
+            <select className="fi" value={selected||''} onChange={e=>setSelected(e.target.value)}>
+              {agents.map(a=><option key={a.userId} value={a.userId}>{a.name} (Group {a.group})</option>)}
+            </select>
+          </div>
+        )}
+        <div style={{background:'var(--card)',border:'1px solid var(--bdr)',borderRadius:8,padding:'10px 14px',fontSize:12,color:'var(--mut)',marginBottom:20,lineHeight:1.6}}>
+          If they accept: the swap happens automatically and admin is notified.
+        </div>
+        <div className="modal-foot">
+          <button className="bs" onClick={onClose}>Cancel</button>
+          <button className="bp" onClick={handleSend} disabled={busy||loading||agents.length===0||!selected}>
+            {busy?<span className="spin-sm"/>:<Ic n="send" size={14}/>} Send Request
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN
+══════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════
+   SHELL — Mercury-style chrome: sidebar, top bar, menus, chart
+══════════════════════════════════════════════════════════════ */
+const firstName = n => (n||'').split(/[\s@]/)[0] || 'there';
+const secOf = (l, now) => l.duration_secs!=null ? l.duration_secs
+  : Math.max(0, Math.round(((l.end_time?new Date(l.end_time).getTime():now) - new Date(l.start_time).getTime())/1000));
+const localMidnight = (d=new Date()) => { const x=new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+const hhmm = t => { const d=new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const mdy  = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
+/* Split a duration into a large figure and a raised remainder, like $12,505.87 */
+const splitDur = s => {
+  s=Math.max(0,Math.round(s||0)); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), x=s%60;
+  if(h>0) return {main:`${h}h ${pad(m)}m`, sup:`${pad(x)}s`};
+  return {main:`${m}m`, sup:`${pad(x)}s`};
+};
+function Amt({main, sup, className=''}){
+  return <span className={`amt ${className}`}><span>{main}</span>{sup!=null&&<span className="amt-s">{sup}</span>}</span>;
+}
+const DurAmt = ({s, className}) => { const d=splitDur(s); return <Amt main={d.main} sup={d.sup} className={className}/>; };
+
+/* Dropdown menu with outside-click / Escape to close */
+function Menu({trigger, children, align='right'}){
+  const [open,setOpen]=useState(false); const ref=useRef(null);
+  useEffect(()=>{
+    if(!open) return;
+    const h=e=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    const k=e=>{ if(e.key==='Escape') setOpen(false); };
+    document.addEventListener('mousedown',h); document.addEventListener('keydown',k);
+    return()=>{ document.removeEventListener('mousedown',h); document.removeEventListener('keydown',k); };
+  },[open]);
+  return (
+    <div className="mn" ref={ref}>
+      {trigger({open, toggle:()=>setOpen(o=>!o)})}
+      {open&&<div className={`mn-pop ${align}`} onClick={()=>setOpen(false)}>{children}</div>}
+    </div>
+  );
+}
+const MI = ({n, children, onClick, danger}) => (
+  <button className={`mn-it${danger?' danger':''}`} onClick={onClick}>{n&&<Ic n={n} size={16}/>}<span>{children}</span></button>
+);
+const Kebab = ({children}) => (
+  <Menu trigger={({toggle})=><button className="kb" onClick={toggle} aria-label="More"><Ic n="more" size={18} sw={2.2}/></button>}>{children}</Menu>
+);
+
+/* Smooth area chart with hover crosshair — sized to its container */
+function AreaChart({points, fmt, live, emptyText}){
+  const ref=useRef(null); const [w,setW]=useState(640); const [hov,setHov]=useState(null);
+  const gid=useRef('g'+Math.random().toString(36).slice(2)).current;
+  useEffect(()=>{
+    const el=ref.current; if(!el) return;
+    const ro=new ResizeObserver(([e])=>setW(Math.max(200,e.contentRect.width)));
+    ro.observe(el); return()=>ro.disconnect();
+  },[]);
+  const H=250, top=34, n=points.length;
+  const max=Math.max(1,...points.map(p=>p.v))*1.12;
+  const X=i=> n<=1 ? w/2 : (i/(n-1))*w;
+  const Y=v=> top+(H-top-2)*(1-v/max);
+  const P=points.map((p,i)=>[X(i),Y(p.v)]);
+  let line='';
+  P.forEach(([x,y],i)=>{
+    if(i===0){ line=`M ${x} ${y}`; return; }
+    const [px,py]=P[i-1]; const cx=(px+x)/2;
+    line+=` C ${cx} ${py}, ${cx} ${y}, ${x} ${y}`;
+  });
+  const area = n ? `${line} L ${w} ${H} L 0 ${H} Z` : '';
+  const labels = (() => {
+    if(n<2) return points.map(p=>p.label);
+    const k=5, out=[];
+    for(let j=0;j<k;j++){ const i=Math.round((j+0.5)*(n-1)/k); out.push(points[i].label); }
+    return out;
+  })();
+  const onMove=e=>{
+    if(!n) return; const r=ref.current.getBoundingClientRect();
+    const i=Math.round(((e.clientX-r.left)/r.width)*(n-1)); setHov(Math.max(0,Math.min(n-1,i)));
+  };
+  const allZero = !points.some(p=>p.v>0);
+  const last = P[P.length-1];
+  return (
+    <div className="ch">
+      <div ref={ref} style={{position:'relative',flex:1,display:'flex'}} onMouseMove={onMove} onMouseLeave={()=>setHov(null)}>
+        <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`}>
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#6e76e6" stopOpacity=".42"/>
+              <stop offset="1" stopColor="#6e76e6" stopOpacity=".04"/>
+            </linearGradient>
+          </defs>
+          {n>0&&<path d={area} fill={`url(#${gid})`}/>}
+          {n>0&&<path d={line} fill="none" stroke="#8d93f2" strokeWidth="1.8" strokeLinejoin="round"/>}
+          {live&&last&&<>
+            <circle cx={last[0]-3} cy={last[1]} r="9" fill="#8d93f2" opacity=".18"><animate attributeName="r" values="4;11;4" dur="2s" repeatCount="indefinite"/></circle>
+            <circle cx={last[0]-3} cy={last[1]} r="3.5" fill="#c3c7ff"/>
+          </>}
+          {hov!=null&&P[hov]&&<>
+            <line x1={P[hov][0]} x2={P[hov][0]} y1={0} y2={H} stroke="rgba(255,255,255,.18)" strokeDasharray="3 4"/>
+            <circle cx={P[hov][0]} cy={P[hov][1]} r="4.5" fill="#17171c" stroke="#c3c7ff" strokeWidth="2"/>
+          </>}
+        </svg>
+        {hov!=null&&points[hov]&&(
+          <div className="ch-tip" style={{left:Math.max(70,Math.min(w-70,P[hov][0]))}}>
+            <span>{points[hov].label}</span><b>{fmt(points[hov].v)}</b>
+          </div>
+        )}
+        {allZero&&<div className="ch-empty">{emptyText||'No activity yet'}</div>}
+      </div>
+      <div className="ch-x">{labels.map((l,i)=><span key={i}>{l}</span>)}</div>
+    </div>
+  );
+}
+
+/* Command-style search: jump to any page or action */
+function SearchBar({items, onPick}){
+  const [q,setQ]=useState(''); const [open,setOpen]=useState(false); const [sel,setSel]=useState(0);
+  const inRef=useRef(null); const wrap=useRef(null);
+  useEffect(()=>{
+    const k=e=>{ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); inRef.current?.focus(); } };
+    const h=e=>{ if(wrap.current&&!wrap.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('keydown',k); document.addEventListener('mousedown',h);
+    return()=>{ document.removeEventListener('keydown',k); document.removeEventListener('mousedown',h); };
+  },[]);
+  const res=items.filter(i=>(i.label+' '+(i.kw||'')).toLowerCase().includes(q.trim().toLowerCase())).slice(0,9);
+  useEffect(()=>setSel(0),[q]);
+  const pick=it=>{ if(!it) return; onPick(it); setQ(''); setOpen(false); inRef.current?.blur(); };
+  const isMac=/Mac|iPhone|iPad/.test(navigator.platform||'');
+  return (
+    <div className="srch" ref={wrap}>
+      <Ic n="search" size={20}/>
+      <input ref={inRef} className="srch-in" placeholder="Search for anything" value={q}
+        onFocus={()=>setOpen(true)} onChange={e=>{setQ(e.target.value);setOpen(true);}}
+        onKeyDown={e=>{
+          if(e.key==='ArrowDown'){e.preventDefault();setSel(s=>Math.min(res.length-1,s+1));}
+          else if(e.key==='ArrowUp'){e.preventDefault();setSel(s=>Math.max(0,s-1));}
+          else if(e.key==='Enter') pick(res[sel]);
+          else if(e.key==='Escape'){ setOpen(false); e.target.blur(); }
+        }}/>
+      {!q&&<div className="kbd"><span>{isMac?'⌘':'Ctrl'}</span><span>K</span></div>}
+      {open&&(
+        <div className="srch-pop">
+          <div className="srch-h">{q?'Results':'Jump to'}</div>
+          {res.length===0&&<div className="srch-empty">Nothing matches “{q}”</div>}
+          {res.map((it,i)=>(
+            <button key={it.id} className={`srch-it${i===sel?' act':''}`} onMouseEnter={()=>setSel(i)} onClick={()=>pick(it)}>
+              <Ic n={it.n} size={17}/>{it.label}<span className="hint">{it.hint||''}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AvatarMenu({name, role, onLogout, extra}){
+  return (
+    <Menu trigger={({toggle})=><button className="avb" onClick={toggle} aria-label="Account">{ini(name)}</button>}>
+      <div className="mn-hd"><b>{name}</b><span>{role}</span></div>
+      {extra}
+      <MI n="logout" onClick={onLogout} danger>Sign out</MI>
+    </Menu>
+  );
+}
+
+function ClockPill(){
+  const [t,setT]=useState(new Date());
+  useEffect(()=>{ const id=setInterval(()=>setT(new Date()),1000); return()=>clearInterval(id); },[]);
+  return <span className="clockpill"><Ic n="clock" size={16}/><span className="hide-s">{t.toLocaleDateString([],{weekday:'short'})}</span><b><TNum value={`${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`}/></b></span>;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN HOME — live dashboard
+══════════════════════════════════════════════════════════════ */
+function AHome({name, go, hide}){
+  const [logs,setLogs]=useState([]);
+  const [clocks,setClocks]=useState([]);
+  const [maxB,setMaxB]=useState(3);
+  const [ls,setLs]=useState(null);
+  const [swaps,setSwaps]=useState(0);
+  const [loading,setLoading]=useState(true);
+  const [err,setErr]=useState('');
+  const [now,setNow]=useState(Date.now());
+  const today=todayISO();
+
+  const capBusyRef=useRef(false);
+  const load=useCallback(async()=>{
+    const since=new Date(); since.setDate(since.getDate()-30); since.setHours(0,0,0,0);
+    const [a,open,c,s,l,w]=await Promise.all([
+      run(SB.from('bt_logs').select('id,user_id,agent_name,start_time,end_time,duration_secs,break_type').gte('start_time',since.toISOString()).order('start_time',{ascending:false}).limit(5000)),
+      run(SB.from('bt_logs').select('id,user_id,agent_name,start_time,end_time,duration_secs,break_type').is('end_time',null)),
+      run(SB.from('bt_clocklogs').select('*').eq('date',today).order('clock_in',{ascending:true})),
+      run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle()),
+      run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle()),
+      run(SB.from('bt_swap_requests').select('id').eq('date',today).eq('status','pending')),
+    ]);
+    if(a.error){ setErr(a.error.message); setLoading(false); return; }
+    const byId=new Map(); [...(a.data||[]),...(open.data||[])].forEach(r=>byId.set(r.id,r));
+    setLogs([...byId.values()]);
+    setClocks(c.data||[]);
+    if(s.data && !capBusyRef.current) setMaxB(s.data.max_concurrent_breaks);
+    setLs(l.data||null);
+    setSwaps((w.data||[]).length);
+    setErr(''); setLoading(false); bumpSync();
+  },[today]);
+
+  useEffect(()=>{
+    load();
+    let t=null; const soon=()=>{ clearTimeout(t); t=setTimeout(load,250); };
+    const ch=SB.channel('home-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_logs'},soon)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_clocklogs'},soon)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},soon)
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},soon)
+      .subscribe(st=>{ if(st==='SUBSCRIBED') load(); });
+    return()=>{ clearTimeout(t); SB.removeChannel(ch); };
+  },[load]);
+  useAutoRefresh(load,5000);
+  useEffect(()=>{ const id=setInterval(()=>setNow(Date.now()),1000); return()=>clearInterval(id); },[]);
+
+  /* ── derived live stats ── */
+  const t0=localMidnight();
+  const todayLogs=logs.filter(l=>new Date(l.start_time).getTime()>=t0);
+  const active=logs.filter(l=>!l.end_time).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
+  const doneToday=todayLogs.filter(l=>l.end_time);
+  const avgToday=doneToday.length?Math.round(doneToday.reduce((s,l)=>s+secOf(l,now),0)/doneToday.length):0;
+  const longest=doneToday.reduce((m,l)=>Math.max(m,secOf(l,now)),0);
+  const todayTotal=todayLogs.reduce((s,l)=>s+secOf(l,now),0);
+  const topAgents=(()=>{ const m={}; todayLogs.forEach(l=>{ const k=l.agent_name||'—'; (m[k]=m[k]||{name:k,total:0,count:0}); m[k].total+=secOf(l,now); m[k].count++; });
+    return Object.values(m).sort((a,b)=>b.total-a.total).slice(0,3); })();
+
+  /* team roster: on break first, then on shift */
+  const onBreakIds=new Set(active.map(l=>l.user_id));
+  const onShift=clocks.filter(c=>c.clock_in&&!c.clock_out&&!onBreakIds.has(c.user_id));
+  const clockedOut=clocks.filter(c=>c.clock_out);
+  const todayBy = uid => todayLogs.filter(l=>l.user_id===uid);
+  const roster=[
+    ...active.map(l=>({key:'b'+l.id, kind:'break', name:l.agent_name, log:l, uid:l.user_id})),
+    ...onShift.map(c=>({key:'s'+c.id, kind:'shift', name:c.agent_name, clock:c, uid:c.user_id})),
+  ];
+  const shown=roster.slice(0,5), extra=roster.length-shown.length;
+
+  /* lunch */
+  const first=ls?.group_first||defaultFirst(today);
+  const slots=lunchSlots(first);
+  const grpA=ls?.group_a||[], grpB=ls?.group_b||[];
+  const nowHM=hhmm(now);
+  const atLunch = ['A','B'].find(g=>nowHM>=slots[g].from && nowHM<slots[g].to) || null;
+
+  const pct=maxB>0?Math.min(100,active.length/maxB*100):100;
+  const atCap=active.length>=maxB;
+
+  const [savingCap,setSavingCap]=useState(false);
+  const capSeq=useRef(0);
+  const setCap=async(n)=>{
+    n=Math.max(0,Math.min(50,n)); setMaxB(n); setSavingCap(true); capBusyRef.current=true;
+    const seq=++capSeq.current;
+    const {error}=await run(SB.from('bt_settings').upsert({id:1,max_concurrent_breaks:n,updated_at:new Date().toISOString()},{onConflict:'id'}));
+    if(seq!==capSeq.current) return;
+    capBusyRef.current=false; setSavingCap(false);
+    if(error){ setErr('Could not update slots: '+error.message); load(); }
+  };
+  const exportToday=()=>csvExport(todayLogs.slice().sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)));
+
+  return (
+    <div className="page">
+      <h1 className="hello">Welcome, {firstName(name)}</h1>
+      <p className="hello-s">{new Date(now).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'})} · {active.length} on break · {onShift.length+active.length} on shift</p>
+
+      <div className="acts">
+        <button className="bp" onClick={()=>go('notifs')}><Ic n="send" size={17}/> Broadcast</button>
+        <button className="bs" onClick={()=>go('live')}><Ic n="play" size={16}/> Start break</button>
+        <button className="bs" onClick={()=>go('clocks')}><Ic n="plus" size={17}/> Clock in</button>
+        <button className="bs" onClick={()=>go('lunch')}><Ic n="utensils" size={16}/> Lunch</button>
+        <button className="bs" onClick={exportToday}><Ic n="download" size={16}/> Export</button>
+        <div className="acts-r"><ConnInstrument/></div>
+      </div>
+
+      {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
+
+      <div className="grid2">
+        {/* ── On break now: every agent out, with a live timer ── */}
+        <div className="card acc onb">
+          <div className="card-hd">
+            <div>
+              <div className="card-t">On break now <span className="vbadge" title="Live"><span className="livedot"/></span></div>
+              <div className="big pv" style={{marginTop:6}}>{loading?<span style={{color:'var(--mut)'}}>—</span>:<Amt main={<TNum value={active.length}/>} sup={maxB<=0?' · paused':`/${maxB} slots`}/>}</div>
+            </div>
+            <div className="card-ctl">
+              <button className="icb sm" onClick={()=>go('live')} title="Start a break remotely"><Ic n="play" size={16}/></button>
+              <Kebab><MI n="activity" onClick={()=>go('live')}>Open live rack</MI><MI n="refresh" onClick={load}>Refresh</MI></Kebab>
+            </div>
+          </div>
+          {loading?<div className="es"><div className="spin"/></div>
+           :active.length===0?(
+            <div className="onb-empty">
+              <div className="es-ic"><Ic n="coffee" size={24}/></div>
+              <div>Nobody is on break right now</div>
+              <span>{maxB<=0?'Breaks are paused':`${maxB} slot${maxB===1?'':'s'} free`} · {onShift.length} agents working</span>
+            </div>
+           ):active.map(l=>{
+              const el=secOf(l,now); const pt=bType(el);
+              const cls=pt==='Lunch Break'?'lun':pt==='Bathroom Break'?'bth':'brk';
+              const tl=todayBy(l.user_id);
+              return (
+                <div key={l.id} className="acc-row onb-row">
+                  <div className={`acc-ic ${cls}`}>{ini(l.agent_name)}</div>
+                  <div className="onb-mid">
+                    <div className="acc-n pv">{l.agent_name} <span className={`badge ${BCLS[pt]||'b-on'}`}>{pt==='Bathroom Break'?'Bathroom':pt==='Lunch Break'?'Lunch':'Break'}</span></div>
+                    <div className={`onb-bar ${cls}`}><i style={{width:`${Math.min(100,el/3600*100)}%`}}/></div>
+                  </div>
+                  <div className="onb-r">
+                    <div className="acc-v pv"><DurAmt s={el}/></div>
+                    <small>since {hhmm(l.start_time)}</small>
+                  </div>
+                  <div className="acc-tip">
+                    <div><span>Started</span><span>{fmtT(l.start_time)}</span></div>
+                    <div><span>Logged as</span><span>{pt}</span></div>
+                    <hr/>
+                    <div><span>Breaks today</span><span>{tl.length} · {durStr(tl.reduce((s,x)=>s+secOf(x,now),0))}</span></div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* ── Team: who's working + today's numbers ── */}
+        <div className="card acc">
+          <div className="card-hd">
+            <div>
+              <div className="card-t">On shift</div>
+              <div className="big pv" style={{marginTop:6}}>{loading?<span style={{color:'var(--mut)'}}>—</span>:<Amt main={<TNum value={onShift.length+active.length}/>} sup=" agents"/>}</div>
+            </div>
+            <div className="card-ctl">
+              <button className="icb sm" onClick={()=>go('clocks')} title="Clock in an agent"><Ic n="plus" size={18}/></button>
+              <Kebab>
+                <MI n="clock" onClick={()=>go('clocks')}>Attendance</MI>
+                <MI n="bars" onClick={()=>go('analytics')}>Analytics</MI>
+                <MI n="download" onClick={exportToday}>Export today</MI>
+              </Kebab>
+            </div>
+          </div>
+          <div className="tiles pv">
+            <div><span>Working</span><b><TNum value={onShift.length}/></b></div>
+            <div><span>On break</span><b><TNum value={active.length}/></b></div>
+            <div><span>Clocked out</span><b><TNum value={clockedOut.length}/></b></div>
+            <div><span>Breaks today</span><b><TNum value={todayLogs.length}/></b></div>
+            <div><span>Average break</span><b>{durStr(avgToday)}</b></div>
+            <div><span>Total break time</span><b>{durStr(todayTotal).replace(/ \d+s$/,'')}</b></div>
+          </div>
+          <div className="top3-h">Most break time today</div>
+          {topAgents.length===0?<div className="acc-empty" style={{padding:'18px 12px'}}>No breaks logged yet today.</div>
+           :topAgents.map(a=>(
+            <div key={a.name} className="acc-row top3">
+              <div className="acc-ic">{ini(a.name)}</div>
+              <div className="onb-mid">
+                <div className="acc-n pv">{a.name} <small>{a.count} break{a.count===1?'':'s'}</small></div>
+                <div className="onb-bar"><i style={{width:`${a.total/topAgents[0].total*100}%`}}/></div>
+              </div>
+              <div className="acc-v pv">{durStr(a.total).replace(/ \d+s$/,'')}</div>
+            </div>
+          ))}
+          <div className="acc-row link" onClick={()=>go('live')}>
+            <div className="acc-ic more"><Ic n="chevron" size={16}/></div>
+            <div className="acc-n">View all agents</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid3">
+        {/* Capacity */}
+        <div className="card sm">
+          <div className="card-hd">
+            <div>
+              <div className="card-t">Break slots</div>
+              <div className="mid pv" style={{marginTop:8}}><Amt main={<TNum value={active.length}/>} sup={`/${maxB}`}/></div>
+            </div>
+            <div className="card-ctl">
+              <Kebab><MI n="activity" onClick={()=>go('live')}>Live rack</MI><MI n="plus" onClick={()=>setCap(maxB+1)}>Add a slot</MI><MI n="stop" onClick={()=>setCap(0)}>Pause all breaks</MI></Kebab>
+            </div>
+          </div>
+          <div className="bar"><i className={atCap?'full':''} style={{width:`${pct}%`}}/></div>
+          <div className="legend">
+            <span>On break <i/></span><span>Free <i className="f"/></span>
+            <span className="r">{maxB<=0?'Breaks paused':`${Math.max(0,maxB-active.length)} available`}</span>
+          </div>
+          <hr className="sm-hr"/>
+          <div className="sm-ft">
+            <div><div className="sm-l">Slots</div><div className="sm-v">{savingCap?'Saving…':maxB<=0?'Paused':`${maxB} at once`}</div></div>
+            <div className="stepper">
+              <button onClick={()=>setCap(maxB-1)} disabled={maxB<=0} aria-label="Remove a slot">−</button>
+              <span><TNum value={maxB}/></span>
+              <button onClick={()=>setCap(maxB+1)} aria-label="Add a slot">+</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Lunch */}
+        <div className="card sm">
+          <div className="card-hd">
+            <div className="card-t">Lunch</div>
+            <div className="card-ctl">
+              <button className="icb sm" onClick={()=>go('lunch')} title="Edit schedule"><Ic n="edit" size={16}/></button>
+              <Kebab><MI n="utensils" onClick={()=>go('lunch')}>Lunch schedule</MI><MI n="swap" onClick={()=>go('swaps')}>Swap requests</MI></Kebab>
+            </div>
+          </div>
+          <div className="sm-cols">
+            <div><div className="sm-l">Group A</div><div className="sm-v">{slots.A.from}</div><div style={{color:'var(--mut)',fontSize:13.5,marginTop:4}}>{grpA.length} agents</div></div>
+            <div><div className="sm-l">Group B</div><div className="sm-v">{slots.B.from}</div><div style={{color:'var(--mut)',fontSize:13.5,marginTop:4}}>{grpB.length} agents</div></div>
+            <div><div className="sm-l">Now</div><div className="sm-v">{atLunch?`Group ${atLunch}`:'–'}</div></div>
+          </div>
+          <hr className="sm-hr"/>
+          <div className="sm-ft">
+            <div><div className="sm-l">Swap requests</div><div className="sm-v"><TNum value={swaps}/> pending</div></div>
+            <button className="lnk" onClick={()=>go('swaps')}>View <Ic n="chevron" size={15}/></button>
+          </div>
+        </div>
+
+        {/* Attendance */}
+        <div className="card sm">
+          <div className="card-hd">
+            <div className="card-t">Attendance</div>
+            <div className="card-ctl">
+              <button className="icb sm" onClick={()=>go('clocks')} title="Clock in an agent"><Ic n="plus" size={18}/></button>
+              <Kebab><MI n="clock" onClick={()=>go('clocks')}>Clock in/out</MI><MI n="download" onClick={exportToday}>Export today</MI></Kebab>
+            </div>
+          </div>
+          <div className="sm-cols">
+            <div><div className="sm-l">On shift</div><div className="sm-v"><TNum value={onShift.length+active.length}/></div></div>
+            <div><div className="sm-l">Out</div><div className="sm-v"><TNum value={clockedOut.length}/></div></div>
+            <div><div className="sm-l">Breaks</div><div className="sm-v"><TNum value={todayLogs.length}/></div></div>
+          </div>
+          <hr className="sm-hr"/>
+          <div className="sm-ft">
+            <div><div className="sm-l">Average break</div><div className="sm-v pv"><DurAmt s={avgToday}/> <span style={{color:'var(--mut)',fontSize:14}}>· max {durStr(longest)}</span></div></div>
+            <button className="lnk" onClick={()=>go('analytics')}>View <Ic n="chevron" size={15}/></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN SHELL
+══════════════════════════════════════════════════════════════ */
+function AdminApp({user,name,onLogout}){
+  const [tab,setTab]=useState('home');
+  const [navOpen,setNavOpen]=useState(false);
+  const [hide,setHide]=useState(false);
+  const [counts,setCounts]=useState({live:0,swaps:0});
+  const [spin,setSpin]=useState(false);
+  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch
+
+  const loadCounts=useCallback(async()=>{
+    const [l,s]=await Promise.all([
+      run(SB.from('bt_logs').select('id').is('end_time',null)),
+      run(SB.from('bt_swap_requests').select('id').eq('date',todayISO()).eq('status','pending')),
+    ]);
+    setCounts({live:(l.data||[]).length, swaps:(s.data||[]).length});
+  },[]);
+  useEffect(()=>{ loadCounts(); },[loadCounts]);
+  useAutoRefresh(loadCounts,5000);
+  useEffect(()=>{ document.body.classList.toggle('privacy',hide); return()=>document.body.classList.remove('privacy'); },[hide]);
+
+  const go=id=>{ setTab(id); setNavOpen(false); window.scrollTo({top:0}); };
+  const main=[
+    {id:'home',      n:'home',     label:'Home'},
+    {id:'live',      n:'activity', label:'Live Rack', badge:counts.live},
+    {id:'clocks',    n:'clock',    label:'Clock In/Out'},
+    {id:'analytics', n:'bars',     label:'Analytics'},
+    {id:'logs',      n:'list',     label:'All Logs'},
+  ];
+  const flows=[
+    {id:'lunch',    n:'utensils', label:'Lunch Schedule'},
+    {id:'swaps',    n:'swap',     label:'Lunch Swaps', badge:counts.swaps},
+    {id:'notifs',   n:'bell',     label:'Notifications'},
+    {id:'settings', n:'settings', label:'Settings'},
+  ];
+  const exportToday=async()=>{
+    const {data}=await run(SB.from('bt_logs').select('*').gte('start_time',new Date(localMidnight()).toISOString()).order('start_time'));
+    csvExport(data||[]);
+  };
+  const searchItems=[
+    ...[...main,...flows].map(i=>({...i,hint:'Page'})),
+    {id:'a-bc', n:'send',     label:'Broadcast a message', kw:'notify alert', hint:'Action', run:()=>go('notifs')},
+    {id:'a-rb', n:'play',     label:'Start a break remotely', kw:'remote', hint:'Action', run:()=>go('live')},
+    {id:'a-ci', n:'login2',   label:'Clock in an agent', kw:'attendance', hint:'Action', run:()=>go('clocks')},
+    {id:'a-ex', n:'download', label:'Export today as CSV', kw:'download csv', hint:'Action', run:exportToday},
+    {id:'a-cap',n:'users',    label:'Change break capacity', kw:'max concurrent slots', hint:'Action', run:()=>go('settings')},
+  ];
+  const refreshAll=()=>{ setSpin(true); bumpSync(); loadCounts(); window.dispatchEvent(new Event('focus')); setTimeout(()=>setSpin(false),800); };
+
+  const NavItem=({id,n,label,badge})=>(
+    <button className={`ni${tab===id?' on':''}`} onClick={()=>go(id)}>
+      <Ic n={n} size={20} sw={1.6}/><span>{label}</span>
+      {badge>0&&<span className="nbadge">{badge}</span>}
+    </button>
+  );
+
+  return (
+    <div className="shell">
+      <div className={`scrim${navOpen?' open':''}`} onClick={()=>setNavOpen(false)}/>
+      <aside className={`side${navOpen?' open':''}`}>
+        <div className="side-org">
+          <div className="wm">
+            <div className="wm-icon"><Ic n="tower" size={16} col="#c9c9d2" sw={1.8}/></div>
+            <span className="wm-t">BreakTrack</span>
+          </div>
+          <Ic n="chevdown" size={18}/>
+        </div>
+        <nav className="side-nav">
+          {main.map(i=><NavItem key={i.id} {...i}/>)}
+          <div className="side-sec">Workflows</div>
+          {flows.map(i=><NavItem key={i.id} {...i}/>)}
+        </nav>
+        <div className="side-ft"><ConnInstrument compact/><span className="muted">Admin</span></div>
+      </aside>
+
+      <div className="main">
+        <header className="top">
+          <button className="icb top-menu" onClick={()=>setNavOpen(true)} aria-label="Menu"><Ic n="menu" size={20}/></button>
+          <SearchBar items={searchItems} onPick={it=>it.run?it.run():go(it.id)}/>
+          <Menu trigger={({toggle})=>(
+            <button className="mv" onClick={toggle}><Ic n="zap" size={18}/><span className="lbl">Quick actions</span><Ic n="chevdown" size={16}/></button>
+          )}>
+            <MI n="send" onClick={()=>go('notifs')}>Broadcast a message</MI>
+            <MI n="play" onClick={()=>go('live')}>Start a break remotely</MI>
+            <MI n="login2" onClick={()=>go('clocks')}>Clock in an agent</MI>
+            <MI n="utensils" onClick={()=>go('lunch')}>Edit lunch groups</MI>
+            <MI n="download" onClick={exportToday}>Export today as CSV</MI>
+          </Menu>
+          <div className="top-ic">
+            <button className={`icb hide-s${hide?' on':''}`} onClick={()=>setHide(h=>!h)} title={hide?'Show names & numbers':'Hide names & numbers'}><Ic n={hide?'eye':'eyeoff'} size={20}/></button>
+            <button className="icb" onClick={()=>go('swaps')} title={counts.swaps?`${counts.swaps} pending swap request(s)`:'Notifications'}><Ic n="bell" size={20}/>{counts.swaps>0&&<span className="dot"/>}</button>
+            <AvatarMenu name={name} role="Controller · Admin" onLogout={onLogout} extra={<MI n="settings" onClick={()=>go('settings')}>Settings</MI>}/>
+          </div>
+        </header>
+        <main>
+          {tab==='home'      &&<AHome name={name} go={go} hide={hide}/>}
+          {tab==='live'      &&<ALive/>}
+          {tab==='clocks'    &&<AClocks/>}
+          {tab==='lunch'     &&<ALunch/>}
+          {tab==='swaps'     &&<ASwapRequests/>}
+          {tab==='analytics' &&<AAnalytics/>}
+          {tab==='logs'      &&<ALogs/>}
+          {tab==='notifs'    &&<ANotifications/>}
+          {tab==='settings'  &&<ASettings/>}
+        </main>
+      </div>
+      <button className={`fab${spin?' spinning':''}`} onClick={refreshAll} title="Sync now"><Ic n="refresh" size={24} sw={1.7}/></button>
+    </div>
+  );
+}
+
+/* ── Admin Live (the Live Rack) ── */
+function ALive(){
+  const [live,setLive]=useState([]);
+  const [clocked,setClocked]=useState([]);
+  const [maxB,setMaxB]=useState(3);
+  const [loading,setLoad]=useState(true);
+  const [err,setErr]=useState('');
+  const [rt,setRt]=useState(false);
+  const [confirm,setConfirm]=useState(null);
+  const [remoting,setRemoting]=useState(null);
+
+  const load=useCallback(async()=>{
+    setErr('');
+    const {data:bl,error:e1}=await run(SB.from('bt_logs').select('*').is('end_time',null).order('start_time'));
+    if(e1){setErr(e1.message);setLoad(false);return;}
+    setLive(bl||[]);
+    const today=todayISO();
+    const {data:ck}=await run(SB.from('bt_clocklogs').select('*').eq('date',today).is('clock_out',null));
+    setClocked(ck||[]);
+    const {data:cfg}=await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
+    if(cfg)setMaxB(cfg.max_concurrent_breaks);
+    setLoad(false);
+    bumpSync();
+  },[]);
+
+  useEffect(()=>{
+    load();
+    const ch=SB.channel('live-rt2')
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'bt_logs'},({new:nw})=>{ if(!nw.end_time)setLive(p=>[...p,nw]); bumpSync(); })
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'bt_logs'},({new:nw})=>{ if(nw.end_time)setLive(p=>p.filter(r=>r.id!==nw.id)); else setLive(p=>p.map(r=>r.id===nw.id?nw:r)); bumpSync(); })
+      .subscribe(s=>{ setRt(s==='SUBSCRIBED'); if(s==='SUBSCRIBED') load(); });
+    return()=>SB.removeChannel(ch);
+  },[load]);
+  useAutoRefresh(load, 4000);
+
+  const remoteStart=async(agent)=>{
+    setRemoting(agent.user_id); setErr('');
+    // Re-check the live count fresh from the DB right before inserting — the button's
+    // disabled state uses local `live`/`maxB`, which can lag a few seconds behind on a
+    // slow connection, so we can't trust it alone as the only guard.
+    const {data:tc}=await run(SB.from('bt_logs').select('id').is('end_time',null));
+    if((tc||[]).length>=maxB){ setErr(`All ${maxB} break slots are taken. Please wait.`); setRemoting(null); setConfirm(null); return; }
+    const now=new Date().toISOString();
+    const {data,error}=await run(SB.from('bt_logs').insert({user_id:agent.user_id,agent_name:agent.agent_name,start_time:now}).select().single());
+    if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Remote break failed: '+error.message);}
+    else{setLive(p=>[...p,data]);}
+    setRemoting(null); setConfirm(null);
+  };
+
+  const onBreakIds=new Set(live.map(l=>l.user_id));
+  const available=clocked.filter(a=>!onBreakIds.has(a.user_id));
+  const atCap=live.length>=maxB;
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Live Rack</h1><p className="ps"><TNum value={`${live.length}/${maxB}`}/> slots in use · updates instantly</p></div>
+        <div className="fc g10">
+          <ConnInstrument/>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>:(
+        <>
+          {live.length>0&&(
+            <div className="sc" style={{marginBottom:16}}>
+              <div className="sc-hd"><span className="ldot"/><h2 className="sc-t">On Break Now ({live.length})</h2></div>
+              <div className="tbl-wrap"><table className="dt">
+                <thead><tr><th>Agent</th><th>Started</th><th>Elapsed</th><th>Predicted Type</th></tr></thead>
+                <tbody>{live.map(l=><tr key={l.id}><td><AvC name={l.agent_name}/></td><td>{fmtT(l.start_time)}</td><td><LSec start={l.start_time}/></td><td><LType start={l.start_time}/></td></tr>)}</tbody>
+              </table></div>
+            </div>
+          )}
+          {live.length===0&&<div className="es" style={{padding:'24px 20px'}}><span className="es-ic"><Ic n="coffee" size={36} sw={1.2}/></span><p>No agents on break right now</p></div>}
+          <div className="sc">
+            <div className="sc-hd">
+              <span className="sc-ic"><Ic n="play" size={15}/></span>
+              <h2 className="sc-t">Start Break Remotely</h2>
+              <span style={{marginLeft:8,fontSize:11,color:'var(--mut)'}}>For agents who left their desk without starting</span>
+            </div>
+            {available.length===0
+              ?<div className="es" style={{padding:'24px 20px'}}><p>All clocked-in agents are already on break or none are clocked in yet.</p></div>
+              :(
+                <div className="tbl-wrap"><table className="dt">
+                  <thead><tr><th>Agent</th><th>Clocked In</th><th>Status</th><th>Action</th></tr></thead>
+                  <tbody>
+                    {available.map(a=>(
+                      <tr key={a.id}>
+                        <td><AvC name={a.agent_name}/></td>
+                        <td>{fmtT(a.clock_in)}</td>
+                        <td><span className="badge b-in"><span style={{width:6,height:6,borderRadius:'50%',background:'var(--green)',display:'inline-block'}}/> On Shift</span></td>
+                        <td>
+                          <button className="btn-remote" disabled={atCap||remoting===a.user_id} onClick={()=>setConfirm({user_id:a.user_id,agent_name:a.agent_name})}>
+                            {remoting===a.user_id?<span className="spin-sm"/>:<Ic n="play" size={12}/>}
+                            {atCap?'Slots Full':'Start Break'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table></div>
+              )
+            }
+          </div>
+        </>
+      )}
+      {confirm&&(
+        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setConfirm(null)}>
+          <div className="modal-box">
+            <div className="modal-title">Start break for {confirm.agent_name}?</div>
+            <div className="modal-sub">This will log a break starting right now on their behalf. The timer will begin immediately and they will see it on their screen.</div>
+            <div className="modal-foot">
+              <button className="bs" onClick={()=>setConfirm(null)}>Cancel</button>
+              <button className="bp blue" onClick={()=>remoteStart(confirm)} disabled={!!remoting}>{remoting?<span className="spin-sm on-dark"/>:<Ic n="play" size={14}/>} Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin Clock In/Out ── */
+function AClocks(){
+  const [rows,setRows]=useState([]);
+  const [date,setDate]=useState(todayISO());
+  const [loading,setLoad]=useState(true);
+  const [err,setErr]=useState('');
+  const [rt,setRt]=useState(false);
+  const [clockingIn,setClockingIn]=useState(null); // user_id being processed
+  const [confirmClock,setConfirmClock]=useState(null); // {user_id,agent_name}
+
+  const load=useCallback(async()=>{
+    setLoad(true);setErr('');
+    const {data,error}=await run(SB.from('bt_clocklogs').select('*').eq('date',date).order('clock_in',{ascending:true}));
+    if(error){setErr(error.message);setLoad(false);return;}
+    setRows(data||[]); setLoad(false);
+    bumpSync();
+  },[date]);
+
+  useEffect(()=>{
+    load();
+    const ch=SB.channel('clock-rt2')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_clocklogs'},({eventType,new:nw,old:ol})=>{
+        if(nw?.date!==date&&ol?.date!==date)return;
+        if(eventType==='INSERT')setRows(p=>[...p,nw]);
+        if(eventType==='UPDATE')setRows(p=>p.map(r=>r.id===nw.id?nw:r));
+        if(eventType==='DELETE')setRows(p=>p.filter(r=>r.id!==ol.id));
+        bumpSync();
+      }).subscribe(s=>{ setRt(s==='SUBSCRIBED'); if(s==='SUBSCRIBED') load(); });
+    return()=>SB.removeChannel(ch);
+  },[load,date]);
+  useAutoRefresh(load, 6000);
+
+  /* Remote clock in — needs the user_id and display_name from Supabase Auth.
+     We look them up from auth.users via a simple approach: we use the agent_name
+     stored in existing clock records or fetch from a known list. Since we can't
+     query auth.users from the client directly, we use a workaround:
+     Admin types the agent name and we create the clock record with user_id from
+     the most recent existing record for that agent, or admin picks from a dropdown. */
+  const remoteClockIn=async(agentName,userId)=>{
+    setClockingIn(userId);setErr('');
+    const now=new Date().toISOString();
+    const {data,error}=await run(
+      SB.from('bt_clocklogs').insert({user_id:userId,agent_name:agentName,clock_in:now,date:date}).select().single()
+    );
+    if(error){setErr('Remote clock-in failed: '+error.message);}
+    else{setRows(p=>[...p,data]);}
+    setClockingIn(null);setConfirmClock(null);
+  };
+
+  const remoteClockOut=async(row)=>{
+    const now=new Date().toISOString();
+    const {data,error}=await run(SB.from('bt_clocklogs').update({clock_out:now}).eq('id',row.id).select().single());
+    if(error){setErr('Clock-out failed: '+error.message);return;}
+    setRows(p=>p.map(r=>r.id===row.id?data:r));
+  };
+
+  const clockedIn=rows.filter(r=>r.clock_in&&!r.clock_out);
+  const clockedOut=rows.filter(r=>r.clock_out);
+  const shiftDur=r=>{ if(!r.clock_in||!r.clock_out)return'—'; return durStr(Math.round((new Date(r.clock_out)-new Date(r.clock_in))/1000)); };
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Clock In / Out</h1><p className="ps">Agent attendance · {rows.length} records</p></div>
+        <div className="fc g10">
+          <ConnInstrument/>
+          <input className="si" type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:160}}/>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      <div className="sg3" style={{marginBottom:20}}>
+        <SC n="users"  label="Total agents" val={rows.length}/>
+        <SC n="login2" label="Currently in"  val={clockedIn.length} ac={clockedIn.length>0}/>
+        <SC n="moon"   label="Clocked out"   val={clockedOut.length}/>
+      </div>
+      {loading?<div className="es"><div className="spin"/></div>:(
+        <div className="sc">
+          <div className="sc-hd">
+            <span className="sc-ic"><Ic n="sun" size={15}/></span>
+            <h2 className="sc-t">Attendance — {date}</h2>
+            {date===todayISO()&&<button className="btn-remote" style={{marginLeft:'auto'}} onClick={()=>setConfirmClock('new')}><Ic n="login2" size={12}/> Clock In Agent</button>}
+          </div>
+          {rows.length===0
+            ?<div className="es"><span className="es-ic"><Ic n="sun" size={36} sw={1.2}/></span><p>No clock records for this date</p></div>
+            :(
+              <div className="tbl-wrap"><table className="dt">
+                <thead><tr><th>Agent</th><th>Clock In</th><th>Clock Out</th><th>Shift Duration</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                  {rows.map(r=>(
+                    <tr key={r.id}>
+                      <td><AvC name={r.agent_name}/></td>
+                      <td>{fmtT(r.clock_in)}</td>
+                      <td>{r.clock_out?fmtT(r.clock_out):'—'}</td>
+                      <td>{shiftDur(r)}</td>
+                      <td>{r.clock_out?<span className="badge b-out">Clocked Out</span>:<span className="badge b-in"><span style={{width:6,height:6,borderRadius:'50%',background:'var(--green)',display:'inline-block'}}/> On Shift</span>}</td>
+                      <td>{!r.clock_out&&<button className="btn-edit" onClick={()=>remoteClockOut(r)}><Ic n="logoff" size={12}/> Clock Out</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table></div>
+            )
+          }
+        </div>
+      )}
+      {confirmClock==='new'&&<RemoteClockInModal date={date} onDone={(agentName,userId)=>remoteClockIn(agentName,userId)} onClose={()=>setConfirmClock(null)}/>}
+    </div>
+  );
+}
+
+/* Modal for remote clock in — picks from ALL known agents, filters out already clocked in today */
+function RemoteClockInModal({date,onDone,onClose}){
+  const [allAgents,  setAllAgents]  = useState([]); // everyone ever in bt_clocklogs
+  const [todayNames, setTodayNames] = useState([]); // names already clocked in today
+  const [available,  setAvailable]  = useState([]); // allAgents minus today
+  const [selected,   setSelected]   = useState('');
+  const [busy,       setBusy]       = useState(false);
+  const [loading,    setLoading]    = useState(true);
+  const [err,        setErr]        = useState('');
+
+  useEffect(()=>{
+    (async()=>{
+      // 1. All unique agents ever recorded — order by clock_in desc, no created_at needed
+      const {data:hist} = await run(
+        SB.from('bt_clocklogs')
+          .select('user_id,agent_name')
+          .order('clock_in',{ascending:false})
+          .limit(500)
+      );
+      const seen = new Set();
+      const unique = [];
+      (hist||[]).forEach(r=>{
+        if(!seen.has(r.user_id)){ seen.add(r.user_id); unique.push(r); }
+      });
+      setAllAgents(unique);
+
+      // 2. Who is already clocked in today?
+      const {data:today} = await run(
+        SB.from('bt_clocklogs').select('agent_name').eq('date',date)
+      );
+      const todaySet = new Set((today||[]).map(r=>r.agent_name));
+      setTodayNames([...todaySet]);
+
+      // 3. Available = in history but NOT already clocked in today
+      const avail = unique.filter(a=>!todaySet.has(a.agent_name));
+      setAvailable(avail);
+      if(avail.length>0) setSelected(avail[0].user_id);
+      setLoading(false);
+    })();
+  },[date]);
+
+  const go=async()=>{
+    const ag=available.find(a=>a.user_id===selected);
+    if(!ag)return;
+    setBusy(true);
+    await onDone(ag.agent_name, ag.user_id);
+    setBusy(false);
+  };
+
+  return(
+    <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box">
+        <div className="modal-title">Clock In Agent Remotely</div>
+        <div className="modal-sub">
+          Select an agent to clock them in right now. Only agents not yet clocked in today are shown.
+        </div>
+        {loading
+          ?<div style={{textAlign:'center',padding:'16px'}}><div className="spin" style={{margin:'0 auto'}}/></div>
+          :available.length===0
+            ?<div style={{background:'var(--card)',borderRadius:8,padding:'12px 14px',fontSize:13,color:'var(--mut)',marginBottom:16}}>
+                {allAgents.length===0
+                  ?'No agents found in the system yet. Each agent must clock in manually at least once before they appear here.'
+                  :`All ${allAgents.length} known agent${allAgents.length>1?'s are':' is'} already clocked in today.`
+                }
+              </div>
+            :(
+              <div className="fg">
+                <label className="fl">Select Agent ({available.length} available)</label>
+                <select className="fi" value={selected} onChange={e=>setSelected(e.target.value)}>
+                  {available.map(a=><option key={a.user_id} value={a.user_id}>{a.agent_name}</option>)}
+                </select>
+              </div>
+            )
+        }
+        {err&&<div className="aerr"><Ic n="alert" size={14}/>{err}</div>}
+        <div className="modal-foot">
+          <button className="bs" onClick={onClose}>Cancel</button>
+          <button className="bp" onClick={go} disabled={busy||available.length===0||loading}>
+            {busy?<span className="spin-sm"/>:<Ic n="login2" size={14}/>} Clock In
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Admin Lunch Schedule ── */
+function ALunch(){
+  const [date,    setDate]    = useState(todayISO());
+  const [row,     setRow]     = useState(null);   // bt_lunch_schedule row
+  const [grpA,    setGrpA]    = useState([]);
+  const [grpB,    setGrpB]    = useState([]);
+  const [pool,    setPool]    = useState([]);     // clocked in but unassigned
+  const [first,   setFirst]   = useState('A');    // which group goes at 12:00
+  const [loading, setLoad]    = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [err,     setErr]     = useState('');
+  const [saved,   setSaved]   = useState(false);
+
+  const load=useCallback(async()=>{
+    setLoad(true);setErr('');setSaved(false);
+
+    // Load existing schedule for the selected date
+    const {data:ls}=await run(SB.from('bt_lunch_schedule').select('*').eq('date',date).maybeSingle());
+
+    // Load agents clocked in on the selected date
+    const {data:ck}=await run(SB.from('bt_clocklogs').select('agent_name').eq('date',date));
+    const allClocked=[...new Set((ck||[]).map(r=>r.agent_name))];
+
+    if(ls){
+      // Schedule already exists for this date — use it directly
+      const a=ls.group_a||[];
+      const b=ls.group_b||[];
+      setRow(ls); setGrpA(a); setGrpB(b);
+      setFirst(ls.group_first||defaultFirst(date));
+      // Any agent clocked in today but not yet assigned → pool
+      setPool(allClocked.filter(n=>!a.includes(n)&&!b.includes(n)));
+    } else {
+      // No schedule for this date — try to auto-fill from the most recent previous schedule
+      const {data:prev}=await run(
+        SB.from('bt_lunch_schedule')
+          .select('*')
+          .lt('date', date)          // any date before today
+          .order('date',{ascending:false})
+          .limit(1)
+          .maybeSingle()
+      );
+
+      setRow(null);
+      setFirst(defaultFirst(date));
+
+      if(prev){
+        // Auto-fill: keep agents from previous groups if they're clocked in today
+        const prevA = (prev.group_a||[]).filter(n=>allClocked.includes(n));
+        const prevB = (prev.group_b||[]).filter(n=>allClocked.includes(n));
+        const assigned = new Set([...prevA,...prevB]);
+        // Any new agent clocked in today who wasn't in yesterday's schedule → pool
+        const newAgents = allClocked.filter(n=>!assigned.has(n));
+        setGrpA(prevA); setGrpB(prevB);
+        setPool(newAgents);
+      } else {
+        // No previous schedule at all — everyone goes to pool
+        setGrpA([]); setGrpB([]);
+        setPool(allClocked);
+      }
+    }
+    setLoad(false);
+    bumpSync();
+  },[date]);
+
+  useEffect(()=>{load();},[load]);
+
+  // Real-time: when the schedule changes (e.g. swap auto-applied or Supabase direct edit),
+  // reload — but filter to only the date being viewed so unrelated days don't trigger a refresh.
+  // No polling interval here — that was causing constant re-renders every 20s.
+  useEffect(()=>{
+    const ch=SB.channel('admin-lunch-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_lunch_schedule'},({new:nw,old:ol})=>{
+        const changedDate = nw?.date || ol?.date;
+        if(changedDate && changedDate !== date) return;
+        load();
+      })
+      .subscribe(s=>{ if(s==='SUBSCRIBED') load(); });
+    return()=>{ SB.removeChannel(ch); };
+  },[date,load]);
+  useAutoRefresh(load, null); // no polling here (breaks drag-and-drop); just refetch when tab/app regains focus
+
+  const move=(name,from,to)=>{
+    const rem=arr=>arr.filter(n=>n!==name);
+    if(from==='A')setGrpA(rem);
+    else if(from==='B')setGrpB(rem);
+    else setPool(rem);
+    if(to==='A')setGrpA(p=>[...p,name]);
+    else if(to==='B')setGrpB(p=>[...p,name]);
+    else setPool(p=>[...p,name]);
+  };
+
+  const save=async()=>{
+    setSaving(true);setErr('');setSaved(false);
+    const payload={date,group_a:grpA,group_b:grpB,group_first:first,updated_at:new Date().toISOString()};
+    let error;
+    if(row){
+      ({error}=await run(SB.from('bt_lunch_schedule').update(payload).eq('id',row.id)));
+    } else {
+      const {data,error:e}=await run(SB.from('bt_lunch_schedule').insert(payload).select().single());
+      error=e; if(data)setRow(data);
+    }
+    if(error)setErr('Save failed: '+error.message);
+    else setSaved(true);
+    setSaving(false);
+  };
+
+  const slots=lunchSlots(first);
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Lunch Schedule</h1><p className="ps">Assign agents to groups · groups rotate daily</p></div>
+        <div className="fc g10">
+          <input className="si" type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:160}}/>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Reload</button>
+          <button className="bp" onClick={save} disabled={saving}>{saving?<span className="spin-sm"/>:<Ic n="check" size={14}/>} Save Schedule</button>
+          {saved&&<span style={{color:'var(--green)',fontSize:13,fontWeight:600}}>✓ Saved</span>}
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+
+      {/* First slot toggle */}
+      <div className="sc" style={{marginBottom:14}}>
+        <div className="sc-hd"><span className="sc-ic"><Ic n="clock" size={15}/></span><h2 className="sc-t">Rotation — who goes first today?</h2></div>
+        <div style={{padding:'16px 18px',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+          <button onClick={()=>setFirst('A')} style={{padding:'8px 20px',borderRadius:8,border:'1.5px solid',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:'var(--font)',background:first==='A'?'var(--amber-d)':'var(--card)',color:first==='A'?'var(--amber)':'var(--mut)',borderColor:first==='A'?'var(--amber-r)':'var(--bdr)'}}>
+            Group A first — {fmtH(_lunchStart)}
+          </button>
+          <button onClick={()=>setFirst('B')} style={{padding:'8px 20px',borderRadius:8,border:'1.5px solid',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:'var(--font)',background:first==='B'?'var(--indigo-d)':'var(--card)',color:first==='B'?'var(--indigo)':'var(--mut)',borderColor:first==='B'?'var(--indigo-r)':'var(--bdr)'}}>
+            Group B first — {fmtH(_lunchStart)}
+          </button>
+          <span style={{fontSize:12,color:'var(--mut)',marginLeft:8}}>Auto-rotates daily · override here if needed</span>
+        </div>
+      </div>
+
+      {loading?<div className="es"><div className="spin"/></div>:(
+        <>
+          <div className="lunch-groups">
+            {/* Group A */}
+            <div className="lunch-group-card grp-a">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                <div className="fc g8">
+                  <span className="badge b-a">Group A</span>
+                  <span style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>{slots.A.from} – {slots.A.to}</span>
+                  {first==='A'&&<span style={{fontSize:10,background:'var(--violet)',color:'#fff',padding:'2px 7px',borderRadius:20,fontWeight:700}}>FIRST</span>}
+                </div>
+                <span style={{fontSize:12,color:'var(--mut)'}}>{grpA.length} agents</span>
+              </div>
+              {grpA.length===0&&<div style={{textAlign:'center',padding:'16px',fontSize:12,color:'var(--mut)',border:'1px dashed var(--bdr)',borderRadius:8}}>No agents assigned</div>}
+              {grpA.map(n=>(
+                <div key={n} className="agent-chip">
+                  <div className="av">{ini(n)}</div>
+                  <span style={{fontSize:13,flex:1}}>{n}</span>
+                  <button className="chip-move ind" onClick={()=>move(n,'A','B')}>→ B</button>
+                  <button className="chip-move" style={{marginLeft:4}} onClick={()=>move(n,'A','pool')}>Remove</button>
+                </div>
+              ))}
+            </div>
+
+            {/* Group B */}
+            <div className="lunch-group-card grp-b">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                <div className="fc g8">
+                  <span className="badge b-b">Group B</span>
+                  <span style={{fontSize:12,color:'var(--indigo)',fontWeight:600}}>{slots.B.from} – {slots.B.to}</span>
+                  {first==='B'&&<span style={{fontSize:10,background:'var(--indigo)',color:'#05060f',padding:'2px 7px',borderRadius:20,fontWeight:700}}>FIRST</span>}
+                </div>
+                <span style={{fontSize:12,color:'var(--mut)'}}>{grpB.length} agents</span>
+              </div>
+              {grpB.length===0&&<div style={{textAlign:'center',padding:'16px',fontSize:12,color:'var(--mut)',border:'1px dashed var(--bdr)',borderRadius:8}}>No agents assigned</div>}
+              {grpB.map(n=>(
+                <div key={n} className="agent-chip">
+                  <div className="av" style={{background:'var(--indigo-d)',color:'var(--indigo)',border:'1px solid var(--indigo-r)'}}>{ini(n)}</div>
+                  <span style={{fontSize:13,flex:1}}>{n}</span>
+                  <button className="chip-move" onClick={()=>move(n,'B','A')}>→ A</button>
+                  <button className="chip-move" style={{marginLeft:4}} onClick={()=>move(n,'B','pool')}>Remove</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Unassigned pool */}
+          {pool.length>0&&(
+            <div className="lunch-group-card unset-pool" style={{borderRadius:14,padding:16,marginBottom:14}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--mut)',marginBottom:10}}>Unassigned — clocked in today ({pool.length})</div>
+              {pool.map(n=>(
+                <div key={n} className="agent-chip">
+                  <div className="av" style={{background:'var(--card)',color:'var(--mut)',border:'1px solid var(--bdr)'}}>{ini(n)}</div>
+                  <span style={{fontSize:13,flex:1}}>{n}</span>
+                  <button className="chip-move" onClick={()=>move(n,'pool','A')}>→ A</button>
+                  <button className="chip-move ind" style={{marginLeft:4}} onClick={()=>move(n,'pool','B')}>→ B</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {pool.length===0&&grpA.length===0&&grpB.length===0&&(
+            <div className="es"><span className="es-ic"><Ic n="users" size={36} sw={1.2}/></span><p>No agents clocked in for {date} yet. Once agents clock in their names will appear here.</p></div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin Swap Requests ── */
+function ASwapRequests(){
+  const [swaps,setSwaps]=useState([]);
+  const [loading,setLoad]=useState(true);
+  const [err,setErr]=useState('');
+  const [rt,setRt]=useState(false);
+  const today=todayISO();
+
+  const load=useCallback(async()=>{
+    setLoad(true);setErr('');
+    const {data,error}=await run(
+      SB.from('bt_swap_requests').select('*').eq('date',today).order('created_at',{ascending:false})
+    );
+    if(error){setErr(error.message);}
+    else setSwaps(data||[]);
+    setLoad(false);
+    bumpSync();
+  },[today]);
+
+  useEffect(()=>{
+    load();
+    const ch=SB.channel('admin-swaps-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'bt_swap_requests'},({eventType,new:nw,old:ol})=>{
+        // Re-fetch on any change (safest approach regardless of REPLICA IDENTITY setting)
+        load();
+      }).subscribe(s=>{ setRt(s==='SUBSCRIBED'); if(s==='SUBSCRIBED') load(); });
+    // Polling fallback every 12s
+    const poll = setInterval(load, 12000);
+    return()=>{ SB.removeChannel(ch); clearInterval(poll); };
+  },[load]);
+  useAutoRefresh(load, null); // instant refetch on regaining focus, on top of the 12s poll above
+
+  const pending=swaps.filter(s=>s.status==='pending');
+  const completed=swaps.filter(s=>s.status!=='pending'&&s.status!=='cancelled');
+  const cancelled=swaps.filter(s=>s.status==='cancelled');
+
+  const statusEl=(s)=>{
+    if(s==='pending')return <span className="swap-status-pending">⏳ Pending</span>;
+    if(s==='accepted')return <span className="swap-status-accepted">✅ Accepted</span>;
+    if(s==='declined')return <span className="swap-status-declined">❌ Declined</span>;
+    if(s==='cancelled')return <span style={{color:'var(--mut)'}}>Cancelled</span>;
+    return <span>{s}</span>;
+  };
+
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Lunch Swap Requests</h1><p className="ps">Today's swap activity · auto-updates</p></div>
+        <div className="fc g10">
+          <ConnInstrument/>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      <div className="sg3" style={{marginBottom:20}}>
+        <SC n="timer"    label="Pending"   val={pending.length}   wn={pending.length>0}/>
+        <SC n="check"    label="Accepted"  val={completed.filter(s=>s.status==='accepted').length} ac={completed.filter(s=>s.status==='accepted').length>0}/>
+        <SC n="activity" label="Declined"  val={completed.filter(s=>s.status==='declined').length}/>
+      </div>
+      {loading?<div className="es"><div className="spin"/></div>:swaps.length===0?(
+        <div className="es"><span className="es-ic"><Ic n="swap" size={36} sw={1.2}/></span><p>No swap requests today</p></div>
+      ):(
+        <div className="sc">
+          <div className="sc-hd"><span className="sc-ic"><Ic n="swap" size={15}/></span><h2 className="sc-t">All Swap Requests — Today</h2></div>
+          <div className="tbl-wrap"><table className="dt">
+            <thead><tr><th>From</th><th>To</th><th>Swap</th><th>Status</th><th>Time</th></tr></thead>
+            <tbody>
+              {swaps.map(s=>(
+                <tr key={s.id}>
+                  <td><AvC name={s.from_name}/></td>
+                  <td><AvC name={s.to_name}/></td>
+                  <td>
+                    <span className="badge b-a">Grp {s.from_group}</span>
+                    <span style={{color:'var(--mut)',margin:'0 6px'}}>↔</span>
+                    <span className="badge b-b">Grp {s.to_group}</span>
+                  </td>
+                  <td>{statusEl(s.status)}</td>
+                  <td style={{color:'var(--mut)',fontSize:12}}>{fmtT(s.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </div>
+      )}
+      {pending.length>0&&(
+        <div className="awrn" style={{marginTop:16}}>
+          <Ic n="alert" size={15}/> {pending.length} swap request{pending.length>1?'s are':' is'} waiting for a response. No action needed — swaps are automatic when accepted.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin Analytics ── */
+function AAnalytics(){
+  const [agents,setAgents]=useState([]);
+  const [summary,setSummary]=useState({count:0,total:0,avg:0,lunch:0,brk:0,bath:0});
+  const [loading,setLoad]=useState(true);
+  const [err,setErr]=useState('');
+  const today=todayISO();
+  const load=useCallback(async()=>{
+    setLoad(true);setErr('');
+    const {data,error}=await run(SB.from('bt_logs').select('agent_name,start_time,duration_secs,break_type').gte('start_time',today+'T00:00:00.000Z').not('duration_secs','is',null).order('start_time',{ascending:false}));
+    if(error){setErr(error.message);setLoad(false);return;}
+    const rows=data||[];
+    const total=rows.reduce((s,l)=>s+(l.duration_secs||0),0);
+    const avg=rows.length?Math.round(total/rows.length):0;
+    const lunch=rows.filter(l=>l.break_type==='Lunch Break').length;
+    const brk=rows.filter(l=>l.break_type==='Break').length;
+    const bath=rows.filter(l=>l.break_type==='Bathroom Break').length;
+    setSummary({count:rows.length,total,avg,lunch,brk,bath});
+    const byAg={};
+    rows.forEach(l=>{
+      if(!byAg[l.agent_name])byAg[l.agent_name]={count:0,total:0,lunch:0,brk:0,bath:0};
+      byAg[l.agent_name].count++; byAg[l.agent_name].total+=l.duration_secs||0;
+      if(l.break_type==='Lunch Break')byAg[l.agent_name].lunch++;
+      else if(l.break_type==='Break')byAg[l.agent_name].brk++;
+      else if(l.break_type==='Bathroom Break')byAg[l.agent_name].bath++;
+    });
+    setAgents(Object.entries(byAg).map(([n,v])=>({name:n,...v,avg:Math.round(v.total/v.count)})).sort((a,b)=>b.total-a.total));
+    setLoad(false);
+    bumpSync();
+  },[today]);
+  useEffect(()=>{load();},[load]);
+  useAutoRefresh(load, 8000); // no realtime channel on this screen, so poll + refetch-on-focus keeps it current
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Analytics</h1><p className="ps">Today · {fmtD(today+'T12:00:00')}</p></div>
+        <div className="fc g10"><ConnInstrument/><button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button></div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>:(
+        <>
+          <div className="sg4" style={{marginBottom:16}}>
+            <SC n="activity" label="Total Breaks Today" val={summary.count}/>
+            <SC n="clock"    label="Total Break Time"   val={durStr(summary.total)}/>
+            <SC n="trending" label="Avg per Break"      val={durStr(summary.avg)}/>
+            <SC n="users"    label="Agents on Breaks"   val={agents.length}/>
+          </div>
+          <div className="sg3" style={{marginBottom:20}}>
+            <SC n="utensils" label="Lunch Breaks"    val={summary.lunch} ac={summary.lunch>0}/>
+            <SC n="coffee"   label="Breaks"          val={summary.brk}/>
+            <SC n="activity" label="Bathroom Breaks" val={summary.bath}/>
+          </div>
+          <div className="sc">
+            <div className="sc-hd"><span className="sc-ic"><Ic n="users" size={15}/></span><h2 className="sc-t">Per Agent — Today</h2></div>
+            {agents.length===0?<div className="es"><span className="es-ic"><Ic n="trending" size={36} sw={1.2}/></span><p>No completed breaks yet today</p></div>:(
+              <div className="tbl-wrap"><table className="dt">
+                <thead><tr><th>Agent</th><th>Breaks</th><th>Total Time</th><th>Avg</th><th>Lunch</th><th>Break</th><th>Bathroom</th></tr></thead>
+                <tbody>{agents.map(a=><tr key={a.name}><td><AvC name={a.name}/></td><td>{a.count}</td><td style={{fontWeight:600,color:'var(--amber)'}}>{durStr(a.total)}</td><td>{durStr(a.avg)}</td><td>{a.lunch||'—'}</td><td>{a.brk||'—'}</td><td>{a.bath||'—'}</td></tr>)}</tbody>
+              </table></div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin All Logs ── */
+function ALogs(){
+  const [logs,setLogs]=useState([]);
+  const [filter,setFilter]=useState('');
+  const [date,setDate]=useState('');
+  const [loading,setLoad]=useState(true);
+  const [err,setErr]=useState('');
+  const [editing,setEditing]=useState(null);
+  const [saving,setSaving]=useState(null);
+
+  const load=useCallback(()=>{ run(SB.from('bt_logs').select('*').order('start_time',{ascending:false}).limit(500)).then(({data,error})=>{ if(error)setErr(error.message); setLogs(data||[]); setLoad(false); bumpSync(); }); },[]);
+  useEffect(()=>{load();},[load]);
+  useAutoRefresh(load, 8000); // no realtime channel on this screen, so poll + refetch-on-focus keeps it current
+
+  const saveType=async(logId,newType)=>{
+    setSaving(logId);
+    const {error}=await run(SB.from('bt_logs').update({break_type:newType}).eq('id',logId));
+    if(error)setErr('Save failed: '+error.message);
+    else setLogs(p=>p.map(l=>l.id===logId?{...l,break_type:newType}:l));
+    setSaving(null); setEditing(null);
+  };
+
+  const filtered=logs.filter(l=>{ const nm=!filter||l.agent_name.toLowerCase().includes(filter.toLowerCase()); const dt=!date||l.start_time.startsWith(date); return nm&&dt; });
+  return(
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">All Break Logs</h1><p className="ps">{logs.length} total records</p></div>
+        <div className="phr">
+          <input className="si" placeholder="Filter by agent…" value={filter} onChange={e=>setFilter(e.target.value)}/>
+          <input className="si" type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:150}}/>
+          <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
+          <button className="bs" onClick={()=>csvExport(filtered)}><Ic n="download" size={14}/> Export CSV</button>
+        </div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>
+        :filtered.length===0?<div className="es"><span className="es-ic"><Ic n="clock" size={36} sw={1.2}/></span><p>No records found</p></div>
+        :(
+          <div className="sc">
+            <div className="tbl-wrap"><table className="dt">
+              <thead><tr><th>Agent</th><th>Date</th><th>Start</th><th>Return</th><th>Duration</th><th>Type</th><th></th></tr></thead>
+              <tbody>
+                {filtered.map(l=>(
+                  <tr key={l.id}>
+                    <td><AvC name={l.agent_name}/></td>
+                    <td style={{color:'var(--mut)',fontSize:12}}>{fmtD(l.start_time)}</td>
+                    <td>{fmtT(l.start_time)}</td>
+                    <td>{l.end_time?fmtT(l.end_time):<span className="badge b-on">On Break</span>}</td>
+                    <td>{l.duration_secs!=null?durStr(l.duration_secs):l.end_time?'—':<LSec start={l.start_time}/>}</td>
+                    <td>
+                      {editing===l.id?(
+                        <div className="fc g6">
+                          <select className="type-sel" defaultValue={l.break_type||''} onChange={e=>saveType(l.id,e.target.value)} disabled={saving===l.id}>
+                            <option value="" disabled>Select…</option>
+                            {BREAK_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                          </select>
+                          {saving===l.id&&<span className="spin-sm"/>}
+                        </div>
+                      ):(l.break_type?<BB type={l.break_type}/>:l.end_time?<span style={{color:'var(--mut)',fontSize:12}}>No label</span>:<LType start={l.start_time}/>)}
+                    </td>
+                    <td>
+                      {l.end_time&&(editing===l.id
+                        ?<button className="btn-edit" onClick={()=>setEditing(null)}>✕</button>
+                        :<button className="btn-edit" onClick={()=>setEditing(l.id)}><Ic n="edit" size={12}/> Edit</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+/* ── Admin Notifications ── */
+const PRESETS = [
+  { key:'lunch_a',  icon:'utensils', iconCls:'lunch',  title:'Lunch — Group A',   body:"Group A: your lunch break starts now. Please wrap up your call and do not take anymore calls.",   recipientHint:'group_a' },
+  { key:'lunch_b',  icon:'utensils', iconCls:'break',  title:'Lunch — Group B',   body:"Group B: your lunch break starts now. Please wrap up your call and do not take anymore calls",   recipientHint:'group_b' },
+  { key:'break',    icon:'coffee',   iconCls:'break',  title:'Take Your Break',    body:"It's time to take your 15-minute break. Please log it in BreakTrack.",  recipientHint:'all' },
+  { key:'clockin',  icon:'login2',   iconCls:'info',   title:'Clock In Reminder', body:"Your shift is starting. Please clock in via BreakTrack now.",            recipientHint:'all' },
+  { key:'return',   icon:'zap',      iconCls:'warn',   title:'Break Time',        body:"It's time for you to go on a break 😊",              recipientHint:'all' },
+  { key:'meeting',  icon:'users',    iconCls:'custom', title:'Team Meeting',       body:"There is a team meeting starting shortly. Please wrap up and join teams meeting.",     recipientHint:'all' },
+];
+
+// recipientMode: 'all' | 'group_a' | 'group_b' | 'custom'
+function ANotifications(){
+  const [agents,        setAgents]        = useState([]);   // [{user_id, agent_name}]
+  const [lunchGroups,   setLunchGroups]   = useState({ a:[], b:[] }); // names per group today
+  const [recipientMode, setRecipientMode] = useState('all');
+  const [customPicks,   setCustomPicks]   = useState(new Set()); // user_ids for 'custom' mode
+  const [msgTab,        setMsgTab]        = useState('presets');
+  const [customTitle,   setCustomTitle]   = useState('');
+  const [customBody,    setCustomBody]    = useState('');
+  const [alertMins,     setAlertMins]     = useState(5);
+  const [sentLog,       setSentLog]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [sending,       setSending]       = useState(false);
+  const [err,           setErr]           = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const today = todayISO();
+      // All known agents
+      const { data: cl } = await run(SB.from('bt_clocklogs').select('user_id,agent_name').order('clock_in',{ascending:false}).limit(500));
+      const seen = new Set(); const unique = [];
+      (cl||[]).forEach(r => { if(!seen.has(r.user_id)){seen.add(r.user_id);unique.push(r);} });
+      setAgents(unique);
+      // Today's lunch groups
+      const { data: ls } = await run(SB.from('bt_lunch_schedule').select('group_a,group_b').eq('date',today).maybeSingle());
+      if (ls) setLunchGroups({ a: ls.group_a||[], b: ls.group_b||[] });
+      setLoading(false);
+    })();
+  }, []);
+
+  const toggleCustom = (uid) => setCustomPicks(s => { const n=new Set(s); n.has(uid)?n.delete(uid):n.add(uid); return n; });
+
+  // Resolve who actually gets the notification given current recipientMode
+  const resolveTargets = (overrideMode) => {
+    const mode = overrideMode || recipientMode;
+    if (mode === 'all')     return { lunchGroup: null, userIds: null, label: 'All agents' };
+    if (mode === 'group_a') return { lunchGroup: 'A',  userIds: null, label: 'Group A' };
+    if (mode === 'group_b') return { lunchGroup: 'B',  userIds: null, label: 'Group B' };
+    // custom: specific user_ids
+    const ids = [...customPicks];
+    const names = ids.map(uid => agents.find(a=>a.user_id===uid)?.agent_name||'?').join(', ');
+    return { lunchGroup: null, userIds: ids, label: names || 'No one selected' };
+  };
+
+  const doSend = async (title, body, type='custom', overrideMode=null) => {
+    if (!title.trim()) return;
+    const { lunchGroup, userIds, label } = resolveTargets(overrideMode);
+    if (recipientMode==='custom' && !overrideMode && customPicks.size===0) { setErr('Select at least one agent in Custom mode.'); return; }
+    setSending(true); setErr('');
+    try {
+      if (userIds) {
+        for (const uid of userIds) await broadcastNotif({ title, body, type, targetUserId: uid, lunchGroup });
+      } else {
+        await broadcastNotif({ title, body, type, targetUserId: null, lunchGroup });
+      }
+      setSentLog(p => [{ id:Date.now(), title, body, type, to:label, time:new Date() }, ...p].slice(0,30));
+      if (msgTab==='custom') { setCustomTitle(''); setCustomBody(''); }
+    } catch(e) { setErr('Broadcast failed: '+e.message); }
+    setSending(false);
+  };
+
+  const [autoEnabled, setAutoEnabled] = useState(true);
+
+  const modeOpts = [
+    { value:'all',     label:'All Agents' },
+    { value:'group_a', label:'Group A'    },
+    { value:'group_b', label:'Group B'    },
+    { value:'custom',  label:'Custom…'   },
+  ];
+
+  const { label: recipientLabel } = resolveTargets();
+
+  return (
+    <div className="panel">
+      <div className="phd">
+        <div><h1 className="pt">Notifications</h1><p className="ps">Send real-time alerts — sound · toast · OS desktop notification</p></div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+
+      {loading ? <div className="es"><div className="spin"/></div> : (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 300px',gap:20,alignItems:'start'}}>
+
+          {/* ══ LEFT COLUMN ══ */}
+          <div style={{display:'flex',flexDirection:'column',gap:20}}>
+
+            {/* ── AUTOMATED LUNCH ALERTS ── */}
+            <div style={{background:'var(--surf)',border:'1px solid var(--bdr)',borderRadius:14,padding:'18px 20px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div className="toast-ic lunch" style={{width:32,height:32,borderRadius:9,flexShrink:0}}><Ic n="utensils" size={14} sw={2}/></div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:700}}>Automated Lunch Alerts</div>
+                  <div style={{fontSize:12,color:'var(--mut)',marginTop:1}}>Fires before each group's slot — only that group is notified</div>
+                </div>
+                {/* Toggle switch */}
+                <button onClick={()=>setAutoEnabled(v=>!v)} style={{
+                  width:44,height:24,borderRadius:12,border:'none',cursor:'pointer',flexShrink:0,
+                  background:autoEnabled?'var(--violet)':'rgba(186,214,247,.12)',
+                  position:'relative',transition:'background .2s',padding:0,
+                }}>
+                  <span style={{
+                    position:'absolute',top:3,left:autoEnabled?22:3,width:18,height:18,
+                    borderRadius:'50%',background:'#fff',transition:'left .2s',display:'block',
+                  }}/>
+                </button>
+                <span style={{fontSize:12,fontWeight:700,color:autoEnabled?'var(--amber)':'var(--mut)',minWidth:32}}>{autoEnabled?'On':'Off'}</span>
+              </div>
+              {autoEnabled && (
+                <div style={{display:'flex',alignItems:'center',gap:10,marginTop:14,paddingTop:14,borderTop:'1px solid var(--bdr)',flexWrap:'wrap'}}>
+                  <span style={{fontSize:13,color:'var(--mut)'}}>Alert</span>
+                  <button className="nb" style={{width:26,height:26,fontSize:15}} onClick={()=>setAlertMins(n=>Math.max(1,n-1))}>−</button>
+                  <span style={{fontSize:20,fontWeight:800,color:'var(--amber)',minWidth:28,textAlign:'center',fontFamily:'var(--font-mono)'}}>{alertMins}</span>
+                  <button className="nb" style={{width:26,height:26,fontSize:15}} onClick={()=>setAlertMins(n=>Math.min(30,n+1))}>+</button>
+                  <span style={{fontSize:13,color:'var(--mut)'}}>minutes before lunch</span>
+                  <span style={{fontSize:11,color:'var(--mut)'}}>· requires a schedule saved for today</span>
+                </div>
+              )}
+            </div>
+
+            {/* ── RECIPIENTS ── */}
+            <div style={{background:'var(--surf)',border:'1px solid var(--bdr)',borderRadius:14,padding:'18px 20px'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--mut)',letterSpacing:.5,textTransform:'uppercase',marginBottom:12}}>Recipients</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                {modeOpts.map(o => (
+                  <button key={o.value} onClick={()=>setRecipientMode(o.value)}
+                    style={{padding:'7px 16px',borderRadius:8,border:'1.5px solid',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:'var(--font)',
+                      background: recipientMode===o.value ? (o.value==='group_b'?'var(--indigo-d)':'var(--amber-d)') : 'var(--card)',
+                      color:      recipientMode===o.value ? (o.value==='group_b'?'var(--indigo)':'var(--amber)') : 'var(--mut)',
+                      borderColor:recipientMode===o.value ? (o.value==='group_b'?'var(--indigo-r)':'var(--amber-r)') : 'var(--bdr)',
+                    }}>
+                    {o.label}
+                    {o.value==='group_a'&&lunchGroups.a.length>0&&<span style={{fontSize:10,opacity:.7,marginLeft:5}}>({lunchGroups.a.length})</span>}
+                    {o.value==='group_b'&&lunchGroups.b.length>0&&<span style={{fontSize:10,opacity:.7,marginLeft:5}}>({lunchGroups.b.length})</span>}
+                  </button>
+                ))}
+              </div>
+
+              {recipientMode==='custom' && (
+                <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid var(--bdr)'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--mut)',letterSpacing:.5,textTransform:'uppercase',marginBottom:8,display:'flex',alignItems:'center',gap:8}}>
+                    Select agents
+                    {customPicks.size>0&&<button style={{background:'none',border:'none',color:'var(--amber)',cursor:'pointer',fontSize:11,fontWeight:700}} onClick={()=>setCustomPicks(new Set())}>Clear all</button>}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:6,maxHeight:200,overflowY:'auto'}}>
+                    {agents.length===0&&<div style={{fontSize:12,color:'var(--mut)',gridColumn:'1/-1'}}>No agents found yet.</div>}
+                    {agents.map(a=>{
+                      const on=customPicks.has(a.user_id);
+                      const grp=lunchGroups.a.includes(a.agent_name)?'A':lunchGroups.b.includes(a.agent_name)?'B':null;
+                      return(
+                        <div key={a.user_id} onClick={()=>toggleCustom(a.user_id)} style={{
+                          display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,cursor:'pointer',
+                          background:on?'var(--amber-d)':'var(--card)',border:'1px solid',borderColor:on?'var(--amber-r)':'var(--bdr)',transition:'all .12s',
+                        }}>
+                          <input type="checkbox" readOnly checked={on} style={{accentColor:'var(--amber)',width:13,height:13,pointerEvents:'none',flexShrink:0}}/>
+                          <div className="av" style={{width:22,height:22,fontSize:9,flexShrink:0}}>{ini(a.agent_name)}</div>
+                          <span style={{fontSize:12,fontWeight:500,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.agent_name}</span>
+                          {grp&&<span className={`badge ${grp==='A'?'b-a':'b-b'}`} style={{fontSize:9,padding:'1px 6px'}}>{grp}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── MESSAGE ── */}
+            <div style={{background:'var(--surf)',border:'1px solid var(--bdr)',borderRadius:14,padding:'18px 20px'}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--mut)',letterSpacing:.5,textTransform:'uppercase',marginBottom:12}}>Message</div>
+              <div style={{display:'flex',gap:8,marginBottom:16}}>
+                <button onClick={()=>setMsgTab('presets')} className={msgTab==='presets'?'bp':'bs'} style={{fontSize:12,padding:'7px 16px'}}>Quick Presets</button>
+                <button onClick={()=>setMsgTab('custom')}  className={msgTab==='custom'?'bp':'bs'}  style={{fontSize:12,padding:'7px 16px'}}>Custom Message</button>
+              </div>
+
+              {msgTab==='presets' && (
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                  {PRESETS.map(p=>(
+                    <button key={p.key} className="notif-preset" disabled={sending}
+                      onClick={()=>doSend(p.title,p.body,p.iconCls,p.recipientHint!=='all'?p.recipientHint:null)}>
+                      <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:6}}>
+                        <div className={`toast-ic ${p.iconCls}`} style={{width:28,height:28,borderRadius:7,flexShrink:0}}><Ic n={p.icon} size={13} sw={2}/></div>
+                        <span className="notif-preset-title">{p.title}</span>
+                      </div>
+                      <div className="notif-preset-sub">{p.body}</div>
+                      <div style={{marginTop:7,fontSize:10,color:'var(--mut)',fontWeight:600}}>
+                        → {p.recipientHint==='group_a'?'Group A only':p.recipientHint==='group_b'?'Group B only':'selected recipients'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {msgTab==='custom' && (
+                <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                  <div className="fg" style={{marginBottom:0}}>
+                    <label className="fl">Title</label>
+                    <input className="fi" placeholder="e.g. System Update" value={customTitle} onChange={e=>setCustomTitle(e.target.value)} maxLength={80}/>
+                  </div>
+                  <div className="fg" style={{marginBottom:0}}>
+                    <label className="fl">Message</label>
+                    <textarea className="fi" rows={4} placeholder="Write your message here…" value={customBody} onChange={e=>setCustomBody(e.target.value)} maxLength={300} style={{resize:'vertical',minHeight:90}}/>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:12}}>
+                    <button className="bp" onClick={()=>doSend(customTitle,customBody,'custom')} disabled={sending||!customTitle.trim()}>
+                      {sending?<span className="spin-sm"/>:<Ic n="send" size={14}/>} Send to {recipientLabel}
+                    </button>
+                    {sending&&<span style={{fontSize:12,color:'var(--mut)'}}>Sending…</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ══ RIGHT COLUMN — Sent Log ══ */}
+          <div className="sc" style={{position:'sticky',top:16}}>
+            <div className="sc-hd">
+              <span className="sc-ic"><Ic n="bell" size={15}/></span>
+              <h2 className="sc-t">Sent This Session</h2>
+              <span style={{marginLeft:'auto',fontSize:10,color:'var(--mut)'}}>clears on refresh</span>
+            </div>
+            {sentLog.length===0
+              ?<div className="es" style={{padding:'32px 20px'}}>
+                  <span className="es-ic"><Ic n="bell" size={32} sw={1.2}/></span>
+                  <p>Nothing sent yet</p>
+                </div>
+              :<div style={{padding:'10px 14px'}} className="notif-history">
+                {sentLog.map(h=>(
+                  <div key={h.id} className="notif-hist-item">
+                    <div className={`notif-hist-ic toast-ic ${h.type}`} style={{width:26,height:26,borderRadius:7,flexShrink:0}}><Ic n="bell" size={11} sw={2}/></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.title}</div>
+                      <div style={{fontSize:11,color:'var(--mut)',marginTop:1,lineHeight:1.4,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{h.body}</div>
+                      <div style={{fontSize:10,color:'var(--mut)',marginTop:4}}>→ {h.to} · {h.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            }
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Admin Settings ── */
+function ASettings(){
+  const [maxB,setMaxB]=useState(3);
+  const [lunchH,setLunchH]=useState(_lunchStart);
+  const [busy,setBusy]=useState('');
+  const [ok,setOk]=useState('');
+  const [err,setErr]=useState('');
+  const [needCol,setNeedCol]=useState(false);
+  useEffect(()=>{
+    run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle())
+      .then(({data,error})=>{
+        if(error){setErr('Load: '+error.message);return;}
+        if(data){ setMaxB(data.max_concurrent_breaks); if(data.lunch_start!=null) setLunchH(parseInt(data.lunch_start)); else setNeedCol(!('lunch_start' in data)); }
+      });
+  },[]);
+  const flash=k=>{ setOk(k); setTimeout(()=>setOk(''),3000); };
+  const saveMax=async()=>{
+    setBusy('max');setErr('');
+    const{error}=await run(SB.from('bt_settings').upsert({id:1,max_concurrent_breaks:maxB,updated_at:new Date().toISOString()},{onConflict:'id'}));
+    setBusy(''); if(error){setErr('Save: '+error.message);return;} flash('max');
+  };
+  const saveLunch=async()=>{
+    setBusy('lunch');setErr('');
+    const{error}=await run(SB.from('bt_settings').update({lunch_start:lunchH,updated_at:new Date().toISOString()}).eq('id',1));
+    setBusy('');
+    if(error){ if(/lunch_start/.test(error.message||'')) setNeedCol(true); setErr('Save: '+error.message); return; }
+    _lunchStart=lunchH; setNeedCol(false); flash('lunch');
+    fireNotification({title:'Lunch times updated',body:`Lunch now runs ${fmtH(lunchH)}–${fmtH(lunchH+1)} and ${fmtH(lunchH+1)}–${fmtH(lunchH+2)}.`,type:'info',duration:5000});
+  };
+  const Saved=({k})=>ok===k?<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>:null;
+  return(
+    <div className="panel">
+      <div className="phd"><div><h1 className="pt">Settings</h1><p className="ps">Team configuration</p></div></div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      <div className="sblk">
+        <h2 className="sh">Max concurrent breaks</h2>
+        <p className="sd">How many agents can be on break at the same time. You can also change this from the Break slots card on Home.</p>
+        <div className="num-wrap">
+          <button className="nb" onClick={()=>setMaxB(n=>Math.max(0,n-1))}>−</button>
+          <div className="nv">{maxB}</div>
+          <button className="nb" onClick={()=>setMaxB(n=>n+1)}>+</button>
+        </div>
+        <p style={{fontSize:13.5,color:'var(--mut)',marginTop:12}}>Set to 0 to pause all breaks (e.g. during a peak-call window).</p>
+        <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
+          <button className="bp" onClick={saveMax} disabled={!!busy}>{busy==='max'?<span className="spin-sm"/>:'Save'}</button>
+          <Saved k="max"/>
+        </div>
+      </div>
+      <div className="sblk">
+        <h2 className="sh">Lunch start time</h2>
+        <p className="sd">When the first lunch group leaves. The second group goes one hour later, and the groups swap order every day.</p>
+        <div className="num-wrap">
+          <button className="nb" onClick={()=>setLunchH(h=>Math.max(9,h-1))}>−</button>
+          <div className="nv" style={{minWidth:110}}>{fmtH(lunchH)}</div>
+          <button className="nb" onClick={()=>setLunchH(h=>Math.min(16,h+1))}>+</button>
+        </div>
+        <div className="sg2" style={{marginTop:20,marginBottom:0,maxWidth:520}}>
+          <div className="stat"><div className="stl">First group</div><div className="stv" style={{fontSize:22,marginTop:0}}>{fmtH(lunchH)} – {fmtH(lunchH+1)}</div></div>
+          <div className="stat"><div className="stl">Second group</div><div className="stv" style={{fontSize:22,marginTop:0}}>{fmtH(lunchH+1)} – {fmtH(lunchH+2)}</div></div>
+        </div>
+        {needCol&&(
+          <div style={{marginTop:18}}>
+            <p className="sd" style={{marginBottom:10}}>One-time setup: run this in the Supabase SQL Editor so the lunch time can be saved.</p>
+            <div className="codebox"><b>ALTER TABLE</b> bt_settings <b>ADD COLUMN IF NOT EXISTS</b> lunch_start int <b>DEFAULT</b> 12;</div>
+          </div>
+        )}
+        <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
+          <button className="bp" onClick={saveLunch} disabled={!!busy}>{busy==='lunch'?<span className="spin-sm"/>:'Save'}</button>
+          <Saved k="lunch"/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SHARED COMPONENTS
+══════════════════════════════════════════════════════════════ */
+function SC({n,label,val,ac,wn,ticker}){
+  return(
+    <div className={`stat${ac?' ac':''}${wn?' wn':''}`}>
+      <div className="stat-hd"><div className="stic"><Ic n={n} size={16} sw={1.8}/></div></div>
+      <div className="stv">{ticker?<TNum value={val}/>:val}</div>
+      <div className="stl">{label}</div>
+    </div>
+  );
+}
+function AvC({name}){
+  return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span></div>;
+}
+function BB({type}){
+  if(!type)return null;
+  return <span className={`badge ${BCLS[type]||'b-brk'}`}>{type}</span>;
+}
+function LiveClock(){
+  const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const [t,setT]=useState(new Date());
+  useEffect(()=>{ const id=setInterval(()=>setT(new Date()),1000); return()=>clearInterval(id); },[]);
+  const day=DAYS[t.getDay()],hrs=pad(t.getHours()),mins=pad(t.getMinutes()),secs=pad(t.getSeconds());
+  return(
+    <div className="live-clock">
+      <div className="clk-seg"><div className="clk-day-val">{day}</div><div className="clk-unit">Day</div></div>
+      <div className="clk-sep">:</div>
+      <div className="clk-seg"><TNum className="clk-num" value={hrs}/><div className="clk-unit">Hours</div></div>
+      <div className="clk-sep">:</div>
+      <div className="clk-seg"><TNum className="clk-num" value={mins}/><div className="clk-unit">Minutes</div></div>
+      <div className="clk-sep">:</div>
+      <div className="clk-seg"><TNum className="clk-num" value={secs}/><div className="clk-unit">Seconds</div></div>
+    </div>
+  );
+}
+function LSec({start}){
+  const [s,setS]=useState(Math.round((Date.now()-new Date(start).getTime())/1000));
+  useEffect(()=>{ const id=setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),1000); return()=>clearInterval(id); },[start]);
+  return <TNum className="mono act" value={tStr(Math.max(0,s))}/>;
+}
+function LType({start}){
+  const [s,setS]=useState(Math.round((Date.now()-new Date(start).getTime())/1000));
+  useEffect(()=>{ const id=setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),5000); return()=>clearInterval(id); },[start]);
+  return <BB type={bType(s)}/>;
+}
+function LT({logs,showDate}){
+  return(
+    <div className="tbl-wrap"><table className="dt">
+      <thead><tr><th>Agent</th>{showDate&&<th>Date</th>}<th>Start</th><th>Return</th><th>Duration</th><th>Type</th></tr></thead>
+      <tbody>
+        {logs.map(l=>(
+          <tr key={l.id}>
+            <td><AvC name={l.agent_name}/></td>
+            {showDate&&<td style={{color:'var(--mut)',fontSize:12}}>{fmtD(l.start_time)}</td>}
+            <td>{fmtT(l.start_time)}</td>
+            <td>{l.end_time?fmtT(l.end_time):<span className="badge b-on">On Break</span>}</td>
+            <td>{l.duration_secs!=null?durStr(l.duration_secs):l.end_time?'—':<LSec start={l.start_time}/>}</td>
+            <td>{l.break_type?<BB type={l.break_type}/>:l.end_time?'—':<LType start={l.start_time}/>}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table></div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
