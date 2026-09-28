@@ -3347,6 +3347,129 @@ function ASettings(){
           <Saved k="lunch"/>
         </div>
       </div>
+      <AArchive/>
+    </div>
+  );
+}
+
+/* ── Archive old data ─────────────────────────────────────────
+   Frees Supabase storage: finds rows older than the chosen cutoff,
+   lets the admin download each table as CSV, then deletes exactly
+   the rows that were downloaded. Home analytics reads the last 30
+   days, so the cutoff can't be shorter than ARCHIVE_MIN_DAYS. */
+const ARCHIVE_MIN_DAYS = 35;
+const ARCHIVE_TABLES = [
+  { t:'bt_logs',           label:'Break logs',     q:(s,c)=>s.lt('start_time',c.iso).not('end_time','is',null) },
+  { t:'bt_clocklogs',      label:'Clock logs',     q:(s,c)=>s.lt('date',c.date) },
+  { t:'bt_swap_requests',  label:'Swap requests',  q:(s,c)=>s.lt('date',c.date) },
+  { t:'bt_lunch_schedule', label:'Lunch schedules',q:(s,c)=>s.lt('date',c.date) },
+];
+const rowsToCsv = rows => {
+  const cols = [...new Set(rows.flatMap(r=>Object.keys(r)))];
+  const cell = v => v==null ? '' : `"${(typeof v==='object'?JSON.stringify(v):String(v)).replace(/"/g,'""')}"`;
+  return cols.join(',')+'\n'+rows.map(r=>cols.map(k=>cell(r[k])).join(',')).join('\n');
+};
+function AArchive(){
+  const [days,setDays]=useState(90);
+  const [scan,setScan]=useState(null);   // {cut, tables:{[t]:rows}}
+  const [saved,setSaved]=useState({});   // tables downloaded since the scan
+  const [busy,setBusy]=useState('');
+  const [msg,setMsg]=useState('');
+  const [err,setErr]=useState('');
+  const [needPolicy,setNeedPolicy]=useState(false);
+
+  const cutoff=()=>{
+    const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-days);
+    return { iso:d.toISOString(), date:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` };
+  };
+  const doScan=async()=>{
+    setBusy('scan');setErr('');setMsg('');setSaved({});setNeedPolicy(false);
+    const cut=cutoff(), tables={};
+    for(const {t,q} of ARCHIVE_TABLES){
+      const rows=[];
+      for(let from=0;;from+=1000){
+        const {data,error}=await run(q(SB.from(t).select('*'),cut).order('id').range(from,from+999));
+        if(error){ setErr(`${t}: ${error.message}`); setBusy(''); return; }
+        rows.push(...(data||[]));
+        if(!data||data.length<1000) break;
+      }
+      tables[t]=rows;
+    }
+    setScan({cut,tables}); setBusy('');
+  };
+  const download=t=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([rowsToCsv(scan.tables[t])],{type:'text/csv'}));
+    a.download=`${t}-before-${scan.cut.date}.csv`; a.click();
+    setSaved(s=>({...s,[t]:true}));
+  };
+  const nonEmpty = scan ? ARCHIVE_TABLES.filter(({t})=>scan.tables[t].length) : [];
+  const total = nonEmpty.reduce((n,{t})=>n+scan.tables[t].length,0);
+  const allSaved = nonEmpty.every(({t})=>saved[t]);
+  const doDelete=async()=>{
+    if(!confirm(`Permanently delete ${total} rows from before ${scan.cut.date}? Make sure the CSV files are saved somewhere safe.`)) return;
+    setBusy('del');setErr('');setMsg('');
+    let deleted=0, blocked=false;
+    for(const {t} of nonEmpty){
+      const ids=scan.tables[t].map(r=>r.id);
+      for(let i=0;i<ids.length;i+=100){
+        const chunk=ids.slice(i,i+100);
+        const {data,error}=await run(SB.from(t).delete().in('id',chunk).select('id'));
+        if(error){ setErr(`${t}: ${error.message}`); setBusy(''); return; }
+        deleted+=(data||[]).length;
+        if((data||[]).length<chunk.length) blocked=true;
+      }
+    }
+    setBusy(''); setScan(null); setSaved({});
+    setNeedPolicy(blocked);
+    setMsg(`Deleted ${deleted} of ${total} rows.`);
+  };
+
+  return(
+    <div className="sblk">
+      <h2 className="sh">Archive old data</h2>
+      <p className="sd">Frees database space. Rows older than the cutoff are downloaded as CSV files, then removed from the database. Open breaks are never removed. Agents who haven't clocked in since the cutoff will drop off the agent pickers.</p>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      <div className="num-wrap">
+        <button className="nb" onClick={()=>{setDays(d=>Math.max(ARCHIVE_MIN_DAYS,d-5));setScan(null);}}>−</button>
+        <div className="nv" style={{minWidth:110}}>{days} days</div>
+        <button className="nb" onClick={()=>{setDays(d=>d+5);setScan(null);}}>+</button>
+      </div>
+      <p style={{fontSize:13.5,color:'var(--mut)',marginTop:12}}>Keep the last {days} days. Minimum {ARCHIVE_MIN_DAYS}, because Home analytics uses the last 30 days.</p>
+      <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
+        <button className="bs" onClick={doScan} disabled={!!busy}>{busy==='scan'?<span className="spin-sm"/>:'Find old rows'}</button>
+        {msg&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> {msg}</span>}
+      </div>
+      {scan&&(
+        <div style={{marginTop:20}}>
+          {total===0
+            ? <p className="sd" style={{marginBottom:0}}>Nothing older than {scan.cut.date}.</p>
+            : <>
+                <p className="sd" style={{marginBottom:12}}>Step 1: download each file. Step 2: delete.</p>
+                {nonEmpty.map(({t,label})=>(
+                  <div key={t} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+                    <button className="bs" onClick={()=>download(t)} disabled={!!busy}><Ic n="download" size={14}/> {label}</button>
+                    <span style={{fontSize:14,color:'var(--mut)'}}>{scan.tables[t].length} rows</span>
+                    {saved[t]&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center'}}><Ic n="check" size={15}/></span>}
+                  </div>
+                ))}
+                <div style={{marginTop:14}}>
+                  <button className="bp" onClick={doDelete} disabled={!!busy||!allSaved}>{busy==='del'?<span className="spin-sm"/>:`Delete ${total} rows`}</button>
+                </div>
+              </>}
+        </div>
+      )}
+      {needPolicy&&(
+        <div style={{marginTop:18}}>
+          <p className="sd" style={{marginBottom:10}}>Some rows weren't deleted because the database doesn't allow deletes yet. One-time setup: run this in the Supabase SQL Editor, sign out and back in, then try again. Change the email to your admin account.</p>
+          <div className="codebox">
+            <b>UPDATE</b> auth.users <b>SET</b> raw_app_meta_data = raw_app_meta_data || '{`{"role":"admin"}`}' <b>WHERE</b> email = 'admin@example.com';<br/>
+            {ARCHIVE_TABLES.map(({t})=>(
+              <React.Fragment key={t}><b>CREATE POLICY</b> "admin archive" <b>ON</b> {t} <b>FOR DELETE TO</b> authenticated <b>USING</b> ((auth.jwt()-&gt;'app_metadata'-&gt;&gt;'role') = 'admin');<br/></React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
