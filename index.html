@@ -3446,11 +3446,16 @@ function Stepper({value,onChange,min=0,max=50}){
     </div>
   );
 }
+/* The schedule runs on a fixed UTC offset the admin picks, so it matches the clock they actually work by. */
+const offToTz = o => o===0 ? 'UTC' : `Etc/GMT${o>0?'-':'+'}${Math.abs(o)}`;
+const tzToOff = tz => { if(tz==='UTC') return 0; const m=/^Etc\/GMT([+-])(\d{1,2})$/.exec(tz||''); return m ? (m[1]==='-'?1:-1)*parseInt(m[2]) : null; };
+const clockAt = off => { const d=new Date(Date.now()+off*3600000); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
 function ASlotSchedule(){
   const [rules,setRules]=useState([]);                                  // [{time:'09:00',slots:4}]
   const [lunch,setLunch]=useState({on:false,extra:0,afterOn:false,after:3});
   const [lunchH,setLunchH]=useState(_lunchStart);
-  const [applied,setApplied]=useState(null);
+  const [off,setOff]=useState(()=>Math.round(-new Date().getTimezoneOffset()/60));
+  const [,tick]=useState(0);
   const [needSetup,setNeedSetup]=useState(false);
   const [busy,setBusy]=useState(false);
   const [ok,setOk]=useState(false);
@@ -3459,6 +3464,7 @@ function ASlotSchedule(){
   const [needFn,setNeedFn]=useState(false);
   const [checking,setChecking]=useState(false);
   const [err,setErr]=useState('');
+  useEffect(()=>{ const id=setInterval(()=>tick(n=>n+1),15000); return()=>clearInterval(id); },[]);
   const checkNow=async()=>{
     setChecking(true);
     const {data,error}=await run(SB.rpc('bt_slot_sync'));
@@ -3471,13 +3477,11 @@ function ASlotSchedule(){
     setNeedFn(false); _slotFnMissing=false;
     const parts=[];
     if(!data.ok) parts.push(data.reason);
-    else if(data.reason) parts.push(data.reason+(data.now?` (it is ${data.now} in ${data.tz})`:''));
-    else parts.push(`Slots are ${data.slots}, from the ${data.rule} rule (it is ${data.now} in ${data.tz})${data.changed?'. Just applied.':'.'}`);
     let warn=!data.ok;
     if(data.lunch_error){ warn=true; parts.push('Lunch rules were skipped: '+data.lunch_error); }
     if(data.cron===false){ warn=true; parts.push('The background job isn’t running (pg_cron is off or wasn’t set up). The schedule still applies while anyone has the app open; for exact timing when nobody does, turn on pg_cron and run the setup SQL.'); }
     else if(data.cron_last_run && /^failed/i.test(data.cron_last_run)) { warn=true; parts.push('Last background run: '+data.cron_last_run); }
-    setStatus({warn,text:parts.join(' ')});
+    setStatus(warn?{warn,text:parts.join(' ')}:null);
   };
   useEffect(()=>{
     checkNow();
@@ -3486,7 +3490,7 @@ function ASlotSchedule(){
       if(!data) return;
       if(!('slot_schedule' in data)){ setNeedSetup(true); return; }
       if(data.lunch_start!=null) setLunchH(parseInt(data.lunch_start));
-      setApplied(data.slot_applied||null);
+      const o=tzToOff(data.slot_tz); if(o!==null) setOff(o);
       const list=Array.isArray(data.slot_schedule)?data.slot_schedule:[];
       setRules(list.filter(r=>r.time).map(r=>({time:r.time,slots:r.slots|0})).sort((a,b)=>a.time.localeCompare(b.time)));
       const l=list.find(r=>r.lunch);
@@ -3504,7 +3508,7 @@ function ASlotSchedule(){
     const sorted=[...rules].filter(r=>/^\d\d:\d\d$/.test(r.time)).sort((a,b)=>a.time.localeCompare(b.time));
     const schedule=[...sorted];
     if(lunch.on) schedule.push(lunch.afterOn?{lunch:true,extra:lunch.extra,after:lunch.after}:{lunch:true,extra:lunch.extra});
-    const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tz=offToTz(off);
     const {error}=await run(SB.from('bt_settings').update({slot_schedule:schedule,slot_tz:tz,updated_at:new Date().toISOString()}).eq('id',1));
     setBusy(false);
     if(error){ if(/slot_schedule|slot_tz/.test(error.message||'')) setNeedSetup(true); setErr('Save: '+error.message); return; }
@@ -3532,6 +3536,13 @@ function ASlotSchedule(){
           <button className="bs" onClick={copySql}>{copied?<><Ic n="check" size={15}/> Copied</>:'Copy setup SQL'}</button>
         </div>
       ):(<>
+        <div style={{...row,marginBottom:18}}>
+          <span style={{fontSize:15,color:'var(--mut)'}}>Clock</span>
+          <button className="nb" style={{width:32,height:32,fontSize:17}} onClick={()=>setOff(o=>Math.max(-12,o-1))} aria-label="One hour earlier">−</button>
+          <span style={{minWidth:64,textAlign:'center',fontSize:16,fontVariantNumeric:'tabular-nums'}}>UTC{off<0?'−':'+'}{Math.abs(off)}</span>
+          <button className="nb" style={{width:32,height:32,fontSize:17}} onClick={()=>setOff(o=>Math.min(14,o+1))} aria-label="One hour later">+</button>
+          <span style={{fontSize:15,color:'var(--mut)'}}>Now <b style={{color:'var(--txt)',fontWeight:500,fontVariantNumeric:'tabular-nums'}}>{clockAt(off)}</b></span>
+        </div>
         {rules.length===0&&<p style={{fontSize:14,color:'var(--mut)',marginBottom:12}}>No scheduled times yet.</p>}
         {rules.map((r,i)=>(
           <div key={i} style={row}>
@@ -3571,7 +3582,6 @@ function ASlotSchedule(){
           {ok&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>}
         </div>
         {status&&<p style={{fontSize:13.5,lineHeight:1.55,marginTop:14,color:status.warn?'#f7b3c1':'var(--mut)'}}>{status.text}</p>}
-        {applied&&<p style={{fontSize:13,color:'var(--mut)',marginTop:6}}>Last applied: {applied}</p>}
       </>)}
     </div>
   );
