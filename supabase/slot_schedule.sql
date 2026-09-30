@@ -47,7 +47,7 @@ begin
   lh    := coalesce(s.lunch_start, 12);
 
   -- Read today's lunch groups as JSON so a different column layout can't break the schedule.
-  select to_jsonb(l) into lsj from bt_lunch_schedule l where l.date = today limit 1;
+  select to_jsonb(l) into lsj from bt_lunch_schedule l where l.date::text = today::text limit 1;
   if lsj is not null then
     if jsonb_typeof(lsj->'group_a') = 'array' then a_size := jsonb_array_length(lsj->'group_a'); end if;
     if jsonb_typeof(lsj->'group_b') = 'array' then b_size := jsonb_array_length(lsj->'group_b'); end if;
