@@ -734,6 +734,30 @@ const defaultFirst = (dateStr) => {
   return day % 2 === 0 ? 'A' : 'B';
 };
 
+/* Team config from bt_settings: trainees (names), trainee_lunch ('HH:MM', one hour), shift_end ('HH:MM').
+   Module-level so any screen can ask isTrainee(). Trainee breaks don't use or count toward break slots. */
+const normName = n => String(n||'').trim().replace(/\s+/g,' ').toLowerCase();
+let _team = { trainees:[], lunch:'12:00', shiftEnd:null, ready:false };
+let _traineeSet = new Set();
+const isTrainee = n => _traineeSet.has(normName(n));
+const slotCount = rows => (rows||[]).filter(r=>!isTrainee(r.agent_name)).length;   // open breaks that use a slot
+const addMin = (hm,m) => { const [h,mm]=hm.split(':').map(Number); const t=((h*60+mm+m)%1440+1440)%1440; return `${pad(Math.floor(t/60))}:${pad(t%60)}`; };
+const HM_RE = /^\d\d:\d\d$/;
+function useTeamConfig(){
+  const [v,setV]=useState(_team);
+  const load=useCallback(async()=>{
+    const {data}=await run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle());
+    if(!data) return;
+    const t=Array.isArray(data.trainees)?data.trainees.filter(x=>typeof x==='string'):[];
+    _traineeSet=new Set(t.map(normName));
+    _team={ trainees:t, lunch:HM_RE.test(data.trainee_lunch||'')?data.trainee_lunch:'12:00', shiftEnd:HM_RE.test(data.shift_end||'')?data.shift_end:null, ready:true };
+    setV(_team);
+  },[]);
+  useEffect(()=>{ load(); },[load]);
+  useAutoRefresh(load,30000);
+  return v;
+}
+
 const csvExport = (rows) => {
   const h = 'Agent,Date,Start,Return,Duration,Type\n';
   const b = rows.map(r=>{
@@ -1128,6 +1152,9 @@ function AgentApp({user,name,onLogout}){
   const [maxB,      setMaxB]      = useState(3);
   const [teamCount, setTeamCount] = useState(0);
   useSlotSchedulerTick();
+  const team = useTeamConfig();
+  const trainee = isTrainee(name);
+  const [confirmOut, setConfirmOut] = useState(false);
   const [loading,   setLoading]   = useState(true);
   const [err,       setErr]       = useState('');
   const [lunchInfo, setLunchInfo] = useState(null); // {group:'A'|'B', slot:{from,to}}
@@ -1142,8 +1169,8 @@ function AgentApp({user,name,onLogout}){
   const today = todayISO();
 
   // Notification hooks
-  useLunchReminder(lunchInfo);
-  useAgentNotifListener(user.id, lunchInfo);
+  useLunchReminder(trainee ? null : lunchInfo);
+  useAgentNotifListener(user.id, trainee ? null : lunchInfo);
 
   // Swap listener — receives broadcast events for immediate response UX
   useSwapListener(user.id, useCallback((payload) => {
@@ -1182,8 +1209,8 @@ function AgentApp({user,name,onLogout}){
     setActive(openBreak||null);
     const {data:cfg} = await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
     if(cfg) setMaxB(cfg.max_concurrent_breaks);
-    const {data:tc} = await run(SB.from('bt_logs').select('id').is('end_time',null));
-    setTeamCount((tc||[]).length);
+    const {data:tc} = await run(SB.from('bt_logs').select('id,agent_name').is('end_time',null));
+    setTeamCount(slotCount(tc));
     // Lunch schedule
     const {data:ls} = await run(SB.from('bt_lunch_schedule').select('*').eq('date',today).maybeSingle());
     if(ls){
@@ -1306,8 +1333,8 @@ function AgentApp({user,name,onLogout}){
     // Poll team break count every 8s (tightened from 15s so a dropped realtime
     // socket never leaves the agent staring at a stale team-capacity number)
     const id=setInterval(async()=>{
-      const {data}=await run(SB.from('bt_logs').select('id').is('end_time',null));
-      setTeamCount((data||[]).length);
+      const {data}=await run(SB.from('bt_logs').select('id,agent_name').is('end_time',null));
+      setTeamCount(slotCount(data));
       const {data:cfg}=await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
       if(cfg) setMaxB(cfg.max_concurrent_breaks);
     },8000);
@@ -1352,17 +1379,24 @@ function AgentApp({user,name,onLogout}){
     if(error){setErr('Clock-out failed: '+error.message);return;}
     setClockRow(data);
   };
+  // Ask before clocking out unless the shift has ended (clocking out can't be undone for the day)
+  const askClockOut = ()=>{
+    if(!clockRow) return;
+    if(team.shiftEnd && hhmm(Date.now())>=team.shiftEnd){ clockOut(); return; }
+    setConfirmOut(true);
+  };
   const startBreak = async()=>{
     setErr('');
-    const {data:tc}=await run(SB.from('bt_logs').select('id').is('end_time',null));
+    const {data:tc}=await run(SB.from('bt_logs').select('id,agent_name').is('end_time',null));
     // Read the cap fresh too: the slot schedule may have changed it since this screen loaded
     const {data:cfg}=await run(SB.from('bt_settings').select('max_concurrent_breaks').eq('id',1).maybeSingle());
     const cap=cfg?cfg.max_concurrent_breaks:maxB; if(cfg) setMaxB(cap);
-    if((tc||[]).length>=cap){setErr(`All ${cap} break slots are taken. Please wait.`);return;}
+    // Trainees have no slot limit: they skip this check, and their breaks aren't counted for others
+    if(!trainee&&slotCount(tc)>=cap){setErr(`All ${cap} break slots are taken. Please wait.`);return;}
     const now=new Date().toISOString();
     const {data,error}=await run(SB.from('bt_logs').insert({user_id:user.id,agent_name:name,start_time:now}).select().single());
     if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Could not start break: '+error.message);return;}
-    setActive(data); setLogs(p=>[data,...p]); setTeamCount(c=>c+1);
+    setActive(data); setLogs(p=>[data,...p]); if(!trainee) setTeamCount(c=>c+1);
   };
   const endBreak = async()=>{
     if(!active)return; setErr('');
@@ -1372,7 +1406,7 @@ function AgentApp({user,name,onLogout}){
     const {error}=await run(SB.from('bt_logs').update({end_time:now,duration_secs:durSecs,break_type:bt}).eq('id',active.id));
     if(error){setErr('Could not end break: '+error.message);return;}
     setLogs(p=>p.map(l=>l.id===active.id?{...l,end_time:now,duration_secs:durSecs,break_type:bt}:l));
-    setActive(null); setTeamCount(c=>Math.max(0,c-1));
+    setActive(null); if(!trainee) setTeamCount(c=>Math.max(0,c-1));
   };
 
   // Swap: send request to another agent
@@ -1440,14 +1474,15 @@ function AgentApp({user,name,onLogout}){
   const done=logs.filter(l=>l.end_time);
   const totalSec=done.reduce((s,l)=>s+(l.duration_secs||0),0);
   const predType=active?bType(Math.floor(elapsed/1000)):null;
-  const atCap=teamCount>=maxB;
+  const atCap=!trainee&&teamCount>=maxB;
+  const li=trainee?null:lunchInfo;   // trainees have no lunch group
   const isClockedIn=clockRow?.clock_in&&!clockRow?.clock_out;
   const isClockedOut=clockRow?.clock_out;
   // Other agents in the opposite group (for swap target selection)
-  const otherGroupAgents = lunchInfo?.group ? (
-    lunchInfo.group==='A'
-      ? (lunchInfo.allB||[]).map(n=>({name:n, group:'B', userId:null}))
-      : (lunchInfo.allA||[]).map(n=>({name:n, group:'A', userId:null}))
+  const otherGroupAgents = li?.group ? (
+    li.group==='A'
+      ? (li.allB||[]).map(n=>({name:n, group:'B', userId:null}))
+      : (li.allA||[]).map(n=>({name:n, group:'A', userId:null}))
   ) : [];
 
   const [showAll,setShowAll]=useState(false);
@@ -1457,7 +1492,7 @@ function AgentApp({user,name,onLogout}){
   const avgMine=done.length?Math.round(totalSec/done.length):0;
   const breakDisabled=atCap||loading||!isClockedIn;
   const breakHint=!isClockedIn?(isClockedOut?'Your shift has ended for today':'Clock in first to take breaks')
-    :maxB<=0?'Breaks are paused right now — check with your supervisor'
+    :(!trainee&&maxB<=0)?'Breaks are paused right now — check with your supervisor'
     :atCap?`All ${maxB} break slots are in use — wait for a colleague to return`:null;
   const listed=showAll?logs:logs.slice(0,5);
   const shiftSec=clockRow?.clock_in?Math.round(((clockRow.clock_out?new Date(clockRow.clock_out).getTime():nowA)-new Date(clockRow.clock_in).getTime())/1000):0;
@@ -1475,7 +1510,7 @@ function AgentApp({user,name,onLogout}){
         <div className="top-ic">
           <ClockPill/>
           <span className="hide-s"><ConnInstrument compact/></span>
-          <AvatarMenu name={name} role={lunchInfo?.group?`Agent · Group ${lunchInfo.group}`:'Agent'} onLogout={onLogout}
+          <AvatarMenu name={name} role={trainee?'Agent · Trainee':li?.group?`Agent · Group ${li.group}`:'Agent'} onLogout={onLogout}
             extra={<MI n="refresh" onClick={load}>Refresh</MI>}/>
         </div>
       </header>
@@ -1512,8 +1547,8 @@ function AgentApp({user,name,onLogout}){
 
         <div className="acts">
           {!clockRow&&<button className="bp" onClick={clockIn}><Ic n="login2" size={16}/> Clock in</button>}
-          {isClockedIn&&<button className="bs" onClick={clockOut}><Ic n="logoff" size={16}/> Clock out</button>}
-          {lunchInfo?.group&&!outgoingSwap&&isClockedIn&&<button className="bs" onClick={()=>setShowSwapModal(true)}><Ic n="swap" size={16}/> Swap lunch</button>}
+          {isClockedIn&&<button className="bs" onClick={askClockOut}><Ic n="logoff" size={16}/> Clock out</button>}
+          {li?.group&&!outgoingSwap&&isClockedIn&&<button className="bs" onClick={()=>setShowSwapModal(true)}><Ic n="swap" size={16}/> Swap lunch</button>}
           <button className="bs" onClick={load}><Ic n="refresh" size={16}/> Refresh</button>
           <div className="acts-r"><ConnInstrument/></div>
         </div>
@@ -1545,7 +1580,9 @@ function AgentApp({user,name,onLogout}){
               <div><div className="sm-l">Breaks today</div><div className="sm-v"><TNum value={done.length}/></div></div>
               <div><div className="sm-l">Total</div><div className="sm-v">{durStr(todaySec)}</div></div>
               <div><div className="sm-l">Average</div><div className="sm-v">{durStr(avgMine)}</div></div>
-              <div><div className="sm-l">Team out</div><div className="sm-v"><TNum value={teamCount}/><span style={{color:'var(--mut)'}}>/{maxB}</span></div></div>
+              {trainee
+                ?<div><div className="sm-l">Break slots</div><div className="sm-v">No limit</div></div>
+                :<div><div className="sm-l">Team out</div><div className="sm-v"><TNum value={teamCount}/><span style={{color:'var(--mut)'}}>/{maxB}</span></div></div>}
             </div>
           </div>
 
@@ -1602,42 +1639,55 @@ function AgentApp({user,name,onLogout}){
             <div className="sm-ft">
               <div><div className="sm-l"><Ic n="clock" size={14}/> Status</div><div className="sm-v">{isClockedIn?'Working':isClockedOut?'Shift ended':'Not clocked in'}</div></div>
               {!clockRow&&<button className="pay" onClick={clockIn}>Clock in</button>}
-              {isClockedIn&&<button className="pay" onClick={clockOut}>Clock out</button>}
+              {isClockedIn&&<button className="pay" onClick={askClockOut}>Clock out</button>}
             </div>
           </div>
 
           <div className="card sm">
             <div className="card-hd">
               <div>
-                <div className="card-t">Lunch{lunchInfo?.group?` · Group ${lunchInfo.group}`:''}</div>
-                <div className="mid" style={{marginTop:8}}>{lunchInfo?.group?<Amt main={lunchInfo.slot.from} sup={`–${lunchInfo.slot.to}`}/>:<span style={{color:'var(--mut)'}}>Unassigned</span>}</div>
+                <div className="card-t">{trainee?'Lunch · Trainee':`Lunch${li?.group?` · Group ${li.group}`:''}`}</div>
+                <div className="mid" style={{marginTop:8}}>{trainee?<Amt main={team.lunch} sup={`–${addMin(team.lunch,60)}`}/>:li?.group?<Amt main={li.slot.from} sup={`–${li.slot.to}`}/>:<span style={{color:'var(--mut)'}}>Unassigned</span>}</div>
               </div>
-              {lunchInfo?.group&&!outgoingSwap&&isClockedIn&&<div className="card-ctl"><button className="icb sm" onClick={()=>setShowSwapModal(true)} title="Request swap"><Ic n="swap" size={17}/></button></div>}
+              {li?.group&&!outgoingSwap&&isClockedIn&&<div className="card-ctl"><button className="icb sm" onClick={()=>setShowSwapModal(true)} title="Request swap"><Ic n="swap" size={17}/></button></div>}
             </div>
+            {trainee?(<>
+              <div className="sm-cols">
+                <div><div className="sm-l">Starts</div><div className="sm-v">{team.lunch}</div></div>
+                <div><div className="sm-l">Ends</div><div className="sm-v">{addMin(team.lunch,60)}</div></div>
+                <div><div className="sm-l">Group</div><div className="sm-v">None</div></div>
+              </div>
+              <hr className="sm-hr"/>
+              <div className="sm-ft">
+                <div><div className="sm-l">Schedule</div><div className="sm-v">Same time every day</div></div>
+              </div>
+            </>):(<>
             <div className="sm-cols">
-              <div><div className="sm-l">Group A</div><div className="sm-v">{lunchInfo?.slots?`${lunchInfo.slots.A.from}`:'–'}</div></div>
-              <div><div className="sm-l">Group B</div><div className="sm-v">{lunchInfo?.slots?`${lunchInfo.slots.B.from}`:'–'}</div></div>
-              <div><div className="sm-l">First</div><div className="sm-v">{lunchInfo?.first?`Group ${lunchInfo.first}`:'–'}</div></div>
+              <div><div className="sm-l">Group A</div><div className="sm-v">{li?.slots?`${li.slots.A.from}`:'–'}</div></div>
+              <div><div className="sm-l">Group B</div><div className="sm-v">{li?.slots?`${li.slots.B.from}`:'–'}</div></div>
+              <div><div className="sm-l">First</div><div className="sm-v">{li?.first?`Group ${li.first}`:'–'}</div></div>
             </div>
             <hr className="sm-hr"/>
             <div className="sm-ft">
               <div><div className="sm-l">Swap</div><div className="sm-v">{outgoingSwap?'Pending':incomingSwaps.length?`${incomingSwaps.length} incoming`:'None'}</div></div>
-              {lunchInfo?.group&&!outgoingSwap&&isClockedIn&&<button className="lnk" onClick={()=>setShowSwapModal(true)}>Request <Ic n="chevron" size={15}/></button>}
+              {li?.group&&!outgoingSwap&&isClockedIn&&<button className="lnk" onClick={()=>setShowSwapModal(true)}>Request <Ic n="chevron" size={15}/></button>}
             </div>
+            </>)}
           </div>
 
           <div className="card sm">
             <div className="card-hd">
               <div>
                 <div className="card-t">Team on break</div>
-                <div className="mid" style={{marginTop:8}}><Amt main={<TNum value={teamCount}/>} sup={`/${maxB}`}/></div>
+                <div className="mid" style={{marginTop:8}}>{trainee?<span style={{color:'var(--mut)'}}>No slot limit</span>:<Amt main={<TNum value={teamCount}/>} sup={`/${maxB}`}/>}</div>
               </div>
             </div>
+            {!trainee&&<>
             <div className="bar"><i className={atCap?'full':''} style={{width:`${pct}%`}}/></div>
             <div className="legend">
               <span>On break <i/></span><span>Free <i className="f"/></span>
               <span className="r">{Math.max(0,maxB-teamCount)} available</span>
-            </div>
+            </div></>}
             <hr className="sm-hr"/>
             <div className="sm-ft">
               <div><div className="sm-l"><Ic n="refresh" size={14}/> Live</div><div className="sm-v">Updates instantly</div></div>
@@ -1649,13 +1699,25 @@ function AgentApp({user,name,onLogout}){
         </div>
       </div>
 
-      {showSwapModal&&lunchInfo?.group&&(
+      {confirmOut&&(
+        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setConfirmOut(false)}>
+          <div className="modal-box">
+            <div className="modal-title">{team.shiftEnd?'Clock out early?':'Clock out?'}</div>
+            <div className="modal-sub">{team.shiftEnd?`Your shift ends at ${team.shiftEnd} and it's ${hhmm(nowA)} now. `:''}Once you clock out you can't clock back in today.</div>
+            <div className="modal-foot">
+              <button className="bp" autoFocus onClick={()=>setConfirmOut(false)}>Stay clocked in</button>
+              <button className="bs" onClick={async()=>{ setConfirmOut(false); await clockOut(); }}><Ic n="logoff" size={14}/> Yes, clock out</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showSwapModal&&li?.group&&(
         <SwapRequestModal
           myName={name}
-          myGroup={lunchInfo.group}
-          otherGroup={lunchInfo.group==='A'?'B':'A'}
-          otherSlot={lunchInfo.group==='A'?lunchInfo.slots.B:lunchInfo.slots.A}
-          mySlot={lunchInfo.slot}
+          myGroup={li.group}
+          otherGroup={li.group==='A'?'B':'A'}
+          otherSlot={li.group==='A'?li.slots.B:li.slots.A}
+          mySlot={li.slot}
           date={today}
           onSend={sendSwapRequest}
           onClose={()=>setShowSwapModal(false)}
@@ -1977,8 +2039,9 @@ function AHome({name, go, hide}){
   const nowHM=hhmm(now);
   const atLunch = ['A','B'].find(g=>nowHM>=slots[g].from && nowHM<slots[g].to) || null;
 
-  const pct=maxB>0?Math.min(100,active.length/maxB*100):100;
-  const atCap=active.length>=maxB;
+  const slotActive=active.filter(l=>!isTrainee(l.agent_name));   // trainees don't use break slots
+  const pct=maxB>0?Math.min(100,slotActive.length/maxB*100):100;
+  const atCap=slotActive.length>=maxB;
 
   const [savingCap,setSavingCap]=useState(false);
   const capSeq=useRef(0);
@@ -2014,7 +2077,7 @@ function AHome({name, go, hide}){
           <div className="card-hd">
             <div>
               <div className="card-t">On break now <span className="vbadge" title="Live"><span className="livedot"/></span></div>
-              <div className="big pv" style={{marginTop:6}}>{loading?<span style={{color:'var(--mut)'}}>—</span>:<Amt main={<TNum value={active.length}/>} sup={maxB<=0?' · paused':`/${maxB} slots`}/>}</div>
+              <div className="big pv" style={{marginTop:6}}>{loading?<span style={{color:'var(--mut)'}}>—</span>:<Amt main={<TNum value={slotActive.length}/>} sup={maxB<=0?' · paused':`/${maxB} slots`}/>}</div>
             </div>
             <div className="card-ctl">
               <button className="icb sm" onClick={()=>go('live')} title="Start a break remotely"><Ic n="play" size={16}/></button>
@@ -2103,7 +2166,7 @@ function AHome({name, go, hide}){
           <div className="card-hd">
             <div>
               <div className="card-t">Break slots</div>
-              <div className="mid pv" style={{marginTop:8}}><Amt main={<TNum value={active.length}/>} sup={`/${maxB}`}/></div>
+              <div className="mid pv" style={{marginTop:8}}><Amt main={<TNum value={slotActive.length}/>} sup={`/${maxB}`}/></div>
             </div>
             <div className="card-ctl">
               <Kebab><MI n="activity" onClick={()=>go('live')}>Live rack</MI><MI n="plus" onClick={()=>setCap(maxB+1)}>Add a slot</MI><MI n="stop" onClick={()=>setCap(0)}>Pause all breaks</MI></Kebab>
@@ -2112,7 +2175,7 @@ function AHome({name, go, hide}){
           <div className="bar"><i className={atCap?'full':''} style={{width:`${pct}%`}}/></div>
           <div className="legend">
             <span>On break <i/></span><span>Free <i className="f"/></span>
-            <span className="r">{maxB<=0?'Breaks paused':`${Math.max(0,maxB-active.length)} available`}</span>
+            <span className="r">{maxB<=0?'Breaks paused':`${Math.max(0,maxB-slotActive.length)} available`}</span>
           </div>
           <hr className="sm-hr"/>
           <div className="sm-ft">
@@ -2182,6 +2245,7 @@ function AdminApp({user,name,onLogout}){
   const [spin,setSpin]=useState(false);
   useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch
   useSlotSchedulerTick();
+  useTeamConfig();
 
   const loadCounts=useCallback(async()=>{
     const [l,s]=await Promise.all([
@@ -2204,6 +2268,7 @@ function AdminApp({user,name,onLogout}){
   ];
   const flows=[
     {id:'lunch',    n:'utensils', label:'Lunch Schedule'},
+    {id:'trainees', n:'users',    label:'Trainees'},
     {id:'swaps',    n:'swap',     label:'Lunch Swaps', badge:counts.swaps},
     {id:'notifs',   n:'bell',     label:'Notifications'},
     {id:'settings', n:'settings', label:'Settings'},
@@ -2272,6 +2337,7 @@ function AdminApp({user,name,onLogout}){
           {tab==='live'      &&<ALive/>}
           {tab==='clocks'    &&<AClocks/>}
           {tab==='lunch'     &&<ALunch/>}
+          {tab==='trainees'  &&<ATrainees/>}
           {tab==='swaps'     &&<ASwapRequests/>}
           {tab==='analytics' &&<AAnalytics/>}
           {tab==='logs'      &&<ALogs/>}
@@ -2324,8 +2390,8 @@ function ALive(){
     // Re-check the live count fresh from the DB right before inserting — the button's
     // disabled state uses local `live`/`maxB`, which can lag a few seconds behind on a
     // slow connection, so we can't trust it alone as the only guard.
-    const {data:tc}=await run(SB.from('bt_logs').select('id').is('end_time',null));
-    if((tc||[]).length>=maxB){ setErr(`All ${maxB} break slots are taken. Please wait.`); setRemoting(null); setConfirm(null); return; }
+    const {data:tc}=await run(SB.from('bt_logs').select('id,agent_name').is('end_time',null));
+    if(!isTrainee(agent.agent_name)&&slotCount(tc)>=maxB){ setErr(`All ${maxB} break slots are taken. Please wait.`); setRemoting(null); setConfirm(null); return; }
     const now=new Date().toISOString();
     const {data,error}=await run(SB.from('bt_logs').insert({user_id:agent.user_id,agent_name:agent.agent_name,start_time:now}).select().single());
     if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Remote break failed: '+error.message);}
@@ -2335,12 +2401,13 @@ function ALive(){
 
   const onBreakIds=new Set(live.map(l=>l.user_id));
   const available=clocked.filter(a=>!onBreakIds.has(a.user_id));
-  const atCap=live.length>=maxB;
+  const slotLive=live.filter(l=>!isTrainee(l.agent_name));   // trainees don't use break slots
+  const atCap=slotLive.length>=maxB;
 
   return(
     <div className="panel">
       <div className="phd">
-        <div><h1 className="pt">Live Rack</h1><p className="ps"><TNum value={`${live.length}/${maxB}`}/> slots in use · updates instantly</p></div>
+        <div><h1 className="pt">Live Rack</h1><p className="ps"><TNum value={`${slotLive.length}/${maxB}`}/> slots in use · updates instantly</p></div>
         <div className="fc g10">
           <ConnInstrument/>
           <button className="bs" onClick={load}><Ic n="refresh" size={14}/> Refresh</button>
@@ -2377,9 +2444,9 @@ function ALive(){
                         <td>{fmtT(a.clock_in)}</td>
                         <td><span className="badge b-in"><span style={{width:6,height:6,borderRadius:'50%',background:'var(--green)',display:'inline-block'}}/> On Shift</span></td>
                         <td>
-                          <button className="btn-remote" disabled={atCap||remoting===a.user_id} onClick={()=>setConfirm({user_id:a.user_id,agent_name:a.agent_name})}>
+                          <button className="btn-remote" disabled={(atCap&&!isTrainee(a.agent_name))||remoting===a.user_id} onClick={()=>setConfirm({user_id:a.user_id,agent_name:a.agent_name})}>
                             {remoting===a.user_id?<span className="spin-sm"/>:<Ic n="play" size={12}/>}
-                            {atCap?'Slots Full':'Start Break'}
+                            {atCap&&!isTrainee(a.agent_name)?'Slots Full':'Start Break'}
                           </button>
                         </td>
                       </tr>
@@ -2605,6 +2672,7 @@ function RemoteClockInModal({date,onDone,onClose}){
 
 /* ── Admin Lunch Schedule ── */
 function ALunch(){
+  useTeamConfig();
   const [date,    setDate]    = useState(todayISO());
   const [row,     setRow]     = useState(null);   // bt_lunch_schedule row
   const [grpA,    setGrpA]    = useState([]);
@@ -2624,7 +2692,7 @@ function ALunch(){
 
     // Load agents clocked in on the selected date
     const {data:ck}=await run(SB.from('bt_clocklogs').select('agent_name').eq('date',date));
-    const allClocked=[...new Set((ck||[]).map(r=>r.agent_name))];
+    const allClocked=[...new Set((ck||[]).map(r=>r.agent_name))].filter(n=>!isTrainee(n));   // trainees have their own lunch time
 
     if(ls){
       // Schedule already exists for this date — use it directly
@@ -3587,6 +3655,178 @@ function ASlotSchedule(){
   );
 }
 
+/* ── Trainees & shift end ─────────────────────────────────────
+   Trainees have no break slot limit and one shared lunch time (no groups).
+   Shift end is the clock-out time: agents who clock out earlier are asked to confirm. */
+const TEAM_SETUP_SQL = `-- Trainees and shift end: one-time setup. Run in the Supabase SQL Editor. Safe to run again.
+
+alter table bt_settings add column if not exists trainees jsonb default '[]'::jsonb;
+alter table bt_settings add column if not exists trainee_lunch text default '12:00';
+alter table bt_settings add column if not exists shift_end text default '16:30';`;
+function CopySql({sql,label='Copy setup SQL'}){
+  const [c,setC]=useState(false);
+  return <button className="bs" onClick={()=>navigator.clipboard?.writeText(sql).then(()=>{setC(true);setTimeout(()=>setC(false),3000);})}>{c?<><Ic n="check" size={15}/> Copied</>:label}</button>;
+}
+function ATrainees(){
+  const [list,setList]=useState([]);
+  const [lunch,setLunch]=useState('12:00');
+  const [known,setKnown]=useState([]);
+  const [today,setToday]=useState({clocks:[],open:[]});
+  const [input,setInput]=useState('');
+  const [needSetup,setNeedSetup]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState('');
+  const [ok,setOk]=useState('');
+  const [err,setErr]=useState('');
+  const lunchLoaded=useRef(false);
+
+  const load=useCallback(async()=>{
+    const [cfg,hist,ck,open]=await Promise.all([
+      run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle()),
+      run(SB.from('bt_clocklogs').select('agent_name').order('clock_in',{ascending:false}).limit(500)),
+      run(SB.from('bt_clocklogs').select('agent_name,clock_in,clock_out').eq('date',todayISO())),
+      run(SB.from('bt_logs').select('agent_name,start_time').is('end_time',null)),
+    ]);
+    if(cfg.error){ setErr('Load: '+cfg.error.message); setLoading(false); return; }
+    const d=cfg.data;
+    if(d){
+      if(!('trainees' in d)) setNeedSetup(true);
+      else{
+        setNeedSetup(false);
+        if(!lunchLoaded.current){ lunchLoaded.current=true; setLunch(HM_RE.test(d.trainee_lunch||'')?d.trainee_lunch:'12:00'); }
+        setList(Array.isArray(d.trainees)?d.trainees.filter(x=>typeof x==='string'):[]);
+      }
+    }
+    setKnown([...new Set((hist.data||[]).map(r=>r.agent_name).filter(Boolean))].sort((a,b)=>a.localeCompare(b)));
+    setToday({clocks:ck.data||[],open:open.data||[]});
+    setLoading(false); bumpSync();
+  },[]);
+  useEffect(()=>{ load(); },[load]);
+  useAutoRefresh(load,8000);
+
+  const save=async(patch,key)=>{
+    setBusy(key);setErr('');
+    const {error}=await run(SB.from('bt_settings').update({...patch,updated_at:new Date().toISOString()}).eq('id',1));
+    setBusy('');
+    if(error){ if(/trainees|trainee_lunch/.test(error.message||'')) setNeedSetup(true); setErr('Save: '+error.message); return false; }
+    return true;
+  };
+  const saveList=async next=>{ if(await save({trainees:next},'list')){ setList(next); _traineeSet=new Set(next.map(normName)); return true; } return false; };
+  const add=async()=>{
+    const n=input.trim().replace(/\s+/g,' ');
+    if(!n) return;
+    if(list.some(x=>normName(x)===normName(n))){ setErr(`${n} is already a trainee.`); return; }
+    setErr('');
+    if(await saveList([...list,n])) setInput('');
+  };
+  const saveLunch=async()=>{
+    if(await save({trainee_lunch:lunch},'lunch')){ setOk('lunch'); setTimeout(()=>setOk(''),3000); }
+  };
+  const statusOf=n=>{
+    const k=normName(n);
+    const br=today.open.find(l=>normName(l.agent_name)===k);
+    if(br) return {cls:'b-on',text:`On break since ${hhmm(br.start_time)}`};
+    const c=today.clocks.find(r=>normName(r.agent_name)===k);
+    if(!c) return {cls:'b-out',text:'Not in yet'};
+    if(c.clock_out) return {cls:'b-out',text:`Clocked out ${hhmm(c.clock_out)}`};
+    return {cls:'b-in',text:`On shift since ${hhmm(c.clock_in)}`};
+  };
+  const options=known.filter(k=>!list.some(x=>normName(x)===normName(k)));
+  const unknownTyped=input.trim()&&!known.some(k=>normName(k)===normName(input));
+  const Saved=({k})=>ok===k?<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>:null;
+
+  return(
+    <div className="panel">
+      <div className="phd"><div><h1 className="pt">Trainees</h1><p className="ps">Agents in training have no break slot limit and one shared lunch time</p></div></div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {loading?<div className="es"><div className="spin"/></div>
+       :needSetup?(
+        <div className="sblk">
+          <h2 className="sh">One-time setup</h2>
+          <p className="sd">Copy this SQL, paste it into the Supabase SQL Editor, run it, then reload this page.</p>
+          <CopySql sql={TEAM_SETUP_SQL}/>
+        </div>
+       ):(<>
+        <div className="sblk">
+          <h2 className="sh">Trainee lunch</h2>
+          <p className="sd">One lunch time for all trainees, every day. No groups, no swaps. It lasts one hour.</p>
+          <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+            <input className="fi" type="time" value={lunch} onChange={e=>setLunch(e.target.value)} style={{width:140}}/>
+            <span style={{fontSize:15,color:'var(--mut)'}}>{HM_RE.test(lunch)?`${lunch} – ${addMin(lunch,60)}`:''}</span>
+          </div>
+          <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
+            <button className="bp" onClick={saveLunch} disabled={!!busy||!HM_RE.test(lunch)}>{busy==='lunch'?<span className="spin-sm"/>:'Save'}</button>
+            <Saved k="lunch"/>
+          </div>
+        </div>
+        <div className="sblk">
+          <h2 className="sh">Trainees ({list.length})</h2>
+          <p className="sd">Their breaks don't need a slot and don't take one from the team. They aren't put in lunch groups.</p>
+          {list.length===0&&<p style={{fontSize:14,color:'var(--mut)',marginBottom:14}}>No trainees yet.</p>}
+          {list.map(n=>{ const st=statusOf(n); return(
+            <div key={n} style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',marginBottom:10}}>
+              <div style={{minWidth:200}}><AvC name={n}/></div>
+              <span className={`badge ${st.cls}`}>{st.text}</span>
+              <button className="ib" style={{marginLeft:'auto'}} onClick={()=>saveList(list.filter(x=>x!==n))} disabled={!!busy} aria-label={`Remove ${n}`}><Ic n="x" size={16}/></button>
+            </div>
+          );})}
+          <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:list.length?18:0}}>
+            <input className="fi" list="trainee-names" placeholder="Agent name" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} style={{maxWidth:280}}/>
+            <datalist id="trainee-names">{options.map(k=><option key={k} value={k}/>)}</datalist>
+            <button className="bs" onClick={add} disabled={!!busy||!input.trim()}>{busy==='list'?<span className="spin-sm"/>:<><Ic n="plus" size={15}/> Add trainee</>}</button>
+          </div>
+          {unknownTyped&&<p style={{fontSize:13,color:'var(--mut)',marginTop:10}}>This name hasn't clocked in before. It must match the agent's name exactly as it shows on their screen.</p>}
+        </div>
+      </>)}
+    </div>
+  );
+}
+function AShiftEnd(){
+  const [val,setVal]=useState('16:30');
+  const [needSetup,setNeedSetup]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [ok,setOk]=useState(false);
+  const [err,setErr]=useState('');
+  useEffect(()=>{
+    run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle()).then(({data,error})=>{
+      if(error){ setErr('Load: '+error.message); return; }
+      if(!data) return;
+      if(!('shift_end' in data)){ setNeedSetup(true); return; }
+      if(HM_RE.test(data.shift_end||'')) setVal(data.shift_end);
+    });
+  },[]);
+  const save=async()=>{
+    setBusy(true);setErr('');setOk(false);
+    const {error}=await run(SB.from('bt_settings').update({shift_end:val,updated_at:new Date().toISOString()}).eq('id',1));
+    setBusy(false);
+    if(error){ if(/shift_end/.test(error.message||'')) setNeedSetup(true); setErr('Save: '+error.message); return; }
+    setOk(true); setTimeout(()=>setOk(false),3000);
+  };
+  return(
+    <div className="sblk">
+      <h2 className="sh">Shift end (clock-out time)</h2>
+      <p className="sd">Agents who clock out before this time are asked "Are you sure?" first, so nobody clocks out by mistake. From this time on, clock-out works with no question. Change it when the shift changes.</p>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      {needSetup?(
+        <div>
+          <p className="sd" style={{marginBottom:10}}>One-time setup: copy this SQL, paste it into the Supabase SQL Editor, run it, then reload this page.</p>
+          <CopySql sql={TEAM_SETUP_SQL}/>
+        </div>
+      ):(<>
+        <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+          <input className="fi" type="time" value={val} onChange={e=>setVal(e.target.value)} style={{width:140}}/>
+          <button className="bs" onClick={()=>setVal('16:30')}>16:30</button>
+          <button className="bs" onClick={()=>setVal('17:30')}>17:30</button>
+        </div>
+        <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
+          <button className="bp" onClick={save} disabled={busy||!HM_RE.test(val)}>{busy?<span className="spin-sm"/>:'Save'}</button>
+          {ok&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>}
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 function ASettings(){
   const [maxB,setMaxB]=useState(3);
   const [lunchH,setLunchH]=useState(_lunchStart);
@@ -3635,6 +3875,7 @@ function ASettings(){
         </div>
       </div>
       <ASlotSchedule/>
+      <AShiftEnd/>
       <div className="sblk">
         <h2 className="sh">Lunch start time</h2>
         <p className="sd">When the first lunch group leaves. The second group goes one hour later, and the groups swap order every day.</p>
@@ -3798,7 +4039,7 @@ function SC({n,label,val,ac,wn,ticker}){
   );
 }
 function AvC({name}){
-  return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span></div>;
+  return <div className="fc g10"><div className="av">{ini(name)}</div><span>{name}</span>{isTrainee(name)&&<span className="badge b-lunch">Trainee</span>}</div>;
 }
 function BB({type}){
   if(!type)return null;
