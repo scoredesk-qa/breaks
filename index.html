@@ -530,18 +530,21 @@ select.fi option,.type-sel option{background:#1d1d23}
 <div id="root"></div>
 
 <script>
-  // Backend: hosted Supabase (cloud) or the self-hosted one.
-  // Test the local one without changing anyone else: open the page with ?local=1
-  // (and ?local=0 to go back). When ready to switch everybody, set USE_LOCAL = true.
-  var USE_LOCAL = false;
+  // Backend: hosted Supabase (cloud) or the self-hosted one on the office PC.
+  // The copy served from the office PC (http://192.168.4.111:8080) uses the local server by
+  // itself. The GitHub Pages copy keeps using the cloud. To override either way, open the page
+  // with ?local=1 (use local) or ?local=0 (use cloud); the choice is remembered in that browser.
+  var USE_LOCAL = !/github\.io$/.test(location.hostname) && location.hostname !== '';
   try {
     var _q = new URLSearchParams(location.search).get('local');
     if (_q === '1') localStorage.setItem('bt_local', '1');
-    if (_q === '0') localStorage.removeItem('bt_local');
-    if (localStorage.getItem('bt_local') === '1') USE_LOCAL = true;
+    if (_q === '0') localStorage.setItem('bt_local', '0');
+    var _s = localStorage.getItem('bt_local');
+    if (_s === '1') USE_LOCAL = true;
+    if (_s === '0') USE_LOCAL = false;
   } catch (e) {}
-  var BT_CLOUD = { url: 'https://bmfwgyruomldxebinwcr.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw' };
-  var BT_LOCAL = { url: 'https://10.96.0.1:8443', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxODE1NDU3LCJleHAiOjE5NDk0OTU0NTd9.Ce0JB7UqbZ-mZ8D0_qedJr2hUIc-gcNFd0yJUBYZ_18' };
+var BT_CLOUD = { url: 'https://bmfwgyruomldxebinwcr.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw' };
+  var BT_LOCAL = { url: 'http://192.168.4.111:8000', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxODg2MTY3LCJleHAiOjE5NDk1NjYxNjd9.SXj1cN0kH5ZqhePcLwVZOn4gIjt_buJA4F5kwJlVxDc' };
   window.BT_URL = (USE_LOCAL ? BT_LOCAL : BT_CLOUD).url;
   window.BT_KEY = (USE_LOCAL ? BT_LOCAL : BT_CLOUD).key;
 </script>
