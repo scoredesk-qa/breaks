@@ -530,23 +530,27 @@ select.fi option,.type-sel option{background:#1d1d23}
 <div id="root"></div>
 
 <script>
-  // Backend: hosted Supabase (cloud) or the self-hosted one on the office PC.
-  // The copy served from the office PC (http://192.168.4.111:8080) uses the local server by
-  // itself. The GitHub Pages copy keeps using the cloud. To override either way, open the page
-  // with ?local=1 (use local) or ?local=0 (use cloud); the choice is remembered in that browser.
-  var USE_LOCAL = !/github\.io$/.test(location.hostname) && location.hostname !== '';
+  // Which Supabase the app talks to.
+  //   cloud  = the hosted project (default for the GitHub Pages copy)
+  //   office = the company server at https://10.96.0.1:8443
+  //   pc     = test copy on 192.168.4.111 (used automatically when the page is served from there)
+  // To try a backend without changing it for anyone else, open the page with ?backend=office
+  // (or ?backend=cloud / ?backend=pc). That browser then remembers the choice.
+  // To make a backend the default for everyone, change DEFAULT_BACKEND below.
+  var BT_BACKENDS = {};
+BT_BACKENDS.cloud = { url: 'https://bmfwgyruomldxebinwcr.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw' };
+  BT_BACKENDS.office = { url: 'https://10.96.0.1:8443', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxODE1NDU3LCJleHAiOjE5NDk0OTU0NTd9.Ce0JB7UqbZ-mZ8D0_qedJr2hUIc-gcNFd0yJUBYZ_18' };
+  BT_BACKENDS.pc = { url: 'http://192.168.4.111:8000', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxODg2MTY3LCJleHAiOjE5NDk1NjYxNjd9.SXj1cN0kH5ZqhePcLwVZOn4gIjt_buJA4F5kwJlVxDc' };
+  var DEFAULT_BACKEND = location.hostname === '192.168.4.111' ? 'pc' : 'cloud';
+  var BT_NAME = DEFAULT_BACKEND;
   try {
-    var _q = new URLSearchParams(location.search).get('local');
-    if (_q === '1') localStorage.setItem('bt_local', '1');
-    if (_q === '0') localStorage.setItem('bt_local', '0');
-    var _s = localStorage.getItem('bt_local');
-    if (_s === '1') USE_LOCAL = true;
-    if (_s === '0') USE_LOCAL = false;
+    var _q = new URLSearchParams(location.search).get('backend');
+    if (_q && BT_BACKENDS[_q]) localStorage.setItem('bt_backend', _q);
+    var _s = localStorage.getItem('bt_backend');
+    if (_s && BT_BACKENDS[_s]) BT_NAME = _s;
   } catch (e) {}
-var BT_CLOUD = { url: 'https://bmfwgyruomldxebinwcr.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZndneXJ1b21sZHhlYmlud2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MTg1MjEsImV4cCI6MjA5MjQ5NDUyMX0.iM1X3dlpwPk_dh9wE281B5bR1NYKlQzM44mAiUpHWUw' };
-  var BT_LOCAL = { url: 'http://192.168.4.111:8000', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxODg2MTY3LCJleHAiOjE5NDk1NjYxNjd9.SXj1cN0kH5ZqhePcLwVZOn4gIjt_buJA4F5kwJlVxDc' };
-  window.BT_URL = (USE_LOCAL ? BT_LOCAL : BT_CLOUD).url;
-  window.BT_KEY = (USE_LOCAL ? BT_LOCAL : BT_CLOUD).key;
+  window.BT_URL = BT_BACKENDS[BT_NAME].url;
+  window.BT_KEY = BT_BACKENDS[BT_NAME].key;
 </script>
 
 <script type="text/babel">
