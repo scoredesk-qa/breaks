@@ -963,17 +963,9 @@ function useLunchReminder(lunchInfo) {
       const nowUTC = Date.now();
       const nowDate = new Date(nowUTC);
       const [h, m] = lunchInfo.slot.from.split(':').map(Number);
-      // Casablanca is UTC+1 → subtract 1 hour for UTC
-      const lunchUTC = Date.UTC(
-        nowDate.getUTCFullYear(),
-        nowDate.getUTCMonth(),
-        nowDate.getUTCDate(),
-        h - 1,
-        m,
-        0,
-        0
-      );
-      const diff = (lunchUTC - nowUTC) / 60000;
+      // Lunch times are wall-clock times on the agent's own computer clock
+      const lunchAt = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), h, m, 0, 0).getTime();
+      const diff = (lunchAt - nowUTC) / 60000;
       const key = `${nowDate.toISOString().slice(0,10)}-${lunchInfo.slot.from}-${lunchInfo.group}`;
       if (diff > 0 && diff <= 5 && !firedRef.current.has(key)) {
         firedRef.current.add(key);
@@ -1025,16 +1017,9 @@ function useAdminLunchBroadcast(alertMinutes = 5) {
       const nowDate = new Date(nowUTC);
       ['A', 'B'].forEach(grp => {
         const [h, m] = slots[grp].from.split(':').map(Number);
-        const lunchUTC = Date.UTC(
-          nowDate.getUTCFullYear(),
-          nowDate.getUTCMonth(),
-          nowDate.getUTCDate(),
-          h - 1,
-          m,
-          0,
-          0
-        );
-        const diff = (lunchUTC - nowUTC) / 60000;
+        // Lunch times are wall-clock times on this computer's clock
+        const lunchAt = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), h, m, 0, 0).getTime();
+        const diff = (lunchAt - nowUTC) / 60000;
         const key = `auto-${grp}-${slots[grp].from}-${today}`;
         if (diff > 0 && diff <= alertMinutes && !firedRef.current.has(key)) {
           firedRef.current.add(key);
