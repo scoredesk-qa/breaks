@@ -115,7 +115,9 @@ begin
                where j.jobname = 'bt-slot-schedule' order by d.start_time desc limit 1$q$ into last_run;
   exception when others then last_run := null;
   end;
-  return res || jsonb_build_object('cron', cron_on, 'cron_last_run', last_run);
+  -- server_ms: the server's real time, so the app doesn't depend on each PC's clock
+  return res || jsonb_build_object('cron', cron_on, 'cron_last_run', last_run,
+                                   'server_ms', (extract(epoch from clock_timestamp()) * 1000)::bigint);
 end $$;
 
 revoke all on function bt_slot_apply(timestamptz) from public, anon, authenticated;

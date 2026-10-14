@@ -541,6 +541,22 @@ const SB = supabase.createClient(window.BT_URL, window.BT_KEY, {
   auth: { persistSession: true, autoRefreshToken: true }
 });
 
+/* ── Company clock ─────────────────────────────────────────────
+   Every time the app shows or compares uses ONE clock, so a PC with a wrong clock or time zone
+   can't change reminders, the shift-end check or the times that get stored:
+     • the time zone is the UTC offset saved in Settings → Clock (bt_settings.slot_tz)
+     • the real time comes from the server (bt_slot_sync returns it every 30s)
+   Until those are known it falls back to the PC's own clock, which is how it behaved before. */
+let _skew = 0;     // server time minus this PC's clock, in ms
+let _coff = null;  // company UTC offset in hours (null = use the PC's)
+const appNow   = () => Date.now() + _skew;
+const nowISO   = () => new Date(appNow()).toISOString();
+const clockOff = () => _coff !== null ? _coff : -new Date().getTimezoneOffset()/60;
+const wall     = t  => new Date((t==null ? appNow() : new Date(t).getTime()) + clockOff()*3600000);   // read with the UTC getters
+const wallHM   = t  => { const w=wall(t); return `${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}`; };
+const wallAt   = (h,m) => { const w=wall(); return Date.UTC(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate(),h,m) - clockOff()*3600000; };
+const applyClockTz = tz => { const o=tzToOff(tz); if(o===null||o===_coff) return false; _coff=o; return true; };
+
 /* ── Auto-refresh safety net ──────────────────────────────────────────
    Supabase Realtime pushes changes instantly when it's working, but it can
    silently drop (phone screen locks, wifi/cell handoff, tab backgrounded,
@@ -567,9 +583,9 @@ function useAutoRefresh(load, intervalMs = 6000){
 /* ── Global "last synced" clock — bumped every time any screen finishes a
    successful load, read by the connection instrument so agent and admin
    both show an honest "how fresh is what I'm looking at" readout. ── */
-let _lastSync = Date.now();
+let _lastSync = appNow();
 const _syncListeners = [];
-function bumpSync(){ _lastSync = Date.now(); _syncListeners.forEach(fn => fn(_lastSync)); }
+function bumpSync(){ _lastSync = appNow(); _syncListeners.forEach(fn => fn(_lastSync)); }
 function useLastSync(){
   const [t,setT] = useState(_lastSync);
   useEffect(() => { _syncListeners.push(setT); return () => { const i=_syncListeners.indexOf(setT); if(i>-1)_syncListeners.splice(i,1); }; }, []);
@@ -602,7 +618,7 @@ function useConnectionState(){
 }
 
 function agoStr(ts){
-  const s = Math.max(0, Math.round((Date.now()-ts)/1000));
+  const s = Math.max(0, Math.round((appNow()-ts)/1000));
   if (s < 3) return 'just now';
   if (s < 60) return `${s}s ago`;
   return `${Math.floor(s/60)}m ago`;
@@ -699,9 +715,9 @@ const Ic = ({ n, size=16, sw=1.8, col }) => {
 const pad      = n  => String(n).padStart(2,'0');
 const tStr     = s  => { s=Math.max(0,s); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60; return h>0?`${h}:${pad(m)}:${pad(sec)}`:`${pad(m)}:${pad(sec)}`; };
 const tMs      = ms => tStr(Math.floor(ms/1000));
-const fmtT     = d  => d ? new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
-const fmtD     = d  => new Date(d).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
-const todayISO = ()  => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const fmtT     = d  => { if(!d) return '—'; const w=wall(d); return `${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}:${pad(w.getUTCSeconds())}`; };
+const fmtD     = d  => wall(d).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
+const todayISO = ()  => { const d=wall(); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`; };
 const ini      = n  => (n||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
 const durStr   = s  => {
   if(s==null||s===0) return '0s';
@@ -751,6 +767,7 @@ function useTeamConfig(){
     const t=Array.isArray(data.trainees)?data.trainees.filter(x=>typeof x==='string'):[];
     _traineeSet=new Set(t.map(normName));
     _team={ trainees:t, lunch:HM_RE.test(data.trainee_lunch||'')?data.trainee_lunch:'12:00', shiftEnd:HM_RE.test(data.shift_end||'')?data.shift_end:null, ready:true };
+    applyClockTz(data.slot_tz);
     setV(_team);
   },[]);
   useEffect(()=>{ load(); },[load]);
@@ -823,9 +840,9 @@ function useToastEmitter(addToast) {
 /* ── Master fire function: in-app toast + OS desktop notification + sound ── */
 function fireNotification({ title, body, type = 'info', duration = 7000 }) {
   playNotifSound(type);
-  toastEmit({ id: Date.now() + Math.random(), title, body, type, duration });
+  toastEmit({ id: appNow() + Math.random(), title, body, type, duration });
   if ('Notification' in window) {
-    const show = () => new Notification(title, { body, tag: type + '-' + Date.now() });
+    const show = () => new Notification(title, { body, tag: type + '-' + appNow() });
     if (Notification.permission === 'granted') show();
     else if (Notification.permission !== 'denied') Notification.requestPermission().then(p => { if(p==='granted') show(); });
   }
@@ -910,7 +927,7 @@ async function createSwapRequest({ fromUserId, fromName, toUserId, toName, fromG
       to_user_id: toUserId,   to_name: toName,
       from_group: fromGroup,  to_group: toGroup,
       date, status: 'pending',
-      created_at: new Date().toISOString(),
+      created_at: nowISO(),
     }).select().single()
   );
   return { data, error };
@@ -960,11 +977,11 @@ function useLunchReminder(lunchInfo) {
   useEffect(() => {
     if (!lunchInfo?.group || !lunchInfo?.slot) return;
     const check = () => {
-      const nowUTC = Date.now();
+      const nowUTC = appNow();
       const nowDate = new Date(nowUTC);
       const [h, m] = lunchInfo.slot.from.split(':').map(Number);
-      // Lunch times are wall-clock times on the agent's own computer clock
-      const lunchAt = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), h, m, 0, 0).getTime();
+      // Lunch times are on the company clock (Settings → Clock), not the PC's
+      const lunchAt = wallAt(h, m);
       const diff = (lunchAt - nowUTC) / 60000;
       const key = `${nowDate.toISOString().slice(0,10)}-${lunchInfo.slot.from}-${lunchInfo.group}`;
       if (diff > 0 && diff <= 5 && !firedRef.current.has(key)) {
@@ -987,11 +1004,21 @@ function useLunchReminder(lunchInfo) {
    bt_slot_sync only does what the admin saved, so it is safe for every signed-in user. */
 let _slotFnMissing = false;
 function useSlotSchedulerTick() {
+  const [, bump] = useState(0);
   useEffect(() => {
     const tick = async () => {
       if (_slotFnMissing) return;
-      const { error } = await run(SB.rpc('bt_slot_sync'));
+      const t0 = Date.now();
+      const { data, error } = await run(SB.rpc('bt_slot_sync'));
+      const t1 = Date.now();
       if (error && /bt_slot_sync|schema cache/.test(error.message || '')) _slotFnMissing = true;
+      let changed = false;
+      if (data && data.server_ms) {                         // server time, minus half the round trip
+        const sk = data.server_ms - (t0 + t1) / 2;
+        if (Math.abs(sk - _skew) > 1500) { _skew = sk; changed = true; }
+      }
+      if (data && data.tz && applyClockTz(data.tz)) changed = true;
+      if (changed) bump(n => n + 1);
     };
     tick();
     const id = setInterval(tick, 30000);
@@ -1013,12 +1040,12 @@ function useAdminLunchBroadcast(alertMinutes = 5) {
       if (!ls) return;
       const first = ls.group_first || defaultFirst(today);
       const slots = lunchSlots(first);
-      const nowUTC = Date.now();
+      const nowUTC = appNow();
       const nowDate = new Date(nowUTC);
       ['A', 'B'].forEach(grp => {
         const [h, m] = slots[grp].from.split(':').map(Number);
-        // Lunch times are wall-clock times on this computer's clock
-        const lunchAt = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), h, m, 0, 0).getTime();
+        // Lunch times are on the company clock (Settings → Clock), not the PC's
+        const lunchAt = wallAt(h, m);
         const diff = (lunchAt - nowUTC) / 60000;
         const key = `auto-${grp}-${slots[grp].from}-${today}`;
         if (diff > 0 && diff <= alertMinutes && !firedRef.current.has(key)) {
@@ -1345,21 +1372,21 @@ function AgentApp({user,name,onLogout}){
   },[today,name]);
 
   useEffect(()=>{
-    if(active){ const s=new Date(active.start_time).getTime(); timerRef.current=setInterval(()=>setElapsed(Date.now()-s),250); }
+    if(active){ const s=new Date(active.start_time).getTime(); timerRef.current=setInterval(()=>setElapsed(appNow()-s),250); }
     else{ clearInterval(timerRef.current); setElapsed(0); }
     return()=>clearInterval(timerRef.current);
   },[active]);
 
   const clockIn = async()=>{
     setErr('');
-    const now=new Date().toISOString();
+    const now=nowISO();
     const {data,error}=await run(SB.from('bt_clocklogs').insert({user_id:user.id,agent_name:name,clock_in:now,date:today}).select().single());
     if(error){setErr('Clock-in failed: '+error.message);return;}
     setClockRow(data);
   };
   const clockOut = async()=>{
     if(!clockRow)return; setErr('');
-    const now=new Date().toISOString();
+    const now=nowISO();
     const {data,error}=await run(SB.from('bt_clocklogs').update({clock_out:now}).eq('id',clockRow.id).select().single());
     if(error){setErr('Clock-out failed: '+error.message);return;}
     setClockRow(data);
@@ -1367,7 +1394,7 @@ function AgentApp({user,name,onLogout}){
   // Ask before clocking out unless the shift has ended (clocking out can't be undone for the day)
   const askClockOut = ()=>{
     if(!clockRow) return;
-    if(team.shiftEnd && hhmm(Date.now())>=team.shiftEnd){ clockOut(); return; }
+    if(team.shiftEnd && hhmm(appNow())>=team.shiftEnd){ clockOut(); return; }
     setConfirmOut(true);
   };
   const startBreak = async()=>{
@@ -1378,14 +1405,14 @@ function AgentApp({user,name,onLogout}){
     const cap=cfg?cfg.max_concurrent_breaks:maxB; if(cfg) setMaxB(cap);
     // Trainees have no slot limit: they skip this check, and their breaks aren't counted for others
     if(!trainee&&slotCount(tc)>=cap){setErr(`All ${cap} break slots are taken. Please wait.`);return;}
-    const now=new Date().toISOString();
+    const now=nowISO();
     const {data,error}=await run(SB.from('bt_logs').insert({user_id:user.id,agent_name:name,start_time:now}).select().single());
     if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Could not start break: '+error.message);return;}
     setActive(data); setLogs(p=>[data,...p]); if(!trainee) setTeamCount(c=>c+1);
   };
   const endBreak = async()=>{
     if(!active)return; setErr('');
-    const now=new Date().toISOString();
+    const now=nowISO();
     const durSecs=Math.round((new Date(now)-new Date(active.start_time))/1000);
     const bt=bType(durSecs);
     const {error}=await run(SB.from('bt_logs').update({end_time:now,duration_secs:durSecs,break_type:bt}).eq('id',active.id));
@@ -1423,7 +1450,7 @@ function AgentApp({user,name,onLogout}){
     setSwapBusy(true);
     const newStatus = accepted ? 'accepted' : 'declined';
     // 1. Update the swap request status
-    await run(SB.from('bt_swap_requests').update({status:newStatus, responded_at:new Date().toISOString()}).eq('id',swapReq.id));
+    await run(SB.from('bt_swap_requests').update({status:newStatus, responded_at:nowISO()}).eq('id',swapReq.id));
     setIncomingSwaps(p=>p.filter(s=>s.id!==swapReq.id));
 
     if(accepted) {
@@ -1438,7 +1465,7 @@ function AgentApp({user,name,onLogout}){
         // Put each in the other's group
         if(swapReq.from_group==='A') { newB.push(swapReq.from_name); newA.push(swapReq.to_name); }
         else { newA.push(swapReq.from_name); newB.push(swapReq.to_name); }
-        await run(SB.from('bt_lunch_schedule').update({group_a:newA,group_b:newB,updated_at:new Date().toISOString()}).eq('id',ls.id));
+        await run(SB.from('bt_lunch_schedule').update({group_a:newA,group_b:newB,updated_at:nowISO()}).eq('id',ls.id));
         // 3. Notify admin via the admin broadcast channel
         broadcastNotif({ title:`🔄 Lunch Swap Done`, body:`${swapReq.from_name} (Grp ${swapReq.from_group}) ↔ ${swapReq.to_name} (Grp ${swapReq.to_group}) · schedule updated automatically.`, type:'info' });
         // 4. Update our own lunch card immediately (the acceptor)
@@ -1471,8 +1498,8 @@ function AgentApp({user,name,onLogout}){
   ) : [];
 
   const [showAll,setShowAll]=useState(false);
-  const [nowA,setNowA]=useState(Date.now());
-  useEffect(()=>{ const id=setInterval(()=>setNowA(Date.now()),1000); return()=>clearInterval(id); },[]);
+  const [nowA,setNowA]=useState(appNow());
+  useEffect(()=>{ const id=setInterval(()=>setNowA(appNow()),1000); return()=>clearInterval(id); },[]);
   const todaySec=logs.reduce((s,l)=>s+secOf(l,nowA),0);
   const avgMine=done.length?Math.round(totalSec/done.length):0;
   const breakDisabled=atCap||loading||!isClockedIn;
@@ -1528,7 +1555,7 @@ function AgentApp({user,name,onLogout}){
         )}
 
         <h1 className="hello">Welcome, {firstName(name)}</h1>
-        <p className="hello-s">{new Date(nowA).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'})}{isClockedIn?` · on shift since ${hhmm(clockRow.clock_in)}`:''}</p>
+        <p className="hello-s">{wall(nowA).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'})}{isClockedIn?` · on shift since ${hhmm(clockRow.clock_in)}`:''}</p>
 
         <div className="acts">
           {!clockRow&&<button className="bp" onClick={clockIn}><Ic n="login2" size={16}/> Clock in</button>}
@@ -1688,7 +1715,7 @@ function AgentApp({user,name,onLogout}){
         <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setConfirmOut(false)}>
           <div className="modal-box">
             <div className="modal-title">{team.shiftEnd?'Clock out early?':'Clock out?'}</div>
-            <div className="modal-sub">{team.shiftEnd?`Your shift ends at ${team.shiftEnd} and it's ${hhmm(nowA)} now. `:''}Once you clock out you can't clock back in today.</div>
+            <div className="modal-sub">{team.shiftEnd?`Your shift ends at ${team.shiftEnd} and it's ${hhmm(appNow())} now. `:''}Once you clock out you can't clock back in today.</div>
             <div className="modal-foot">
               <button className="bp" autoFocus onClick={()=>setConfirmOut(false)}>Stay clocked in</button>
               <button className="bs" onClick={async()=>{ setConfirmOut(false); await clockOut(); }}><Ic n="logoff" size={14}/> Yes, clock out</button>
@@ -1785,9 +1812,9 @@ function SwapRequestModal({myName,myGroup,otherGroup,otherSlot,mySlot,date,onSen
 const firstName = n => (n||'').split(/[\s@]/)[0] || 'there';
 const secOf = (l, now) => l.duration_secs!=null ? l.duration_secs
   : Math.max(0, Math.round(((l.end_time?new Date(l.end_time).getTime():now) - new Date(l.start_time).getTime())/1000));
-const localMidnight = (d=new Date()) => { const x=new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
-const hhmm = t => { const d=new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const mdy  = t => new Date(t).toLocaleDateString([], {month:'short', day:'numeric'});
+const localMidnight = (d=appNow()) => { const w=wall(d); return Date.UTC(w.getUTCFullYear(),w.getUTCMonth(),w.getUTCDate()) - clockOff()*3600000; };   // start of the company day
+const hhmm = t => wallHM(t);
+const mdy  = t => wall(t).toLocaleDateString([], {month:'short', day:'numeric', timeZone:'UTC'});
 /* Split a duration into a large figure and a raised remainder, like $12,505.87 */
 const splitDur = s => {
   s=Math.max(0,Math.round(s||0)); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), x=s%60;
@@ -1941,9 +1968,10 @@ function AvatarMenu({name, role, onLogout, extra}){
 }
 
 function ClockPill(){
-  const [t,setT]=useState(new Date());
-  useEffect(()=>{ const id=setInterval(()=>setT(new Date()),1000); return()=>clearInterval(id); },[]);
-  return <span className="clockpill"><Ic n="clock" size={16}/><span className="hide-s">{t.toLocaleDateString([],{weekday:'short'})}</span><b><TNum value={`${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`}/></b></span>;
+  const [t,setT]=useState(appNow());
+  useEffect(()=>{ const id=setInterval(()=>setT(appNow()),1000); return()=>clearInterval(id); },[]);
+  const w=wall(t);
+  return <span className="clockpill"><Ic n="clock" size={16}/><span className="hide-s">{w.toLocaleDateString([],{weekday:'short',timeZone:'UTC'})}</span><b><TNum value={`${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}:${pad(w.getUTCSeconds())}`}/></b></span>;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1957,12 +1985,12 @@ function AHome({name, go, hide}){
   const [swaps,setSwaps]=useState(0);
   const [loading,setLoading]=useState(true);
   const [err,setErr]=useState('');
-  const [now,setNow]=useState(Date.now());
+  const [now,setNow]=useState(appNow());
   const today=todayISO();
 
   const capBusyRef=useRef(false);
   const load=useCallback(async()=>{
-    const since=new Date(); since.setDate(since.getDate()-30); since.setHours(0,0,0,0);
+    const since=new Date(localMidnight()-30*864e5);
     const [a,open,c,s,l,w]=await Promise.all([
       run(SB.from('bt_logs').select('id,user_id,agent_name,start_time,end_time,duration_secs,break_type').gte('start_time',since.toISOString()).order('start_time',{ascending:false}).limit(5000)),
       run(SB.from('bt_logs').select('id,user_id,agent_name,start_time,end_time,duration_secs,break_type').is('end_time',null)),
@@ -1993,7 +2021,7 @@ function AHome({name, go, hide}){
     return()=>{ clearTimeout(t); SB.removeChannel(ch); };
   },[load]);
   useAutoRefresh(load,5000);
-  useEffect(()=>{ const id=setInterval(()=>setNow(Date.now()),1000); return()=>clearInterval(id); },[]);
+  useEffect(()=>{ const id=setInterval(()=>setNow(appNow()),1000); return()=>clearInterval(id); },[]);
 
   /* ── derived live stats ── */
   const t0=localMidnight();
@@ -2033,7 +2061,7 @@ function AHome({name, go, hide}){
   const setCap=async(n)=>{
     n=Math.max(0,Math.min(50,n)); setMaxB(n); setSavingCap(true); capBusyRef.current=true;
     const seq=++capSeq.current;
-    const {error}=await run(SB.from('bt_settings').upsert({id:1,max_concurrent_breaks:n,updated_at:new Date().toISOString()},{onConflict:'id'}));
+    const {error}=await run(SB.from('bt_settings').upsert({id:1,max_concurrent_breaks:n,updated_at:nowISO()},{onConflict:'id'}));
     if(seq!==capSeq.current) return;
     capBusyRef.current=false; setSavingCap(false);
     if(error){ setErr('Could not update slots: '+error.message); load(); }
@@ -2043,7 +2071,7 @@ function AHome({name, go, hide}){
   return (
     <div className="page">
       <h1 className="hello">Welcome, {firstName(name)}</h1>
-      <p className="hello-s">{new Date(now).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric'})} · {active.length} on break · {onShift.length+active.length} on shift</p>
+      <p className="hello-s">{wall(now).toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'})} · {active.length} on break · {onShift.length+active.length} on shift</p>
 
       <div className="acts">
         <button className="bp" onClick={()=>go('notifs')}><Ic n="send" size={17}/> Broadcast</button>
@@ -2377,7 +2405,7 @@ function ALive(){
     // slow connection, so we can't trust it alone as the only guard.
     const {data:tc}=await run(SB.from('bt_logs').select('id,agent_name').is('end_time',null));
     if(!isTrainee(agent.agent_name)&&slotCount(tc)>=maxB){ setErr(`All ${maxB} break slots are taken. Please wait.`); setRemoting(null); setConfirm(null); return; }
-    const now=new Date().toISOString();
+    const now=nowISO();
     const {data,error}=await run(SB.from('bt_logs').insert({user_id:agent.user_id,agent_name:agent.agent_name,start_time:now}).select().single());
     if(error){setErr(error.message?.includes('break slots are taken')?error.message:'Remote break failed: '+error.message);}
     else{setLive(p=>[...p,data]);}
@@ -2499,7 +2527,7 @@ function AClocks(){
      the most recent existing record for that agent, or admin picks from a dropdown. */
   const remoteClockIn=async(agentName,userId)=>{
     setClockingIn(userId);setErr('');
-    const now=new Date().toISOString();
+    const now=nowISO();
     const {data,error}=await run(
       SB.from('bt_clocklogs').insert({user_id:userId,agent_name:agentName,clock_in:now,date:date}).select().single()
     );
@@ -2509,7 +2537,7 @@ function AClocks(){
   };
 
   const remoteClockOut=async(row)=>{
-    const now=new Date().toISOString();
+    const now=nowISO();
     const {data,error}=await run(SB.from('bt_clocklogs').update({clock_out:now}).eq('id',row.id).select().single());
     if(error){setErr('Clock-out failed: '+error.message);return;}
     setRows(p=>p.map(r=>r.id===row.id?data:r));
@@ -2749,7 +2777,7 @@ function ALunch(){
 
   const save=async()=>{
     setSaving(true);setErr('');setSaved(false);
-    const payload={date,group_a:grpA,group_b:grpB,group_first:first,updated_at:new Date().toISOString()};
+    const payload={date,group_a:grpA,group_b:grpB,group_first:first,updated_at:nowISO()};
     let error;
     if(row){
       ({error}=await run(SB.from('bt_lunch_schedule').update(payload).eq('id',row.id)));
@@ -3163,7 +3191,7 @@ function ANotifications(){
       } else {
         await broadcastNotif({ title, body, type, targetUserId: null, lunchGroup });
       }
-      setSentLog(p => [{ id:Date.now(), title, body, type, to:label, time:new Date() }, ...p].slice(0,30));
+      setSentLog(p => [{ id:appNow(), title, body, type, to:label, time:appNow() }, ...p].slice(0,30));
       if (msgTab==='custom') { setCustomTitle(''); setCustomBody(''); }
     } catch(e) { setErr('Broadcast failed: '+e.message); }
     setSending(false);
@@ -3338,7 +3366,7 @@ function ANotifications(){
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.title}</div>
                       <div style={{fontSize:11,color:'var(--mut)',marginTop:1,lineHeight:1.4,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{h.body}</div>
-                      <div style={{fontSize:10,color:'var(--mut)',marginTop:4}}>→ {h.to} · {h.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
+                      <div style={{fontSize:10,color:'var(--mut)',marginTop:4}}>→ {h.to} · {wallHM(h.time)}</div>
                     </div>
                   </div>
                 ))}
@@ -3475,7 +3503,9 @@ begin
                where j.jobname = 'bt-slot-schedule' order by d.start_time desc limit 1$q$ into last_run;
   exception when others then last_run := null;
   end;
-  return res || jsonb_build_object('cron', cron_on, 'cron_last_run', last_run);
+  -- server_ms: the server's real time, so the app doesn't depend on each PC's clock
+  return res || jsonb_build_object('cron', cron_on, 'cron_last_run', last_run,
+                                   'server_ms', (extract(epoch from clock_timestamp()) * 1000)::bigint);
 end $$;
 
 revoke all on function bt_slot_apply(timestamptz) from public, anon, authenticated;
@@ -3489,7 +3519,8 @@ begin
   perform cron.schedule('bt-slot-schedule', '* * * * *', 'select bt_slot_apply()');
 exception when others then
   raise notice 'pg_cron is not enabled, so the background job was skipped: %', sqlerrm;
-end $$;`;
+end $$;
+`;
 function Stepper({value,onChange,min=0,max=50}){
   return(
     <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -3502,7 +3533,7 @@ function Stepper({value,onChange,min=0,max=50}){
 /* The schedule runs on a fixed UTC offset the admin picks, so it matches the clock they actually work by. */
 const offToTz = o => o===0 ? 'UTC' : `Etc/GMT${o>0?'-':'+'}${Math.abs(o)}`;
 const tzToOff = tz => { if(tz==='UTC') return 0; const m=/^Etc\/GMT([+-])(\d{1,2})$/.exec(tz||''); return m ? (m[1]==='-'?1:-1)*parseInt(m[2]) : null; };
-const clockAt = off => { const d=new Date(Date.now()+off*3600000); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
+const clockAt = off => { const d=new Date(appNow()+off*3600000); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
 function ASlotSchedule(){
   const [rules,setRules]=useState([]);                                  // [{time:'09:00',slots:4}]
   const [lunch,setLunch]=useState({on:false,extra:0,afterOn:false,after:3});
@@ -3562,7 +3593,7 @@ function ASlotSchedule(){
     const schedule=[...sorted];
     if(lunch.on) schedule.push(lunch.afterOn?{lunch:true,extra:lunch.extra,after:lunch.after}:{lunch:true,extra:lunch.extra});
     const tz=offToTz(off);
-    const {error}=await run(SB.from('bt_settings').update({slot_schedule:schedule,slot_tz:tz,updated_at:new Date().toISOString()}).eq('id',1));
+    const {error}=await run(SB.from('bt_settings').update({slot_schedule:schedule,slot_tz:tz,updated_at:nowISO()}).eq('id',1));
     setBusy(false);
     if(error){ if(/slot_schedule|slot_tz/.test(error.message||'')) setNeedSetup(true); setErr('Save: '+error.message); return; }
     setRules(sorted); setOk(true); setTimeout(()=>setOk(false),3000);
@@ -3741,7 +3772,7 @@ function ATrainees(){
 
   const save=async(patch,key)=>{
     setBusy(key);setErr('');
-    const {error}=await run(SB.from('bt_settings').update({...patch,updated_at:new Date().toISOString()}).eq('id',1));
+    const {error}=await run(SB.from('bt_settings').update({...patch,updated_at:nowISO()}).eq('id',1));
     setBusy('');
     if(error){ if(/trainees|trainee_lunch/.test(error.message||'')) setNeedSetup(true); setErr('Save: '+error.message); return false; }
     return true;
@@ -3832,7 +3863,7 @@ function AShiftEnd(){
   },[]);
   const save=async()=>{
     setBusy(true);setErr('');setOk(false);
-    const {error}=await run(SB.from('bt_settings').update({shift_end:val,updated_at:new Date().toISOString()}).eq('id',1));
+    const {error}=await run(SB.from('bt_settings').update({shift_end:val,updated_at:nowISO()}).eq('id',1));
     setBusy(false);
     if(error){ if(/shift_end/.test(error.message||'')) setNeedSetup(true); setErr('Save: '+error.message); return; }
     setOk(true); setTimeout(()=>setOk(false),3000);
@@ -3879,12 +3910,12 @@ function ASettings(){
   const flash=k=>{ setOk(k); setTimeout(()=>setOk(''),3000); };
   const saveMax=async()=>{
     setBusy('max');setErr('');
-    const{error}=await run(SB.from('bt_settings').upsert({id:1,max_concurrent_breaks:maxB,updated_at:new Date().toISOString()},{onConflict:'id'}));
+    const{error}=await run(SB.from('bt_settings').upsert({id:1,max_concurrent_breaks:maxB,updated_at:nowISO()},{onConflict:'id'}));
     setBusy(''); if(error){setErr('Save: '+error.message);return;} flash('max');
   };
   const saveLunch=async()=>{
     setBusy('lunch');setErr('');
-    const{error}=await run(SB.from('bt_settings').update({lunch_start:lunchH,updated_at:new Date().toISOString()}).eq('id',1));
+    const{error}=await run(SB.from('bt_settings').update({lunch_start:lunchH,updated_at:nowISO()}).eq('id',1));
     setBusy('');
     if(error){ if(/lunch_start/.test(error.message||'')) setNeedCol(true); setErr('Save: '+error.message); return; }
     _lunchStart=lunchH; setNeedCol(false); flash('lunch');
@@ -3966,8 +3997,8 @@ function AArchive(){
   const [needPolicy,setNeedPolicy]=useState(false);
 
   const cutoff=()=>{
-    const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-days);
-    return { iso:d.toISOString(), date:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` };
+    const ms=localMidnight()-days*864e5, w=wall(ms);
+    return { iso:new Date(ms).toISOString(), date:`${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}` };
   };
   const doScan=async()=>{
     setBusy('scan');setErr('');setMsg('');setSaved({});setNeedPolicy(false);
@@ -4082,9 +4113,9 @@ function BB({type}){
 }
 function LiveClock(){
   const DAYS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  const [t,setT]=useState(new Date());
-  useEffect(()=>{ const id=setInterval(()=>setT(new Date()),1000); return()=>clearInterval(id); },[]);
-  const day=DAYS[t.getDay()],hrs=pad(t.getHours()),mins=pad(t.getMinutes()),secs=pad(t.getSeconds());
+  const [t,setT]=useState(appNow());
+  useEffect(()=>{ const id=setInterval(()=>setT(appNow()),1000); return()=>clearInterval(id); },[]);
+  const w=wall(t),day=DAYS[w.getUTCDay()],hrs=pad(w.getUTCHours()),mins=pad(w.getUTCMinutes()),secs=pad(w.getUTCSeconds());
   return(
     <div className="live-clock">
       <div className="clk-seg"><div className="clk-day-val">{day}</div><div className="clk-unit">Day</div></div>
@@ -4098,13 +4129,13 @@ function LiveClock(){
   );
 }
 function LSec({start}){
-  const [s,setS]=useState(Math.round((Date.now()-new Date(start).getTime())/1000));
-  useEffect(()=>{ const id=setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),1000); return()=>clearInterval(id); },[start]);
+  const [s,setS]=useState(Math.round((appNow()-new Date(start).getTime())/1000));
+  useEffect(()=>{ const id=setInterval(()=>setS(Math.round((appNow()-new Date(start).getTime())/1000)),1000); return()=>clearInterval(id); },[start]);
   return <TNum className="mono act" value={tStr(Math.max(0,s))}/>;
 }
 function LType({start}){
-  const [s,setS]=useState(Math.round((Date.now()-new Date(start).getTime())/1000));
-  useEffect(()=>{ const id=setInterval(()=>setS(Math.round((Date.now()-new Date(start).getTime())/1000)),5000); return()=>clearInterval(id); },[start]);
+  const [s,setS]=useState(Math.round((appNow()-new Date(start).getTime())/1000));
+  useEffect(()=>{ const id=setInterval(()=>setS(Math.round((appNow()-new Date(start).getTime())/1000)),5000); return()=>clearInterval(id); },[start]);
   return <BB type={bType(s)}/>;
 }
 function LT({logs,showDate}){
