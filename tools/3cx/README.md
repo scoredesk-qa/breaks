@@ -18,8 +18,8 @@ agent's presence changes (`Available`, `Ringing`, `On call`, `Break`, `Admin`, `
 ## Run it
 
 ```
-node tools/3cx/test.js                                   # 67 checks on made-up data (tools/3cx/fixtures)
-node tools/3cx/report.js path/to/status_log.csv 2026-10-27 --tz 1
+node tools/3cx/test.js                                   # 71 checks on made-up data (tools/3cx/fixtures)
+node tools/3cx/report.js path/to/status_log.csv 2026-10-27 --tz 0     # --tz = UTC offset of the logger PC
 CX_REAL_CSV=path/to/status_log.csv node tools/3cx/test.js   # also sanity-checks a real log
 ```
 
@@ -38,8 +38,10 @@ These come from presence only, so they are good guesses and not proof. All the n
   Presence can't tell a dropped call from a wrong number or a quick transfer, so this is "worth a look".
 - **Partial calls:** when the logger starts (or restarts) it only sees the current status, not when it began.
   Those stretches are marked `partialStart`: counted, but never called "short", and the time is understated.
-- **Timestamps** in the CSV are the logger PC's clock with no zone. Pass the same UTC offset as the app's
-  Settings → Clock (`--tz`, or `tzOffsetHours`) and they become real instants.
+- **Timestamps** in the CSV are written on the clock of the PC that runs the logger, with no zone. Tell the analysis that
+  PC's UTC offset (`--tz` on the command line, `tzOffsetHours` in code; **0 if the PC is on UTC+0**). A wrong value shifts
+  everything by that many hours, and a break or call still in progress then shows the wrong length. Cutting the log into days
+  can use a different clock (`dayOffsetHours`, the app's Settings → Clock).
 - **Names:** 3CX has `Sghir, Abdulkarim`, the app has `Abdulkarim Sghir`. They are matched ignoring order, case and accents.
   Anyone without a match is returned as `unmatched` (never guessed).
 - **Gaps:** if the logger stops (PC off, 3CX signed out), the last status is assumed to continue until the next row.

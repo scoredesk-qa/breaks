@@ -9,7 +9,8 @@
 // Pure functions, no dependencies and no network. Nothing here is connected to the app yet.
 
 const DEFAULTS = {
-  tzOffsetHours: 0,        // UTC offset of the clock the log was written in (the app's Settings → Clock)
+  tzOffsetHours: 0,        // UTC offset of the PC that ran the logger (its clock wrote the log's timestamps)
+  dayOffsetHours: null,    // UTC offset used to cut the log into days (the app's Settings → Clock); null = same as tzOffsetHours
   shortCallSec: 60,        // a call shorter than this is a possible dropped call
   ignoreRingSec: 10,       // a ring that ends unanswered after at least this long counts as ignored
   takenByOtherSec: 3,      // someone else answered within this many seconds of the ring ending → not ignored
@@ -181,7 +182,7 @@ function analyze(rows, opts = {}) {
   const alerts = buildAlerts(rings, calls, o, now);
 
   let from = -Infinity, to = Infinity;
-  if (o.day) [from, to] = dayRange(o.day, o.tzOffsetHours);
+  if (o.day) [from, to] = dayRange(o.day, o.dayOffsetHours ?? o.tzOffsetHours);
   const inDay = t => t >= from && t < to;
 
   const agents = {};

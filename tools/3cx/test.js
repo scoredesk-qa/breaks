@@ -86,6 +86,15 @@ eq('Y3 a UTC+1 log gives the same totals', [tz1.agents['601'].callSecs, tz1.agen
 eq('Y4 ...and shifts the alert times to real instants', new Date(tz1.alerts[0].at).toISOString(), '2026-10-27T08:05:00.000Z');
 eq('Y5 isoLocal gives the clock reading back', A.isoLocal(tz1.alerts[0].at, 1), '2026-10-27 09:05:00');
 
+// the logger PC's clock and the company clock can differ: timestamps use one, "which day" uses the other
+const sep = A.analyze(rows, { day: '2026-10-27', tzOffsetHours: 0, dayOffsetHours: 1, now: NOW + 3600000 });
+eq('Y6 log in UTC+0, days cut on a UTC+1 clock: the 23:50-00:10 call is wholly inside the company day that starts at 23:00 UTC', sep.agents['608'].statusSecs['On call'], 1200);
+eq('Y7 ...and the totals are not shifted', [sep.agents['601'].callSecs, sep.agents['606'].breakSecs], [744, 4500]);
+const open0 = A.analyze(A.parseCsv('timestamp,extension,agent,old_status,new_status,detail\n2026-10-27 12:00:00,1,"A, B",Available,Break,"break"\n'), { day: '2026-10-27', tzOffsetHours: 0, now: Date.UTC(2026, 9, 27, 12, 10) });
+eq('Y8 a break still open 10 minutes after it began says 10 minutes when the log clock is right', open0.agents['1'].breakSecs, 600);
+const open1 = A.analyze(A.parseCsv('timestamp,extension,agent,old_status,new_status,detail\n2026-10-27 12:00:00,1,"A, B",Available,Break,"break"\n'), { day: '2026-10-27', tzOffsetHours: 1, now: Date.UTC(2026, 9, 27, 12, 10) });
+eq('Y9 ...and 70 minutes if the log clock is wrongly set to UTC+1 (why the setting matters)', open1.agents['1'].breakSecs, 4200);
+
 // ── break records for the app ─────────────────────────────────────
 const users = [{ id: 'u-kay', name: 'Kay Kim' }, { id: 'u-finn', name: 'Finn Fox' }, { id: 'u-jane', name: 'Jane Doe' }];
 const B = A.toBreakLogs(R.intervals, users, { tzOffsetHours: 0 });
