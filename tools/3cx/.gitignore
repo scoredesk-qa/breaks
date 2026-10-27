@@ -1,0 +1,8 @@
+# never commit the logger's browser profile (it holds the 3CX sign-in) or its output
+profile/
+status_log.csv
+logger.log
+logger.pid
+debug.txt
+snapshot.txt
+node_modules/

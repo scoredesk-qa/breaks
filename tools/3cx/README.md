@@ -1,0 +1,65 @@
+# 3CX status logger: analysis and tests
+
+**Status: test only. Nothing here is connected to the app or to Supabase.**
+
+`logger.js` (from the 3CX status logger) watches the 3CX web client and writes one CSV row each time an
+agent's presence changes (`Available`, `Ringing`, `On call`, `Break`, `Admin`, `Offline`, or any custom status).
+`analyze.js` turns that log into the things the admin wants:
+
+| Wanted | How it is worked out |
+|---|---|
+| **Agent breaks, pulled from 3CX** | every `Break`/`Lunch`/`Bathroom` stretch becomes a record shaped like a `bt_logs` row (`toBreakLogs`) |
+| **Admin time per agent** | total time in the `Admin` status |
+| **Calls and total call time per agent** | every `On call` stretch is a call; talk time is the sum |
+| **Ringing but not answered** | a `Ringing` stretch that ends in anything other than `On call` |
+| **Calls under 1 minute** | an `On call` stretch shorter than 60 s (possible dropped call) |
+| **Alerts to admin** | `ignored_call`, `repeated_ignore` (3 in an hour), `short_call` |
+
+## Run it
+
+```
+node tools/3cx/test.js                                   # 67 checks on made-up data (tools/3cx/fixtures)
+node tools/3cx/report.js path/to/status_log.csv 2026-10-27 --tz 1
+CX_REAL_CSV=path/to/status_log.csv node tools/3cx/test.js   # also sanity-checks a real log
+```
+
+No packages to install (the logger itself needs Playwright, the analysis does not).
+
+## The rules, and what they can't know
+
+These come from presence only, so they are good guesses and not proof. All the numbers are settings
+(`DEFAULTS` in `analyze.js`).
+
+- **Ignored call:** the ring lasted at least `ignoreRingSec` (10 s) and ended without the agent going on a call.
+  - If **another agent answered at the same moment** (a group or queue ring), it is *not* an ignore (`taken_by_other`).
+  - A ring shorter than 10 s is a `short_ring`: the caller most likely hung up first. It is counted, but never alerted.
+  - A ring that ends with the phone going `Offline` still counts as ignored, and the alert says so.
+- **Short call:** an `On call` stretch under `shortCallSec` (60 s) that has finished. A call still going is never flagged.
+  Presence can't tell a dropped call from a wrong number or a quick transfer, so this is "worth a look".
+- **Partial calls:** when the logger starts (or restarts) it only sees the current status, not when it began.
+  Those stretches are marked `partialStart`: counted, but never called "short", and the time is understated.
+- **Timestamps** in the CSV are the logger PC's clock with no zone. Pass the same UTC offset as the app's
+  Settings → Clock (`--tz`, or `tzOffsetHours`) and they become real instants.
+- **Names:** 3CX has `Sghir, Abdulkarim`, the app has `Abdulkarim Sghir`. They are matched ignoring order, case and accents.
+  Anyone without a match is returned as `unmatched` (never guessed).
+- **Gaps:** if the logger stops (PC off, 3CX signed out), the last status is assumed to continue until the next row.
+  `logger.log` records those stops; the analysis doesn't read it yet.
+
+## Proposed integration (not built)
+
+1. **Collect.** Keep the logger on one PC. Instead of (or as well as) the CSV, it posts each row to a new table
+   `bt_3cx_events (id, at timestamptz, ext, agent, old_status, new_status, detail)`. The key stays on the logger PC only.
+2. **Admin page "3CX".** Day picker, one row per agent (calls, talk time, average, short calls, rings, ignored,
+   admin time, break time) and an alerts list. Alerts also go to the existing admin notification toast as they happen.
+3. **Breaks.** `toBreakLogs` rows go into `bt_logs` with a `source` column set to `3cx`, de-duplicated by
+   `(user_id, start_time)`.
+4. **Alerts.** Raised as the rows arrive, so the admin sees an ignored call within seconds, not at the end of the day.
+
+Decisions that change the build: which is the source of truth for breaks (the app's button or 3CX); whether a
+ring of 10 s is the right "ignored" limit; whether inbound and outbound calls need separating (the logger can't see direction);
+and who may see these pages.
+
+## Never commit
+
+`.gitignore` here already excludes `profile/` (the logger's browser profile **contains the 3CX sign-in**),
+`status_log.csv`, `logger.log`, `logger.pid`, `debug.txt` and `snapshot.txt`.
