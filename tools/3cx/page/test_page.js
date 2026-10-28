@@ -59,8 +59,8 @@ const mkdb = (extra = {}) => Object.assign({
   await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('.cx-card');
   body = await text(p);
   check('S1 loading a log keeps today selected: subtitle shows the day, calls and alerts', /Tuesday, October 27 \(today\) · 3 calls · 5 alerts/.test(body), (body.match(/Tuesday[^\n]*/) || [''])[0]);
-  check('R1 a "Right now" strip sits above the day strip with 4 tiles, and the status chips under Agents are gone', await p.locator('.cx-live .cx-lt').count() === 4 && await p.locator('.cx-chip:has-text("on a call")').count() === 0 && (await p.locator('.cx-live').boundingBox()).y < (await p.locator('.cx-days').boundingBox()).y);
-  check('S2 day strip shows the days in the log, today selected', await p.locator('.cx-day').count() === 2 && (await p.locator('.cx-day.on').innerText()).replace(/\s+/g, ' ') === '27 Tue');
+  check('R1 a "Right now" strip sits at the top with 4 tiles, and the status chips under Agents are gone', await p.locator('.cx-live .cx-lt').count() === 4 && await p.locator('.cx-chip:has-text("on a call")').count() === 0);
+  check('S2 the day strip is gone; the calendar is the only day picker', await p.locator('.cx-day').count() === 0 && await p.locator('.acts input[type=date]').inputValue() === TODAY);
   check('S3 Statistics card with tiles and a chart with two lines', /\nStatistics\n/.test(body) && await p.locator('.cx-chart svg').count() === 1 && await p.locator('.cx-chart svg path[stroke]').count() === 2);
   check('S4 one profile card per matching agent (8; Ada is not in the app)', await p.locator('.cx-card').count() === 8, String(await p.locator('.cx-card').count()));
   check('S5 hidden extension explained', /1 other 3CX extension isn't in the app and is hidden/.test(body));
@@ -118,7 +118,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.click('text=All agents');
 
   // choosing another day (chips and calendar)
-  await p.click('.cx-day:has-text("26")'); await p.waitForTimeout(250);
+  await p.fill('.acts input[type=date]','2026-10-26'); await p.waitForTimeout(250);
   body = await text(p);
   check('D1 choosing 26 Mon shows that day, with a Today button', /Monday, October 26/.test(body) && await p.locator('.cx-card').count() === 1 && /Gail Gray/.test(body) && await p.locator('button:text-is("Today")').count() === 1, String(await p.locator('.cx-card').count()));
   await p.click('button:text-is("Today")'); await p.waitForTimeout(150);
@@ -144,8 +144,8 @@ const mkdb = (extra = {}) => Object.assign({
   await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('text=No 3CX activity on');
   body = await text(p);
   check('D4 a log with nothing for today still shows today, and says where the activity is', /Thursday, October 29 \(today\)/.test(body) && /No 3CX activity on Thursday, October 29/.test(body) && /The log has activity on (26 Oct, 27 Oct|Oct 26, Oct 27)/.test(body), (body.match(/The log has[^\n]*/) || [''])[0]);
-  check('D5 today is in the day strip and selected', (await p.locator('.cx-day.on').innerText()).replace(/\s+/g, ' ') === '29 Thu');
-  await p.click('.cx-day:has-text("27")'); await p.waitForSelector('.cx-card');
+  check('D5 the calendar shows today', await p.locator('.acts input[type=date]').inputValue() === '2026-10-29');
+  await p.fill('.acts input[type=date]','2026-10-27'); await p.waitForSelector('.cx-card');
   check('D6 picking 27 shows that day, then Today returns', /Tuesday, October 27 · 3 calls/.test(await text(p)));
   await p.click('button:text-is("Today")'); await p.waitForSelector('text=No 3CX activity on');
   await p.context().close();

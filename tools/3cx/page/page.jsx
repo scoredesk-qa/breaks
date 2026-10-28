@@ -358,13 +358,6 @@ function A3cx({go}){
         </div>);
       })()}
 
-      {ok&&<div className="cx-days" role="tablist" aria-label="Day">
-        {days.map(d=>{ const dt=new Date(d+'T00:00:00Z'); return(
-          <button key={d} role="tab" aria-selected={d===day} className={`cx-day${d===day?' on':''}`} onClick={()=>chooseDay(d)}>
-            <b>{String(dt.getUTCDate()).padStart(2,'0')}</b><span>{dt.toLocaleDateString([],{weekday:'short',timeZone:'UTC'})}</span>
-          </button>); })}
-      </div>}
-
       {ok&&all.length===0&&(
         <div className="card acc"><div className="onb-empty">
           <div className="es-ic"><Ic n="phone" size={24}/></div>
