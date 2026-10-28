@@ -1,4 +1,6 @@
 -- 3CX status log: one-time setup. Run in the Supabase SQL Editor of the project the 3CX logger uploads to.
+-- If the logger's own setup SQL already created the table (insert-only for the public key), you do NOT need this file:
+-- you only need the "admins read status_log" rule below (the page offers it as "Copy SQL to allow admins to read it").
 -- Safe to run again. It creates the table, lets the logger add rows (with the project's public key), and lets signed-in admins read them.
 
 create table if not exists public.status_log (

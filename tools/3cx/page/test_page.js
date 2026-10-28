@@ -214,7 +214,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.context().close();
   p = await open({ db: mkdb({ status_log: [] }) });
   await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('text=No rows in the log for');
-  check('L8 an empty table says so instead of "no agents match"', /The logger has not uploaded anything for this period yet/.test(await text(p)) && !/No agents in this log match/.test(await text(p)));
+  check('L8 an empty table says so instead of "no agents match", and offers the admin-read SQL (a table that only lets the logger insert looks empty to admins)', /logger has not uploaded anything for this period yet, or admins are not allowed to read the table/.test(await text(p)) && !/No agents in this log match/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow admins to read it")').count() === 1);
   await p.context().close();
 
   // the logger can upload to a different Supabase project than the one the app uses

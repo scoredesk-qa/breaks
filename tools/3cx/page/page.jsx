@@ -354,7 +354,8 @@ function A3cx({go}){
         <div className="card acc"><div className="onb-empty">
           <div className="es-ic"><Ic n="phone" size={24}/></div>
           <div>No rows in the log for {dayLabel}</div>
-          <span>{isDb?'The logger has not uploaded anything for this period yet.':'Let the logger run for a while and load the file again.'}</span>
+          <span>{isDb?'Either the logger has not uploaded anything for this period yet, or admins are not allowed to read the table (a table that only lets the logger add rows looks empty to everyone else).':'Let the logger run for a while and load the file again.'}</span>
+          {isDb&&<CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/>}
         </div></div>
       )}
       {ok&&all.length>0&&!matchedAny&&(

@@ -67,12 +67,15 @@ const CX_SAMPLE_APP=(()=>{
 
 /* Shown only if Supabase refuses to let the admin read what the logger uploads. It only ADDS a read rule for admins; it does not turn on
    row security, so it cannot stop the logger from writing. */
-const CX_READ_SQL=`-- Let admins read what the 3CX logger uploads (run once in the Supabase SQL Editor)
+const CX_READ_SQL=`-- Let signed-in admins read what the 3CX logger uploads (run once in the Supabase SQL Editor). Safe to run again.
+-- The logger's own insert-only rule is not touched.
 do $$ begin
   create policy "admins read status_log" on public.status_log for select to authenticated
     using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 exception when duplicate_object then null;
-end $$;`;
+end $$;
+grant select on public.status_log to authenticated;
+notify pgrst, 'reload schema';`;
 
 /* For the logger's own project: the page reads with the public key (it is not signed in there). This lets that key read the rows, nothing else. */
 const CX_READ_SQL_ANON=`-- Let the 3CX page read what the logger uploads (run once in the SQL Editor of the project the logger writes to).
