@@ -47,6 +47,26 @@ These come from presence only, so they are good guesses and not proof. All the n
 - **Gaps:** if the logger stops (PC off, 3CX signed out), the last status is assumed to continue until the next row.
   `logger.log` records those stops; the analysis doesn't read it yet.
 
+## The test page (a local copy of the app with a 3CX page)
+
+`build_test_page.py` builds a copy of the app's `index.html` with a **3CX (test)** admin page and a "3CX call alerts"
+section in Settings. It never changes `index.html` and uploads nothing; open the file it writes straight from your disk.
+
+```
+git show origin/main:index.html > main_index.html
+python3 tools/3cx/build_test_page.py main_index.html BreakTrack_TEST_3cx.html
+```
+
+The page source is in `tools/3cx/page/` (`page.jsx`, `settings.jsx`, `page.css`). It shows a day strip, team statistics with a
+calls-per-hour chart, an alerts list, one profile card per agent (stats and a dotted timeline of the working day) and the
+breaks that would be logged. Click a card for the agent's full profile. Only agents that exist in the app are shown.
+
+Browser test (Playwright; uses a mock database, never the real one):
+
+```
+node tools/3cx/page/test_page.js BreakTrack_TEST_3cx.html <folder containing node_modules/react, react-dom, @babel/standalone>
+```
+
 ## Proposed integration (not built)
 
 1. **Collect.** Keep the logger on one PC. Instead of (or as well as) the CSV, it posts each row to a new table
