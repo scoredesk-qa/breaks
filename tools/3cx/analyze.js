@@ -64,6 +64,18 @@ function isoLocal(ms, tz) {                      // an instant as "YYYY-MM-DD HH
   return new Date(ms + tz * 3600000).toISOString().slice(0, 19).replace('T', ' ');
 }
 
+/* ── rows uploaded by the logger to Supabase ────────────────────── */
+// The logger can also post each status change to a Supabase table (status_log: changed_at, extension, agent, old_status,
+// new_status, detail). changed_at is a real instant (UTC), so these rows do NOT depend on the logger PC's time zone.
+// This turns them into the same rows the CSV gives, written in UTC: analyze them with tzOffsetHours: 0.
+function rowsFromStatusLog(rows) {
+  return (rows || []).filter(r => r && r.extension && r.extension !== '000' && r.changed_at && Number.isFinite(Date.parse(r.changed_at)))   // 000 = the logger's connection test
+    .map(r => ({
+      timestamp: new Date(r.changed_at).toISOString().slice(0, 19).replace('T', ' '),
+      extension: String(r.extension), agent: r.agent || '', old_status: r.old_status || '', new_status: r.new_status || '', detail: r.detail || '',
+    }));
+}
+
 /* ── names ───────────────────────────────────────────────────────── */
 // 3CX shows "Sghir, Abdulkarim"; the app has "Abdulkarim Sghir". Compare ignoring order, case, accents.
 function nameKey(n) {
@@ -320,5 +332,5 @@ function report(result) {
   return L.join('\n');
 }
 
-module.exports = { DEFAULTS, parseCsv, parseStamp, dayRange, isoLocal, nameKey, displayName, buildIntervals, buildRings, buildCalls,
+module.exports = { DEFAULTS, parseCsv, rowsFromStatusLog, parseStamp, dayRange, isoLocal, nameKey, displayName, buildIntervals, buildRings, buildCalls,
   buildAlerts, analyze, toBreakLogs, compareBreaks, breakType, isBreak, fmtDur, report };

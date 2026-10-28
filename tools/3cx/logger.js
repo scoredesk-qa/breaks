@@ -5,6 +5,7 @@
 //   node logger.js            run hidden in the background (no window)
 //   node logger.js login      one-time: sign in to 3CX in a visible browser
 //   node logger.js watch      visible browser, for troubleshooting (Enter = snapshot)
+//   node logger.js test-supabase   send one test row to check supabase.json
 //   node logger.js summary    minutes per status per agent for today
 //   node logger.js summary 2026-10-27
 const path = require('path');
@@ -20,6 +21,16 @@ const CFG = {
   noteFile: path.join(__dirname, 'logger.log'),      // start/stop, sign-outs, gaps
   pidFile: path.join(__dirname, 'logger.pid'),
 };
+// agents.txt: one extension per line (anything after the number is ignored, # = comment).
+// If the file exists, only those extensions are logged. Missing file = log everyone seen.
+function loadAllowed() {
+  try {
+    const set = new Set(fs.readFileSync(path.join(__dirname, 'agents.txt'), 'utf8').split('\n')
+      .map(l => (l.replace(/#.*/, '').match(/\d{3,4}/) || [])[0]).filter(Boolean));
+    return set.size ? set : null;
+  } catch (e) { return null; }
+}
+const ALLOWED = loadAllowed();
 const FAV_URL = CFG.url.replace(/\/+$/, '') + '/#/people/favorites';
 
 // Status text under each name -> what gets written in the log.
@@ -73,12 +84,57 @@ function stamp(d = new Date()) {
 }
 const csv = v => `"${String(v).replace(/"/g, '""')}"`;
 
+// --- Supabase upload (optional: only if supabase.json exists) --------------
+// Every change is also queued in outbox.jsonl and posted to Supabase's REST API.
+// If the upload fails the rows stay queued and are retried, so nothing is lost.
+function loadSupabase() {
+  try {
+    const c = JSON.parse(fs.readFileSync(path.join(__dirname, 'supabase.json'), 'utf8'));
+    if (c.url && c.key) return { url: c.url.replace(/\/+$/, ''), key: c.key, table: c.table || 'status_log' };
+  } catch (e) { /* not configured */ }
+  return null;
+}
+const SB = loadSupabase();
+const outboxFile = path.join(__dirname, 'outbox.jsonl');
+let outbox = [];
+try { outbox = fs.readFileSync(outboxFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (e) { /* empty */ }
+const saveOutbox = () => fs.writeFileSync(outboxFile, outbox.map(r => JSON.stringify(r)).join('\n') + (outbox.length ? '\n' : ''));
+
+async function postRows(rows) {
+  const res = await fetch(`${SB.url}/rest/v1/${SB.table}`, {
+    method: 'POST',
+    headers: { apikey: SB.key, Authorization: `Bearer ${SB.key}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify(rows),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+}
+
+let flushing = false, uploadFailing = false;
+async function flush() {
+  if (!SB || flushing || !outbox.length) return;
+  flushing = true;
+  const batch = outbox.slice(0, 200);
+  try {
+    await postRows(batch);
+    outbox.splice(0, batch.length);
+    saveOutbox();
+    if (uploadFailing) { uploadFailing = false; note('Supabase upload recovered'); }
+  } catch (e) {
+    if (!uploadFailing) { uploadFailing = true; note(`Supabase upload failing (${e.message}) - rows are queued and will retry`); }
+  } finally { flushing = false; }
+}
+
 function logRow(ext, name, oldS, newS, detail) {
   if (!fs.existsSync(CFG.logFile)) {
     fs.writeFileSync(CFG.logFile, 'timestamp,extension,agent,old_status,new_status,detail\n');
   }
   fs.appendFileSync(CFG.logFile, [stamp(), ext, csv(name), oldS, newS, csv(detail)].join(',') + '\n');
   console.log(`${stamp()}  ${ext} ${name}: ${oldS || '(start)'} -> ${newS}`);
+  if (SB) {
+    outbox.push({ changed_at: new Date().toISOString(), extension: ext, agent: name, old_status: oldS || null, new_status: newS, detail: detail || null });
+    saveOutbox();
+  }
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -136,7 +192,8 @@ async function run(mode) {
 
   await page.goto(FAV_URL).catch(() => {});
   await page.waitForSelector('[data-qa="people-tile"]', { timeout: 30000 }).catch(() => {});
-  note(`logger started (${mode})`);
+  note(`logger started (${mode})${SB ? ', uploading to Supabase' : ''}${ALLOWED ? `, tracking ${ALLOWED.size} agents from agents.txt` : ', tracking everyone seen (no agents.txt)'}`);
+  if (SB) { setInterval(flush, 5000); flush(); }
 
   if (mode === 'watch') {
     // Press Enter while an agent's phone is ringing to save what the page looks like.
@@ -161,7 +218,7 @@ async function run(mode) {
       if (/closed/i.test(e.message)) { note('browser closed - logger stopped'); process.exit(0); }
       if (!warned) { warned = true; note(`scan error: ${e.message}`); }
     }
-    const exts = Object.keys(seen);
+    const exts = Object.keys(seen).filter(e => !ALLOWED || ALLOWED.has(e));
     if (!exts.length) {
       empty++;
       if (empty === 5) {
@@ -233,7 +290,16 @@ function summary(day) {
 }
 
 module.exports = { scan, statusFrom };
+async function testSupabase() {
+  if (!SB) return console.log('No supabase.json found (or url/key missing).');
+  try {
+    await postRows([{ changed_at: new Date().toISOString(), extension: '000', agent: 'connection test', old_status: null, new_status: 'Test', detail: 'delete me' }]);
+    console.log('Success - one test row (extension 000, "connection test") was added. You can delete it in Supabase.');
+  } catch (e) { console.log('Failed:', e.message); }
+}
+
 if (require.main === module) {
-  if (process.argv[2] === 'summary') summary(process.argv[3]);
+  if (process.argv[2] === 'test-supabase') testSupabase();
+  else if (process.argv[2] === 'summary') summary(process.argv[3]);
   else run(process.argv[2] === 'login' ? 'login' : process.argv[2] === 'watch' ? 'watch' : 'headless');
 }

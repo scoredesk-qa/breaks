@@ -3,7 +3,7 @@
    breaks per agent. Saves nothing in the database and never changes what agents entered. Only agents that exist in the app are shown. ═══ */
 const CXC={call:'#8e9cff',admin:'#f5c451',brk:'#4fd1c5',avail:'#414760',off:'#272a36',ring:'#ff8a65',other:'#7d86a8'};
 const CX_LABEL={call:'On a call',admin:'Admin',brk:'On break',avail:'Available',off:'Offline',ring:'Ringing',other:'Other'};
-const cxCat=s=>/^on call$/i.test(s)?'call':/^admin$/i.test(s)?'admin':/break|lunch|bathroom|toilet/i.test(s)?'brk':/^ringing$/i.test(s)?'ring':/offline|out of office|not registered/i.test(s)?'off':/^available/i.test(s)?'avail':'other';
+const cxCat=s=>/^on call$/i.test(s)?'call':/^admin$/i.test(s)?'admin':/break|lunch|bathroom|toilet/i.test(s)?'brk':/^ringing$/i.test(s)?'ring':/offline|out of (the )?office|holiday|not registered/i.test(s)?'off':/^available/i.test(s)?'avail':'other';
 const CX_DISMISS_KEY='bt_cx_dismissed';
 
 // smooth line through points for the chart
@@ -39,6 +39,10 @@ function A3cx({go}){
   const [fileMod,setFileMod]=useState(0);
   const [picked,setPicked]=useState(null);          // a day chosen by hand; null = always follow today
   const [, setTick]=useState(0);
+  const [source,setSource]=useState('');          // '' | 'file' (a CSV or the sample) | 'db' (read live from the Supabase status_log table)
+  const [dbRows,setDbRows]=useState([]);
+  const [dbErr,setDbErr]=useState('');
+  const [dbAt,setDbAt]=useState(0);
   const [users,setUsers]=useState([]);
   const [shiftEnd,setShiftEnd]=useState('16:30');
   const [dbLogs,setDbLogs]=useState([]);            // what the agents entered (bt_logs) for the day
@@ -49,6 +53,7 @@ function A3cx({go}){
   const fileRef=useRef(null);
   const tz=clockOff();
   const isSample=fileName==='sample data';
+  const isDb=source==='db';
   const todayStr=todayISO();
   const day=picked||todayStr;
   const [from,to]=CX.dayRange(day,tz);
@@ -76,10 +81,25 @@ function A3cx({go}){
   useEffect(()=>{ loadApp(); },[loadApp]);
   useAutoRefresh(loadApp,30000);
 
+  const reloadDb=useCallback(async()=>{
+    const lo=new Date(from-36*3600000).toISOString(), hi=new Date(to).toISOString();   // a day and a half before, so each agent's status at the start of the day is known
+    let all=[],i=0,last=false;
+    while(!last&&i<60){
+      const {data,error}=await run(SB.from('status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',lo).lt('changed_at',hi).order('changed_at',{ascending:true}).range(i*1000,i*1000+999));
+      if(error){ setDbErr(error.message||String(error)); return; }
+      all=all.concat(data||[]); last=!data||data.length<1000; i++;
+    }
+    setDbErr(''); setDbRows(all); setDbAt(appNow());
+  },[from,to]);
+  useEffect(()=>{ if(source==='db') reloadDb(); },[source,reloadDb]);
+  const reloadIfLive=useCallback(()=>{ if(source==='db') return reloadDb(); },[source,reloadDb]);
+  useAutoRefresh(reloadIfLive,30000);                    // live: new rows every 30 seconds
+  const goLive=()=>{ setErr(''); setDbErr(''); setSel(null); setText(''); setFileMod(0); setFileName('Supabase · live'); setSource('db'); reloadDb(); };
+
   const load=(t,name,mod)=>{
     const rows=CX.parseCsv(t);
     if(!rows.length){ setErr('That file has no rows yet. Let the logger run for a while and try again.'); return; }
-    setErr(''); setText(t); setFileName(name); setFileMod(mod||0); setSel(null);   // the day is NOT changed: it stays on today (or the day you picked)
+    setErr(''); setDbErr(''); setSource('file'); setText(t); setFileName(name); setFileMod(mod||0); setSel(null);   // the day is NOT changed: it stays on today (or the day you picked)
   };
   const pick=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>load(String(r.result),f.name,f.lastModified); r.readAsText(f); e.target.value=''; };
   const chooseDay=d=>setPicked(!d||d===todayISO()?null:d);
@@ -87,23 +107,25 @@ function A3cx({go}){
   const match=isSample?CX_SAMPLE_USERS:users;
   const appLogs=isSample?CX_SAMPLE_APP.filter(l=>inDay(Date.parse(l.start_time))):dbLogs;
   const logTz=_cxCfg.logTz;
+  const rowsAll=React.useMemo(()=>isDb?(dbAt?CX.rowsFromStatusLog(dbRows):null):(text?CX.parseCsv(text):null),[isDb,dbRows,dbAt,text]);
   const R=React.useMemo(()=>{
-    if(!text) return null;
-    // timestamps in the log are on the logger PC's clock; "which day" and the times shown use the app's company clock
-    try{ return CX.analyze(CX.parseCsv(text),{day,now:appNow(),..._cxCfg,tzOffsetHours:logTz,dayOffsetHours:tz}); }
+    if(!rowsAll) return null;
+    // a CSV is on the logger PC's clock; rows from Supabase are real instants, so the logger clock setting doesn't apply to them.
+    // "which day" and the times shown use the app's company clock.
+    try{ return CX.analyze(rowsAll,{day,now:appNow(),..._cxCfg,tzOffsetHours:isDb?0:logTz,dayOffsetHours:tz}); }
     catch(e){ return {error:e.message}; }
-  },[text,day,tz,logTz]);
+  },[rowsAll,day,tz,logTz,isDb]);
   /* Warn if the file itself says the logger PC is on a different clock than Settings: the file's last save time
      is (almost) the time of its last row, so the gap between the two is the logger PC's offset from UTC. */
   const clockHint=React.useMemo(()=>{
-    if(!fileMod||!text||isSample) return null;
+    if(isDb||!fileMod||!text||isSample) return null;
     const last=CX.parseCsv(text).slice(-1)[0]; if(!last) return null;
     const m=/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)/.exec(last.timestamp||''); if(!m) return null;
     const diffH=(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6])-fileMod)/3600000;
     const off=Math.round(diffH);
     if(Math.abs(diffH-off)>0.1) return null;            // not saved at about the time of its last row (copied or edited later): can't tell
     return off!==logTz?off:null;
-  },[fileMod,text,isSample,logTz]);
+  },[fileMod,text,isSample,logTz,isDb]);
 
   /* everything below is limited to agents that match an app agent */
   const ok=R&&!R.error;
@@ -191,13 +213,15 @@ function A3cx({go}){
       <div className="acts">
         <button className="bp" onClick={()=>fileRef.current&&fileRef.current.click()}><Ic n="download" size={17}/> Load log</button>
         <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={pick} style={{display:'none'}}/>
+        <button className="bs" onClick={goLive}><Ic n="activity" size={16}/> Live from Supabase</button>
         <button className="bs" onClick={()=>load(CX_SAMPLE,'sample data')}><Ic n="play" size={16}/> Use sample data</button>
         <input className="fi" type="date" value={day} onChange={e=>chooseDay(e.target.value)} style={{width:190,height:47}} aria-label="Choose a day"/>
         {picked&&<button className="bs" onClick={()=>setPicked(null)}>Today</button>}
         {alerts.length>0&&<button className="bs" onClick={previewAlerts}><Ic n="bell" size={16}/> Preview alerts</button>}
-        <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}</span>}</div>
+        <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}{isDb&&dbAt?` · updated ${wallHM(dbAt)}`:''}</span>}</div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
+      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the status_log table: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>If it says "permission denied" or the table is empty when it shouldn't be, admins need permission to read it.</span><CopySql sql={CX_READ_SQL} label="Copy SQL to allow admins to read it"/></div>}
       {clockHint!==null&&<div className="ebox"><Ic n="alert" size={15}/>This file suggests the 3CX logger PC runs on UTC{clockHint>=0?'+':''}{clockHint}, but Settings says UTC{logTz>=0?'+':''}{logTz}. Calls and breaks still in progress will show the wrong length until it matches. <button className="bs" style={{marginLeft:10}} onClick={()=>go&&go('settings')}>Open Settings</button></div>}
       {R&&R.error&&<div className="ebox"><Ic n="alert" size={15}/>{R.error}</div>}
     </>
@@ -303,8 +327,8 @@ function A3cx({go}){
       {!R&&(
         <div className="card acc"><div className="onb-empty">
           <div className="es-ic"><Ic n="phone" size={24}/></div>
-          <div>Load a 3CX status log to see calls, ignored rings and possible dropped calls</div>
-          <span>Pick the status_log.csv your 3CX logger writes, or try the sample data. The file stays on this computer.</span>
+          <div>{isDb&&!dbErr?'Reading the status_log table…':'Load a 3CX status log, or read it live from Supabase'}</div>
+          <span>{isDb?'This reads what the 3CX logger uploads. Nothing is written.':'Pick the status_log.csv your 3CX logger writes, or try the sample data. A file stays on this computer.'}</span>
         </div></div>
       )}
 
@@ -315,7 +339,14 @@ function A3cx({go}){
           </button>); })}
       </div>}
 
-      {ok&&!matchedAny&&(
+      {ok&&all.length===0&&(
+        <div className="card acc"><div className="onb-empty">
+          <div className="es-ic"><Ic n="phone" size={24}/></div>
+          <div>No rows in the log for {dayLabel}</div>
+          <span>{isDb?'The logger has not uploaded anything for this period yet.':'Let the logger run for a while and load the file again.'}</span>
+        </div></div>
+      )}
+      {ok&&all.length>0&&!matchedAny&&(
         <div className="card acc"><div className="onb-empty">
           <div className="es-ic"><Ic n="users" size={24}/></div>
           <div>No agents in this log match agents in the app</div>

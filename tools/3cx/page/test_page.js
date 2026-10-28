@@ -32,10 +32,10 @@ const mkdb = (extra = {}) => Object.assign({
 (async () => {
   const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {}).catch(() => chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }));
   // open the app as admin on the 3CX page; `now` = the PC/server clock for this test
-  const open = async ({ cfg, w = 1500, now = TODAY + 'T13:10:00.000Z', db } = {}) => {
+  const open = async ({ cfg, w = 1500, now = TODAY + 'T13:10:00.000Z', db, errors } = {}) => {
     const c = await b.newContext({ timezoneId: 'UTC', viewport: { width: w, height: 1000 } });
     const q = await c.newPage(); q.on('pageerror', e => errs.push(e.message));
-    await q.addInitScript(([d, cf]) => { window.__USER = { id: 'adm', email: 'b@x.com', user_metadata: { role: 'admin', display_name: 'Boss' } }; window.__DB = d; if (cf) localStorage.setItem('bt_cx_cfg', cf); }, [db || mkdb(), cfg || null]);
+    await q.addInitScript(([d, cf, er]) => { window.__USER = { id: 'adm', email: 'b@x.com', user_metadata: { role: 'admin', display_name: 'Boss' } }; window.__DB = d; if (er) window.__ERRORS = er; if (cf) localStorage.setItem('bt_cx_cfg', cf); }, [db || mkdb(), cfg || null, errors || null]);
     await q.clock.setFixedTime(new Date(now));
     await q.goto('file://' + page);
     await q.waitForSelector('text=3CX (test)', { timeout: 20000 });
@@ -186,6 +186,35 @@ const mkdb = (extra = {}) => Object.assign({
   check('Z1 logger clock set to UTC+1: a warning says the logger PC looks like UTC+0', /suggests the 3CX logger PC runs on UTC\+0, but Settings says UTC\+1/.test(await text(p)));
   await p.click('button:has-text("Open Settings")'); await p.waitForSelector('text=3CX call alerts');
   check('Z2 the warning\'s button opens Settings', true);
+  await p.context().close();
+
+  // live from Supabase: the table the logger uploads to (status_log), read-only
+  const AZ = require(path.join(__dirname, '..', 'analyze.js'));
+  const fx = AZ.parseCsv(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'status_log.sample.csv'), 'utf8'));
+  const tbl = fx.map(r => ({ changed_at: new Date(AZ.parseStamp(r.timestamp, 0)).toISOString(), extension: r.extension, agent: r.agent, old_status: r.old_status || null, new_status: r.new_status, detail: r.detail || null }));
+  tbl.push({ changed_at: iso('09:00'), extension: '000', agent: 'connection test', old_status: null, new_status: 'Test', detail: 'delete me' });
+  p = await open({ db: mkdb({ status_log: tbl }) });
+  check('L0 there is a "Live from Supabase" button', await p.locator('button:has-text("Live from Supabase")').count() === 1);
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  body = await text(p);
+  check('L1 live: reads the table and shows today\'s agents that exist in the app (4 cards), 3 calls, 5 alerts', await p.locator('.cx-card').count() === 4 && /Tuesday, October 27 \(today\) · 3 calls · 5 alerts/.test(body), (body.match(/Tuesday[^\n]*/) || [''])[0]);
+  check('L2 the page says it is live and when it was updated', /Supabase · live · updated \d\d:\d\d/.test(body));
+  check('L3 the logger\'s connection-test row never shows up', !/connection test/.test(body));
+  check('L4 nothing was written to the table', (await p.evaluate(() => window.__DB.status_log.length)) === tbl.length);
+  check('L5 no clock warning for live data', !/suggests the 3CX logger PC runs on/.test(body));
+  await p.context().close();
+  p = await open({ cfg: JSON.stringify({ logTz: 1 }), db: mkdb({ status_log: tbl }) });
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  check('L6 the logger-clock setting does not move live data (rows are real instants): same 3 calls · 5 alerts even with the setting at UTC+1', /3 calls · 5 alerts/.test(await text(p)));
+  await p.context().close();
+  p = await open({ db: mkdb(), errors: { status_log: 'permission denied for table status_log' } });
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector("text=Couldn't read the status_log table");
+  body = await text(p);
+  check('L7 if Supabase refuses, the page says why and offers the SQL to let admins read it', /permission denied for table status_log/.test(body) && await p.locator('button:has-text("Copy SQL to allow admins to read it")').count() === 1);
+  await p.context().close();
+  p = await open({ db: mkdb({ status_log: [] }) });
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('text=No rows in the log for');
+  check('L8 an empty table says so instead of "no agents match"', /The logger has not uploaded anything for this period yet/.test(await text(p)) && !/No agents in this log match/.test(await text(p)));
   await p.context().close();
 
   // narrow screen

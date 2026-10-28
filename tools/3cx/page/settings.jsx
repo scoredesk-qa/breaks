@@ -50,3 +50,12 @@ const CX_SAMPLE_APP=(()=>{
   const row=(n,a,b)=>({id:'sa-'+n+a,user_id:id(n),agent_name:n,start_time:`2026-10-27T${a}:00.000Z`,end_time:b?`2026-10-27T${b}:00.000Z`:null,break_type:'Break'});
   return [row('Kay Kim','11:00','11:15'),row('Kay Kim','11:30','12:20'),row('Jane Doe','10:00','10:10')];
 })();
+
+/* Shown only if Supabase refuses to let the admin read what the logger uploads. It only ADDS a read rule for admins; it does not turn on
+   row security, so it cannot stop the logger from writing. */
+const CX_READ_SQL=`-- Let admins read what the 3CX logger uploads (run once in the Supabase SQL Editor)
+do $$ begin
+  create policy "admins read status_log" on public.status_log for select to authenticated
+    using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+exception when duplicate_object then null;
+end $$;`;

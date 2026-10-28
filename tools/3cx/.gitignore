@@ -6,3 +6,7 @@ logger.pid
 debug.txt
 snapshot.txt
 node_modules/
+# the logger's own config and queue: a project key, the agents' names and unsent rows
+supabase.json
+outbox.jsonl
+agents.txt

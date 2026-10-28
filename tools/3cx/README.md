@@ -18,7 +18,7 @@ agent's presence changes (`Available`, `Ringing`, `On call`, `Break`, `Admin`, `
 ## Run it
 
 ```
-node tools/3cx/test.js                                   # 89 checks on made-up data (tools/3cx/fixtures)
+node tools/3cx/test.js                                   # 95 checks on made-up data (tools/3cx/fixtures)
 node tools/3cx/report.js path/to/status_log.csv 2026-10-27 --tz 0     # --tz = UTC offset of the logger PC
 CX_REAL_CSV=path/to/status_log.csv node tools/3cx/test.js   # also sanity-checks a real log
 ```
@@ -46,6 +46,18 @@ These come from presence only, so they are good guesses and not proof. All the n
   Anyone without a match is returned as `unmatched` (never guessed).
 - **Gaps:** if the logger stops (PC off, 3CX signed out), the last status is assumed to continue until the next row.
   `logger.log` records those stops; the analysis doesn't read it yet.
+
+## The logger now uploads to Supabase
+
+`logger.js` can also post every status change to a Supabase table (`status_log`: `changed_at`, `extension`, `agent`, `old_status`,
+`new_status`, `detail`) when a `supabase.json` (`url`, `key`, optional `table`) is next to it; unsent rows wait in `outbox.jsonl`.
+`agents.txt` limits which extensions are logged. `supabase.json.example` shows the format. **Never commit** `supabase.json`,
+`outbox.jsonl` or `agents.txt` (`.gitignore` covers them).
+
+`rowsFromStatusLog` (in `analyze.js`) turns those rows into the same form as the CSV. They hold real instants (`changed_at` is UTC),
+so the logger PC's time zone does not matter for them. The test page's **Live from Supabase** button reads the table (read-only,
+refreshed every 30 seconds). The key the logger uses is the public `anon` key, so the table needs a policy that lets the logger insert;
+admins need one that lets them read (the page offers the SQL if Supabase refuses).
 
 ## The test page (a local copy of the app with a 3CX page)
 

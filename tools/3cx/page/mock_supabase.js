@@ -27,6 +27,7 @@
     single() { this.one = 'single'; return this; }
     then(res, rej) { return Promise.resolve(this.exec()).then(res, rej); }
     exec() {
+      if (window.__ERRORS && window.__ERRORS[this.t]) return { data: null, error: { message: window.__ERRORS[this.t] } };
       const db = window.__DB; const tbl = db[this.t] || (db[this.t] = []);
       const match = r => this.f.every(fn => fn(r));
       let rows;

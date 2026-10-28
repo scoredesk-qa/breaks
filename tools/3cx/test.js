@@ -147,6 +147,20 @@ eq('K12 no breaks anywhere → nothing to compare', A.compareBreaks([], [], {}),
 eq('K13 a 3CX break and an app break that do not overlap are not paired', (() => { const r = A.compareBreaks([mk('x', 'X', '09:00', '09:10')], [mk('x', 'X', '09:30', '09:40')], { now: NOW })[0]; return [r.pairs.length, r.onlyCx.length, r.onlyApp.length]; })(), [0, 1, 1]);
 check('K14 times in the reasons use the company clock', /3CX shows a break 12:00 to 12:10/.test(A.compareBreaks([mk('x', 'X', '11:00', '11:10')], [], { now: NOW, tzOffsetHours: 1 })[0].reasons[0]));
 
+// ── rows uploaded to Supabase by the logger (status_log) ──
+const dbRows = rows.map(r => ({ changed_at: new Date(A.parseStamp(r.timestamp, 0)).toISOString(), extension: r.extension, agent: r.agent, old_status: r.old_status || null, new_status: r.new_status, detail: r.detail || null }));
+dbRows.push({ changed_at: '2026-10-27T09:00:00.000Z', extension: '000', agent: 'connection test', old_status: null, new_status: 'Test', detail: 'delete me' });
+const fromDb = A.rowsFromStatusLog(dbRows);
+eq('U1 the logger\'s connection-test row (extension 000) is dropped', fromDb.length, rows.length);
+eq('U2 changed_at becomes a UTC timestamp like the CSV\'s', [fromDb[2].timestamp, fromDb[2].agent, fromDb[2].new_status], ['2026-10-27 08:55:00', 'Doe, Jane', 'Available']);
+eq('U3 empty/missing old_status and detail become empty strings (the first row after a logger restart)', [A.rowsFromStatusLog([{ changed_at: '2026-10-27T09:00:00Z', extension: '5', agent: 'A, B', old_status: null, new_status: 'Break', detail: null }])[0].old_status, A.rowsFromStatusLog([{ changed_at: '2026-10-27T09:00:00Z', extension: '5', agent: 'A, B', old_status: null, new_status: 'Break', detail: null }])[0].detail], ['', '']);
+const viaDb = A.analyze(fromDb, { day: '2026-10-27', tzOffsetHours: 0, now: NOW });
+eq('U4 analysing the uploaded rows gives the same answer as the CSV (calls, talk time, breaks, admin, ignored)',
+  Object.values(viaDb.agents).map(a => [a.ext, a.calls, a.callSecs, a.breakSecs, a.adminSecs, a.ignored]).sort().join('|'),
+  Object.values(R.agents).map(a => [a.ext, a.calls, a.callSecs, a.breakSecs, a.adminSecs, a.ignored]).sort().join('|'));
+eq('U5 same alerts', viaDb.alerts.map(a => a.type + a.ext).join(), R.alerts.map(a => a.type + a.ext).join());
+eq('U6 garbage and rows without a time are skipped', A.rowsFromStatusLog([null, {}, { extension: '1' }, { changed_at: 'nope', extension: '1' }]).length, 0);
+
 // ── edge cases ─────────────────────────────────────────────────────
 const head = 'timestamp,extension,agent,old_status,new_status,detail\n';
 const ringing = A.analyze(A.parseCsv(head + '2026-10-27 10:00:00,1,"A, B",Available,Ringing,"Ringing"\n'), { day: '2026-10-27', now: A.parseStamp('2026-10-27 10:00:20', 0) });
