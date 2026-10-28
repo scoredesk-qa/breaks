@@ -228,10 +228,13 @@ const mkdb = (extra = {}) => Object.assign({
   p = await open({ db: mkdb({ status_log: withId }) });
   await p.waitForSelector('.cx-card');
   check('U1 Kay starts as Available', /Available/.test(await p.locator('.cx-card:has-text("Kay Kim")').innerText()));
-  await p.evaluate(iso => { window.__DB.status_log.push({ id: 100000, changed_at: iso, extension: '606', agent: 'Kim, Kay', old_status: 'Available', new_status: 'On call', detail: null }); }, iso('13:05'));
-  await p.waitForFunction(() => [...document.querySelectorAll('.cx-card')].some(c => /Kay Kim/.test(c.innerText) && /On call/.test(c.innerText)), null, { timeout: 12000 });
-  check('U2 without touching the page, Kay shows On call after the next refresh (under 12 s)', true);
-  check('U3 still 4 cards, no duplicates after the incremental read', await p.locator('.cx-card').count() === 4);
+  const t0 = Date.now();
+  await p.evaluate(iso => { const row = { id: 100000, changed_at: iso, extension: '606', agent: 'Kim, Kay', old_status: 'Available', new_status: 'On call', detail: null }; window.__DB.status_log.push(row); window.__RT.forEach(h => h.cb({ new: row })); }, iso('13:05'));
+  await p.waitForFunction(() => [...document.querySelectorAll('.cx-card')].some(c => /Kay Kim/.test(c.innerText) && /On call/.test(c.innerText)), null, { timeout: 3000 });
+  check('U2 the moment Supabase pushes a new row, Kay shows On call (no polling, no reload)', Date.now() - t0 < 3000, (Date.now() - t0) + ' ms');
+  await p.evaluate(() => window.__RT.forEach(h => h.cb({ new: { id: 100000, changed_at: '2026-10-27T13:05:00.000Z', extension: '606', agent: 'Kim, Kay', new_status: 'On call' } })));
+  await p.waitForTimeout(300);
+  check('U3 still 4 cards; the same row delivered twice is not duplicated', await p.locator('.cx-card').count() === 4);
   await p.context().close();
 
   // people who are offline / out of office are not monitored

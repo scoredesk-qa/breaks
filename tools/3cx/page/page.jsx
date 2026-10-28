@@ -120,8 +120,30 @@ function A3cx({go}){
     } finally { dbBusyRef.current=false; }
   },[from,to]);
   useEffect(()=>{ if(source==='db') reloadDb(); },[source,reloadDb]);
+  // Instant updates: Supabase Realtime pushes every new status_log row the moment the logger inserts it. Polling stays as a slow safety net
+  // (and a faster one while the realtime socket is not connected).
+  const [rtOn,setRtOn]=useState(false);
+  const addLive=useCallback(row=>{
+    if(!row||!row.changed_at||Date.parse(row.changed_at)>=to) return;
+    const all=dbAllRef.current;
+    if(row.id!=null&&all.some(r=>r.id===row.id)) return;
+    const next=all.concat([row]).sort((a,b)=>Date.parse(a.changed_at)-Date.parse(b.changed_at));
+    dbAllRef.current=next; if(row.id!=null&&dbLastIdRef.current!=null&&Number(row.id)>dbLastIdRef.current) dbLastIdRef.current=Number(row.id);
+    setDbRows(next); setDbAt(appNow()); bumpSync();
+  },[to]);
+  useEffect(()=>{
+    if(source!=='db') return;
+    let ch=null;
+    try{
+      const c=cxDb(), tbl=_cxCfg.dbTable||'status_log';
+      ch=c.channel('cx-status-'+Math.random().toString(36).slice(2))
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:tbl},p=>addLive(p&&p.new))
+        .subscribe(st=>setRtOn(st==='SUBSCRIBED'));
+    }catch(e){ setRtOn(false); }
+    return()=>{ setRtOn(false); try{ ch&&cxDb().removeChannel(ch); }catch(e){} };
+  },[source,addLive]);
   const reloadIfLive=useCallback(()=>{ if(source==='db') return reloadDb(); },[source,reloadDb]);
-  useAutoRefresh(reloadIfLive,5000);                     // live: new rows every 5 seconds
+  useAutoRefresh(reloadIfLive,rtOn?60000:5000);          // safety net: every minute while realtime is connected, every 5 seconds if not
   const goLive=()=>{ setErr(''); setDbErr(''); setSel(null); setText(''); setFileMod(0); setFileName('Supabase · live'); setSource('db'); reloadDb(); };
 
   const load=(t,name,mod)=>{

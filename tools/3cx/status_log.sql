@@ -33,4 +33,10 @@ end $$;
 grant insert on public.status_log to anon;
 grant select on public.status_log to authenticated;
 
+-- Live updates: let Supabase push new rows to the page the moment they arrive.
+do $$ begin
+  alter publication supabase_realtime add table public.status_log;
+exception when duplicate_object then null; when undefined_object then null;
+end $$;
+
 notify pgrst, 'reload schema';

@@ -75,6 +75,11 @@ do $$ begin
 exception when duplicate_object then null;
 end $$;
 grant select on public.status_log to authenticated;
+-- Live updates: let Supabase push new rows to the page the moment they arrive.
+do $$ begin
+  alter publication supabase_realtime add table public.status_log;
+exception when duplicate_object then null; when undefined_object then null;
+end $$;
 notify pgrst, 'reload schema';`;
 
 /* For the logger's own project: the page reads with the public key (it is not signed in there). This lets that key read the rows, nothing else. */
