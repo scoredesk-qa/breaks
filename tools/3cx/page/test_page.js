@@ -199,7 +199,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.waitForSelector('.cx-card');
   body = await text(p);
   check('L1 live: reads the table and shows today\'s agents that exist in the app (4 cards), 3 calls, 5 alerts', await p.locator('.cx-card').count() === 4 && /Tuesday, October 27 \(today\) · 3 calls · 5 alerts/.test(body), (body.match(/Tuesday[^\n]*/) || [''])[0]);
-  check('L2 the page says it is live and when it was updated', /Supabase · live · updated \d\d:\d\d/.test(body));
+  check('L2 the page shows the same Live / synced pill as Home, and the old "Supabase · live · updated" text is gone', await p.locator('.acts-r .instr').count() === 1 && /synced/.test(await p.locator('.acts-r .instr').innerText()) && !/Supabase · live/.test(body));
   check('L3 the logger\'s connection-test row never shows up', !/connection test/.test(body));
   check('L4 nothing was written to the table', (await p.evaluate(() => window.__DB.status_log.length)) === tbl.length);
   check('L5 no clock warning for live data', !/suggests the 3CX logger PC runs on/.test(body));
@@ -235,7 +235,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.waitForSelector('.cx-card');
   const cl = await p.evaluate(() => window.__CLIENTS);
   check('X2 with the logger\'s project pre-filled, live data comes through a second connection to that project', cl.length === 2 && cl[1].url === LOGGER.url && cl[1].key === LOGGER.key, JSON.stringify(cl.map(c => c.url)));
-  check('X3 the page says which project it is reading', /Supabase · live · updated \d\d:\d\d · logger-project\.supabase\.co/.test(await text(p)));
+  check('X3 the live pill is still shown with a separate logger project', await p.locator('.acts-r .instr').count() === 1);
   check('X4 the app itself still uses its own project (first connection unchanged)', cl[0].url !== LOGGER.url);
   await p.click('text=Settings >> nth=0'); await p.waitForSelector('text=Where the 3CX logger uploads');
   check('X5 Settings shows the logger\'s project, pre-filled', await p.locator('input[aria-label="3CX data Supabase URL"]').inputValue() === LOGGER.url && await p.locator('input[aria-label="3CX data table"]').inputValue() === 'status_log');

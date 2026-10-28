@@ -99,7 +99,7 @@ function A3cx({go}){
       if(error){ setDbErr(error.message||String(error)); return; }
       all=all.concat(data||[]); last=!data||data.length<1000; i++;
     }
-    setDbErr(''); setDbRows(all); setDbAt(appNow());
+    setDbErr(''); setDbRows(all); setDbAt(appNow()); bumpSync();
   },[from,to]);
   useEffect(()=>{ if(source==='db') reloadDb(); },[source,reloadDb]);
   const reloadIfLive=useCallback(()=>{ if(source==='db') return reloadDb(); },[source,reloadDb]);
@@ -224,7 +224,7 @@ function A3cx({go}){
         <input className="fi" type="date" value={day} onChange={e=>chooseDay(e.target.value)} style={{width:190,height:47}} aria-label="Choose a day"/>
         {picked&&<button className="bs" onClick={()=>setPicked(null)}>Today</button>}
         {alerts.length>0&&<button className="bs" onClick={previewAlerts}><Ic n="bell" size={16}/> Preview alerts</button>}
-        <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}{isDb&&dbAt?` · updated ${wallHM(dbAt)}`:''}{isDb&&cxOwnDb()?` · ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}</span>}</div>
+        <div className="acts-r"><ConnInstrument/></div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
       {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the {_cxCfg.dbTable||'status_log'} table{cxOwnDb()?` in ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>{missingTable?'The table doesn\'t exist in this project yet. Run the SQL once in the Supabase SQL Editor (it also lets the logger add rows and admins read them), then reload the page. The logger must upload to this same project.':cxOwnDb()?'If it says "permission denied", the project needs a rule that lets the public key read it. If it says the table is not found, check the URL and key in Settings → 3CX call alerts.':'If it says "permission denied" or the table is empty when it shouldn\'t be, admins need permission to read it. If the logger uploads to a different Supabase project, set it in Settings → 3CX call alerts.'}</span>{missingTable?<CopySql sql={CX_SETUP_SQL} label="Copy SQL to create the table"/>:<CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/>}</div>}
