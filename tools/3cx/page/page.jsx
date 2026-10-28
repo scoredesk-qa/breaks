@@ -1,5 +1,5 @@
 
-/* ═══ 3CX test page: reads a status_log.csv from this PC and shows calls, ignored rings, short calls, admin time and
+/* ═══ 3CX page: reads a status_log.csv from this PC and shows calls, ignored rings, short calls, admin time and
    breaks per agent. Saves nothing in the database and never changes what agents entered. Only agents that exist in the app are shown. ═══ */
 const CXC={call:'#8e9cff',admin:'#ef6b5b',brk:'#f5a524',avail:'#2fb344',avail2:'#2ec4b6',away:'#7f8ab0',hol:'#2a8fe0',off:'#3a3d4a',ring:'#f5d04e',other:'#7d86a8'};   // the 3CX status colours: Available green, Away/Break orange, Do Not Disturb/Admin red, Available 2 teal, Holiday/Out of office blue
 const CX_LABEL={call:'On a call',admin:'Admin',brk:'On break',avail:'Available',avail2:'Available 2',hol:'Out of office',off:'Offline',ring:'Ringing',other:'Other'};
@@ -327,7 +327,7 @@ function A3cx({go}){
   return(
     <div className="page">
       <h1 className="hello">3CX calls</h1>
-      <p className="hello-s">{ok?`${dayLabel}${day===todayStr?' (today)':''} · ${tot.calls} calls · ${alerts.length} alert${alerts.length===1?'':'s'}`:'Test page · reads what the 3CX logger uploads to Supabase · nothing is written'}</p>
+      <p className="hello-s">{ok?`${dayLabel}${day===todayStr?' (today)':''} · ${tot.calls} calls · ${alerts.length} alert${alerts.length===1?'':'s'}`:'Reads what the 3CX logger uploads to Supabase · nothing is written'}</p>
       {header}
 
       {!R&&(

@@ -17,6 +17,8 @@ args = sys.argv[1:]
 cx = None
 if '--cx-config' in args:
     i = args.index('--cx-config'); cx = args[i + 1]; del args[i:i + 2]
+release = '--release' in args
+if release: args.remove('--release')
 src, out = args[0], args[1]
 raw = open(src, newline='').read()
 crlf = '\r\n' in raw
@@ -39,26 +41,27 @@ def rep(old, new, count=1):
     s = s.replace(old, new)
 
 
-rep('</head>', '<style>\n.testribbon{position:fixed;left:50%;top:0;transform:translateX(-50%);z-index:99999;background:#b45309;color:#fff;'
-    'font:600 12px/1 system-ui,sans-serif;letter-spacing:.04em;padding:6px 14px;border-radius:0 0 8px 8px;pointer-events:none}\n'
-    + css + '\n</style>\n</head>')
-rep('<title>', '<title>TEST COPY · ')
+ribbon_css = '' if release else '.testribbon{position:fixed;left:50%;top:0;transform:translateX(-50%);z-index:99999;background:#b45309;color:#fff;font:600 12px/1 system-ui,sans-serif;letter-spacing:.04em;padding:6px 14px;border-radius:0 0 8px 8px;pointer-events:none}\n'
+rep('</head>', '<style>\n' + ribbon_css + css + '\n</style>\n</head>')
+if not release: rep('<title>', '<title>TEST COPY · ')
 preset = ''
 if cx:
     import json
     c = json.load(open(cx))
     preset = '<script>window.BT_CX_DB=' + json.dumps({'url': c['url'].rstrip('/'), 'key': c['key'], 'table': c.get('table', 'status_log')}) + ';</script>\n'
-rep('<div id="root"></div>', '<div class="testribbon">TEST COPY · not the live page · the 3CX page saves nothing</div>\n' + preset + '<div id="root"></div>')
+rep('<div id="root"></div>', ('' if release else '<div class="testribbon">TEST COPY · not the live page · the 3CX page saves nothing</div>\n') + preset + '<div id="root"></div>')
 
 module = ('/* ═══ 3CX analysis (copy of tools/3cx/analyze.js) ═══ */\nconst CX = (function(){ const module = { exports: {} }; const exports = module.exports;\n'
           + analyze + '\nreturn module.exports; })();\nconst CX_SAMPLE = `' + sample + '`;\n')
+if release: module = module.replace('const CX_SAMPLE = `' + sample + '`;', "const CX_SAMPLE = '';")   # no sample data and no test hook in the real app
 rep('/* ── Icons ── */', module + '\n/* ── Icons ── */')
 rep('const PATHS = {', 'const PATHS = {\n  phone:    "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",')
-rep("    {id:'home',      n:'home',     label:'Home'},", "    {id:'home',      n:'home',     label:'Home'},\n    {id:'cx',        n:'phone',    label:'3CX (test)'},")
+rep("    {id:'home',      n:'home',     label:'Home'},", "    {id:'home',      n:'home',     label:'Home'},\n    {id:'cx',        n:'phone',    label:'" + ('3CX' if release else '3CX (test)') + "'},")
 # the head circle of the "users" icon (Trainees) starts at the wrong point and is clipped at the top: redraw it centred at (9,7)
 rep('"M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"', '"M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"')
 rep("          {tab==='trainees'  &&<ATrainees/>}", "          {tab==='trainees'  &&<ATrainees/>}\n          {tab==='cx'        &&<A3cx go={go}/>}")
 rep("      <AShiftEnd/>", "      <AShiftEnd/>\n      <A3cxSettings/>")
+if release: page = '\n'.join(l for l in page.split('\n') if 'window.__CX_TEST' not in l)
 rep('function AShiftEnd(){', settings + page + 'function AShiftEnd(){')
 
 open(out, 'w', newline='').write(s.replace('\n', '\r\n') if crlf else s)

@@ -1,6 +1,6 @@
 # 3CX status logger: analysis and tests
 
-**Status: test only. Nothing here is connected to the app or to Supabase.**
+**Status: the 3CX page is in the app's `index.html` (admin menu, under Home; settings under Settings). It only reads the `status_log` table. `build_test_page.py --release index.html out.html` regenerates it from a clean `index.html`; without `--release` it builds the labelled local test copy.**
 
 `logger.js` (from the 3CX status logger) watches the 3CX web client and writes one CSV row each time an
 agent's presence changes (`Available`, `Ringing`, `On call`, `Break`, `Admin`, `Offline`, or any custom status).

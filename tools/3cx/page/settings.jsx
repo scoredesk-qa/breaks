@@ -1,6 +1,6 @@
 
-/* ═══ 3CX test page: settings (shown in Settings → "3CX call alerts") ═══
-   Test copy only: the values are kept in this browser (localStorage), not in the database. */
+/* ═══ 3CX settings (shown in Settings → "3CX call alerts") ═══
+   The values are kept in this browser (localStorage), not in the database. */
 const CX_CFG_KEY='bt_cx_cfg';
 // logTz: UTC offset of the PC that runs the 3CX logger (its clock wrote the log's timestamps)
 // Where the 3CX logger uploads to. The logger can use a different Supabase project from the app, so the 3CX page has its own
@@ -35,7 +35,7 @@ function A3cxSettings(){
   return(
     <div className="sblk">
       <h2 className="sh">3CX call alerts</h2>
-      <p className="sd">When the 3CX page raises an alert, and which time zone the logger's timestamps are in (the clock of the PC that runs the 3CX logger). Test copy: these are saved in this browser only.</p>
+      <p className="sd">When the 3CX page raises an alert, and which time zone the logger's timestamps are in (the clock of the PC that runs the 3CX logger). These are saved in this browser only.</p>
       {row('3CX logger PC clock: UTC offset','logTz','hours (UTC+0 = 0, UTC+1 = 1)')}
       {row('Ignored call: a call rings at least','ignoreRingSec','seconds without being answered')}
       {row('Possible dropped call: a call shorter than','shortCallSec','seconds')}

@@ -525,6 +525,88 @@ select.fi option,.type-sel option{background:#1d1d23}
   .ib,.kb{min-width:42px;min-height:42px}
 }
 </style>
+<style>
+/* 3CX page: agent profile cards, day strip, chart. Uses the app's own colour variables. */
+.cx-days{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 14px;margin-bottom:22px}
+.cx-day{flex:0 0 auto;min-width:68px;background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--txt);cursor:pointer;font:inherit;transition:background .12s,border-color .12s}
+.cx-day b{font-size:19px;font-weight:500;font-variant-numeric:tabular-nums}
+.cx-day span{font-size:12.5px;color:var(--mut)}
+.cx-day:hover{border-color:var(--bdr-lt)}
+.cx-day.on{background:#d9d4ff;border-color:#d9d4ff;color:#14131c}
+.cx-day.on span{color:#4b4a66}
+
+.cx-two{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:34px;margin-bottom:34px;align-items:start}
+@media(max-width:1200px){.cx-two{grid-template-columns:1fr}}
+.cx-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;padding:0 12px;margin-bottom:18px}
+.cx-tiles>div{background:#212128;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.cx-tiles span{font-size:12.5px;color:var(--mut);white-space:nowrap}
+.cx-tiles b{font-weight:400;font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cx-chart{padding:0 12px}
+.cx-chart svg{width:100%;height:auto;display:block}
+.cx-leg{display:flex;flex-wrap:wrap;gap:18px;font-size:13px;color:var(--mut);padding:10px 12px 0}
+.cx-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:baseline}
+
+.cx-sec{font-size:24px;font-weight:400;margin:6px 0 16px;display:flex;align-items:baseline;gap:12px}
+.cx-sec small{font-size:14px;color:var(--mut)}
+.cx-chips{display:flex;gap:10px;flex-wrap:wrap;margin:-4px 0 18px}
+.cx-chip{background:var(--surf);border:1px solid var(--bdr);border-radius:999px;padding:8px 16px;font-size:14px;color:var(--txt2);display:inline-flex;align-items:center;gap:8px}
+.cx-chip b{font-weight:500;color:var(--txt)}
+.cx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:22px;margin-bottom:38px}
+.cx-card{text-align:left;font:inherit;color:inherit;cursor:pointer;background:linear-gradient(180deg,#201d2e,#18171f);border:1px solid var(--bdr);border-radius:var(--r-card);padding:22px 22px 18px;display:flex;flex-direction:column;gap:18px;transition:transform .14s,border-color .14s;min-width:0}
+.cx-card:hover{border-color:#4b4f78;transform:translateY(-2px)}
+.cx-top{display:flex;align-items:center;gap:14px;min-width:0}
+.cx-av{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500;background:#262633;flex-shrink:0;color:var(--txt)}
+.cx-av.lg{width:92px;height:92px;font-size:30px}
+.cx-who{min-width:0;display:flex;flex-direction:column;gap:6px}
+.cx-name{font-size:19px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cx-ext{margin-left:auto;font-size:13px;color:var(--mut);white-space:nowrap}
+.cx-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 12px}
+.cx-stats>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cx-stats span{font-size:12.5px;color:var(--mut);white-space:nowrap}
+.cx-stats b{font-weight:400;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cx-stats .warn{color:#ff8fa3}.cx-stats .note{color:#ffb86b}
+.cx-tlbig .cx-st{display:inline-flex;align-items:center;gap:7px;font-size:13px;padding:4px 10px;border-radius:999px;background:var(--card);color:var(--txt2);white-space:nowrap;width:max-content}
+.cx-st::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--c,#6b7390)}
+
+.cx-back{margin-bottom:20px}
+.cx-prof{display:flex;align-items:center;gap:26px;flex-wrap:wrap;margin-bottom:28px}
+.cx-prof h1{font-size:34px;font-weight:400;line-height:1.15;margin-bottom:8px}
+.cx-two2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:34px;margin-bottom:34px}
+@media(max-width:1200px){.cx-two2{grid-template-columns:1fr}}
+.cx-list-sub{font-size:13px;color:var(--mut)}
+
+.cx-bar{display:flex;height:18px;border-radius:999px;overflow:hidden;background:#23252f;gap:2px;margin:6px 0 4px}
+.cx-bar i{display:block;height:100%;min-width:3px}
+.cx-split{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px 24px;padding:12px 0 0;font-size:14px}
+.cx-split>div{display:flex;align-items:center;gap:10px;color:var(--txt2)}
+.cx-split i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.cx-split b{font-weight:400;margin-left:auto;font-variant-numeric:tabular-nums;color:var(--txt)}
+.cx-reason{font-size:13.5px;color:var(--mut);line-height:1.5}
+.cx-ok{background:var(--green-d);color:var(--green)}
+.cx-bad{background:rgba(220,38,38,.18);color:#fca5a5}
+.cx-cmp{display:flex;gap:26px;flex-wrap:wrap;font-size:14px;color:var(--mut);margin-top:4px}
+.cx-cmp b{font-weight:400;color:var(--txt2)}
+
+.cx-alerts .acc-row{gap:14px}
+.cx-alerts .acc-n{white-space:normal;flex:0 1 auto}
+.cx-alerts .cx-reason{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cx-done{width:36px;height:36px;border-radius:50%;border:none;background:var(--card);color:var(--txt2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.cx-done:hover{background:var(--card2);color:var(--green)}
+
+.cx-live{margin:0 0 22px}
+.cx-live-t{font-size:15px;color:var(--txt2);margin-bottom:10px}.cx-live-t small{color:var(--mut);font-size:13px;margin-left:6px}
+.cx-live-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.cx-lt{position:relative;border:1px solid var(--bdr);border-radius:var(--r-card);padding:18px 20px 16px;display:flex;flex-direction:column;gap:2px;background:var(--surf)}
+.cx-lt-ic{position:absolute;right:16px;top:16px;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.cx-lt b{font-weight:300;font-size:44px;line-height:1.1;font-variant-numeric:tabular-nums}
+.cx-lt span{font-size:14px;color:var(--txt2)}
+.cx-lt em{display:block;height:4px;border-radius:99px;background:rgba(255,255,255,.07);margin-top:12px;overflow:hidden}
+.cx-lt em i{display:block;height:100%;background:var(--c);border-radius:99px;transition:width .5s}
+.cx-lt.zero b{color:var(--mut)}
+.cx-mix{display:flex;height:8px;border-radius:99px;overflow:hidden;gap:2px;margin-top:12px;background:#23252f}
+@media(max-width:760px){.cx-live-g{grid-template-columns:repeat(2,minmax(0,1fr))}.cx-lt b{font-size:36px}}
+
+</style>
 </head>
 <body>
 <div id="root"></div>
@@ -652,8 +734,351 @@ function TNum({value, className, mono=true}){
   );
 }
 
+/* ═══ 3CX analysis (copy of tools/3cx/analyze.js) ═══ */
+const CX = (function(){ const module = { exports: {} }; const exports = module.exports;
+// 3CX status log analysis: turns the rows written by logger.js (status_log.csv) into
+//   - per-agent time per status (Admin, Break, Available, On call, ...)
+//   - call counts and talk time per agent
+//   - ignored rings (the phone rang, the agent didn't answer)
+//   - short calls (possible dropped calls)
+//   - break records shaped like the app's bt_logs rows
+//   - a list of alerts for the admin
+//
+// Pure functions, no dependencies and no network. Nothing here is connected to the app yet.
+
+const DEFAULTS = {
+  tzOffsetHours: 0,        // UTC offset of the PC that ran the logger (its clock wrote the log's timestamps)
+  dayOffsetHours: null,    // UTC offset used to cut the log into days (the app's Settings → Clock); null = same as tzOffsetHours
+  shortCallSec: 60,        // a call shorter than this is a possible dropped call
+  ignoreRingSec: 10,       // a ring that ends unanswered after at least this long counts as ignored
+  takenByOtherSec: 3,      // someone else answered within this many seconds of the ring ending → not ignored
+  repeatIgnoreCount: 3,    // this many ignored rings ...
+  repeatIgnoreWindowMin: 60, // ... inside this many minutes raises a "repeated" alert
+  minBreakSec: 10,         // ignore break blips shorter than this when building break records
+  quietCapMin: 30,         // a status with no change keeps running only this long after the log's last row (the logger may have stopped)
+  breakToleranceSec: 180,  // break check: an agent's total break time may differ from 3CX by this much before it is flagged
+};
+
+const S = { CALL: 'On call', RING: 'Ringing', ADMIN: 'Admin', BREAK: 'Break', OFFLINE: 'Offline' };
+// logger.js logs custom 3CX statuses as written, so Lunch / Bathroom / Break all count as breaks
+const isBreak = status => /break|lunch|bathroom|toilet/i.test(status || '');
+
+/* ── CSV ─────────────────────────────────────────────────────────── */
+function parseCsv(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  const s = String(text).replace(/^﻿/, '');
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === '"') { if (s[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && s[i + 1] === '\n') i++;
+      row.push(cur); cur = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else cur += c;
+  }
+  if (cur !== '' || row.length) { row.push(cur); if (row.length > 1 || row[0] !== '') rows.push(row); }
+  if (!rows.length) return [];
+  const head = rows[0].map(h => h.trim());
+  return rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? '').trim()])));
+}
+
+// "2026-10-27 12:51:57" is written in the logger PC's clock. Convert it to a real instant (ms).
+function parseStamp(str, tz) {
+  const m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)/.exec(str || '');
+  if (!m) return NaN;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) - tz * 3600000;
+}
+function dayRange(day, tz) {                     // [start, end) of a day on the company clock
+  const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(day);
+  if (!m) throw new Error('day must look like 2026-10-27');
+  const start = Date.UTC(+m[1], +m[2] - 1, +m[3]) - tz * 3600000;
+  return [start, start + 864e5];
+}
+function isoLocal(ms, tz) {                      // an instant as "YYYY-MM-DD HH:MM:SS" on the company clock
+  return new Date(ms + tz * 3600000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/* ── rows uploaded by the logger to Supabase ────────────────────── */
+// The logger can also post each status change to a Supabase table (status_log: changed_at, extension, agent, old_status,
+// new_status, detail). changed_at is a real instant (UTC), so these rows do NOT depend on the logger PC's time zone.
+// This turns them into the same rows the CSV gives, written in UTC: analyze them with tzOffsetHours: 0.
+function rowsFromStatusLog(rows) {
+  return (rows || []).filter(r => r && r.extension && r.extension !== '000' && r.changed_at && Number.isFinite(Date.parse(r.changed_at)))   // 000 = the logger's connection test
+    .map(r => ({
+      timestamp: new Date(r.changed_at).toISOString().slice(0, 19).replace('T', ' '),
+      extension: String(r.extension), agent: r.agent || '', old_status: r.old_status || '', new_status: r.new_status || '', detail: r.detail || '',
+    }));
+}
+
+/* ── names ───────────────────────────────────────────────────────── */
+// 3CX shows "Sghir, Abdulkarim"; the app has "Abdulkarim Sghir". Compare ignoring order, case, accents.
+function nameKey(n) {
+  return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .split(/[^a-z0-9]+/).filter(Boolean).sort().join(' ');
+}
+function displayName(n) {                        // "Sghir, Abdulkarim" -> "Abdulkarim Sghir"
+  const s = String(n || '').trim();
+  const i = s.indexOf(',');
+  return i < 0 ? s : `${s.slice(i + 1).trim()} ${s.slice(0, i).trim()}`.replace(/\s+/g, ' ');
+}
+
+/* ── status intervals ────────────────────────────────────────────── */
+// Each log row says "this extension is now <new_status>". Turn that into intervals
+// {ext, agent, status, detail, start, end}; the last interval of each extension stays open (end = null).
+function buildIntervals(rows, opts = {}) {
+  const tz = opts.tzOffsetHours ?? DEFAULTS.tzOffsetHours;
+  const ev = rows.map(r => ({
+    t: parseStamp(r.timestamp, tz), ext: r.extension, agent: r.agent,
+    status: r.new_status, detail: r.detail || '', first: !r.old_status,
+  })).filter(e => Number.isFinite(e.t) && e.ext && e.status).sort((a, b) => a.t - b.t);
+
+  const out = []; const open = {};
+  for (const e of ev) {
+    const cur = open[e.ext];
+    if (cur && cur.status === e.status) { cur.detail = cur.detail || e.detail; continue; }   // logger restart: same state, keep going
+    if (cur) cur.end = e.t;
+    // first = the logger had just started and only saw this status; it began earlier, so its length is understated
+    const iv = { ext: e.ext, agent: e.agent, status: e.status, detail: e.detail, start: e.t, end: null, partialStart: e.first };
+    open[e.ext] = iv; out.push(iv);
+  }
+  return out;
+}
+
+const endOf = (iv, now) => iv.end ?? now;
+const secs = (a, b) => Math.max(0, (b - a) / 1000);
+
+/* ── rings and calls ─────────────────────────────────────────────── */
+function buildRings(intervals, now, o) {
+  const byExt = {};
+  for (const iv of intervals) (byExt[iv.ext] = byExt[iv.ext] || []).push(iv);
+  const rings = [];
+  for (const list of Object.values(byExt)) {
+    list.forEach((iv, i) => {
+      if (iv.status !== S.RING) return;
+      const next = list[i + 1];
+      rings.push({
+        ext: iv.ext, agent: iv.agent, start: iv.start, end: iv.end, partialStart: iv.partialStart,
+        secs: secs(iv.start, endOf(iv, now)),
+        endedAs: next ? next.status : null,
+        outcome: !next ? 'ringing' : next.status === S.CALL ? 'answered' : 'unanswered',
+      });
+    });
+  }
+  // A group ring stops for everybody when one agent picks up. If another agent answered at the
+  // moment this ring ended, this agent did not ignore the call.
+  const answered = rings.filter(r => r.outcome === 'answered');
+  for (const r of rings) {
+    if (r.outcome !== 'unanswered') continue;
+    const other = answered.find(a => a.ext !== r.ext && a.start < r.end && Math.abs(a.end - r.end) <= o.takenByOtherSec * 1000);
+    if (other) r.outcome = 'taken_by_other';
+    else r.outcome = r.secs >= o.ignoreRingSec ? 'ignored' : 'short_ring';   // short_ring: caller probably hung up
+  }
+  return rings.sort((a, b) => a.start - b.start);
+}
+
+function buildCalls(intervals, now) {
+  return intervals.filter(iv => iv.status === S.CALL).map(iv => ({
+    ext: iv.ext, agent: iv.agent, start: iv.start, end: iv.end,
+    secs: secs(iv.start, endOf(iv, now)), open: iv.end === null, partialStart: iv.partialStart,
+  })).sort((a, b) => a.start - b.start);
+}
+
+/* ── alerts ──────────────────────────────────────────────────────── */
+function buildAlerts(rings, calls, o, now) {
+  const alerts = [];
+  const name = a => displayName(a);
+  for (const r of rings) {
+    if (r.outcome !== 'ignored') continue;
+    alerts.push({
+      type: 'ignored_call', severity: 'warning', ext: r.ext, agent: name(r.agent), at: r.start, secs: Math.round(r.secs),
+      message: `${name(r.agent)} let a call ring for ${Math.round(r.secs)}s without answering` + (r.endedAs ? ` (then ${r.endedAs})` : ''),
+    });
+  }
+  // repeated ignores
+  const byAgent = {};
+  for (const r of rings) if (r.outcome === 'ignored') (byAgent[r.ext] = byAgent[r.ext] || []).push(r);
+  for (const [ext, list] of Object.entries(byAgent)) {
+    const win = o.repeatIgnoreWindowMin * 60000; let lastFlag = -Infinity;
+    for (let i = o.repeatIgnoreCount - 1; i < list.length; i++) {
+      const first = list[i - (o.repeatIgnoreCount - 1)];
+      if (list[i].start - first.start <= win && list[i].start > lastFlag + win) {
+        lastFlag = list[i].start;
+        alerts.push({
+          type: 'repeated_ignore', severity: 'high', ext, agent: name(list[i].agent), at: list[i].start, count: o.repeatIgnoreCount,
+          message: `${name(list[i].agent)} ignored ${o.repeatIgnoreCount} calls within ${o.repeatIgnoreWindowMin} minutes`,
+        });
+      }
+    }
+  }
+  for (const c of calls) {
+    if (c.open || c.partialStart || c.secs >= o.shortCallSec) continue;
+    alerts.push({
+      type: 'short_call', severity: 'info', ext: c.ext, agent: name(c.agent), at: c.start, secs: Math.round(c.secs),
+      message: `${name(c.agent)} had a ${Math.round(c.secs)}s call (possible dropped call)`,
+    });
+  }
+  return alerts.sort((a, b) => a.at - b.at);
+}
+
+/* ── per-agent statistics for one day ────────────────────────────── */
+function analyze(rows, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  const intervals = buildIntervals(rows, o);
+  // 3CX only writes a row when a status changes, so an unchanged status runs on until now. But if the log stopped growing
+  // (logger off, a later day, nobody working), don't invent activity: stop at the last row plus a short allowance.
+  const logEnd = intervals.reduce((m, iv) => Math.max(m, iv.start, iv.end ?? 0), -Infinity);
+  const now = Math.min(opts.now ?? Date.now(), logEnd + o.quietCapMin * 60000);
+  const rings = buildRings(intervals, now, o);
+  const calls = buildCalls(intervals, now);
+  const alerts = buildAlerts(rings, calls, o, now);
+
+  let from = -Infinity, to = Infinity;
+  if (o.day) [from, to] = dayRange(o.day, o.dayOffsetHours ?? o.tzOffsetHours);
+  const inDay = t => t >= from && t < to;
+
+  const agents = {};
+  const A = (ext, agent) => agents[ext] || (agents[ext] = {
+    ext, agent: displayName(agent), statusSecs: {}, calls: 0, callSecs: 0, shortCalls: 0, longestCallSecs: 0,
+    rings: 0, answered: 0, ignored: 0, takenByOther: 0, shortRings: 0, breaks: 0, adminSecs: 0, breakSecs: 0,
+  });
+  for (const iv of intervals) {                      // time per status, clipped to the day
+    const a = A(iv.ext, iv.agent);
+    const s = Math.max(iv.start, from), e = Math.min(endOf(iv, now), to);
+    if (e > s) a.statusSecs[iv.status] = (a.statusSecs[iv.status] || 0) + (e - s) / 1000;
+    if (isBreak(iv.status)) { if (e > s) a.breakSecs += (e - s) / 1000; if (inDay(iv.start)) a.breaks++; }
+  }
+  for (const c of calls) {                           // a call belongs to the day it started
+    if (!inDay(c.start)) continue;
+    const a = A(c.ext, c.agent);
+    a.calls++; a.callSecs += c.secs; a.longestCallSecs = Math.max(a.longestCallSecs, c.secs);
+    if (!c.open && !c.partialStart && c.secs < o.shortCallSec) a.shortCalls++;
+  }
+  for (const r of rings) {
+    if (!inDay(r.start)) continue;
+    const a = A(r.ext, r.agent);
+    if (r.outcome === 'ringing') continue;
+    a.rings++;
+    if (r.outcome === 'answered') a.answered++;
+    else if (r.outcome === 'ignored') a.ignored++;
+    else if (r.outcome === 'taken_by_other') a.takenByOther++;
+    else if (r.outcome === 'short_ring') a.shortRings++;
+  }
+  for (const a of Object.values(agents)) {
+    a.adminSecs = Object.entries(a.statusSecs).reduce((t, [st, v]) => t + (/admin/i.test(st) ? v : 0), 0);   // 'Admin' or 3CX's 'Do Not Disturb - ADMIN'
+    a.avgCallSecs = a.calls ? a.callSecs / a.calls : 0;
+    a.answerRate = a.answered + a.ignored ? a.answered / (a.answered + a.ignored) : null;
+  }
+  const dayAlerts = alerts.filter(a => inDay(a.at));
+  return { agents, rings, calls, alerts: dayAlerts, intervals, options: o, now };
+}
+
+/* ── break records for the app ───────────────────────────────────── */
+function breakType(status, detail) {
+  const d = `${status || ''} ${detail || ''}`.toLowerCase();
+  if (/lunch/.test(d)) return 'Lunch Break';
+  if (/bathroom|toilet|\bwc\b/.test(d)) return 'Bathroom Break';
+  return 'Break';
+}
+// Break intervals as rows shaped like bt_logs. `users` = [{id, name}] from the app.
+// Returns {logs, unmatched}: agents the log mentions that no app user matches (match is by name).
+function toBreakLogs(intervals, users, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  const byKey = new Map(users.map(u => [nameKey(u.name), u]));
+  const logs = []; const unmatched = new Set();
+  for (const iv of intervals) {
+    if (!isBreak(iv.status)) continue;
+    if (iv.end !== null && secs(iv.start, iv.end) < o.minBreakSec) continue;
+    const u = byKey.get(nameKey(iv.agent));
+    if (!u) { unmatched.add(iv.agent); continue; }
+    logs.push({
+      user_id: u.id, agent_name: u.name,
+      start_time: new Date(iv.start).toISOString(),
+      end_time: iv.end === null ? null : new Date(iv.end).toISOString(),
+      duration_secs: iv.end === null ? null : Math.round(secs(iv.start, iv.end)),
+      break_type: breakType(iv.status, iv.detail), source: '3cx', ext: iv.ext, partial_start: !!iv.partialStart,
+    });
+  }
+  return { logs, unmatched: [...unmatched] };
+}
+
+
+/* ── break check: 3CX against what the agents entered ────────────── */
+// The agents' own break log (bt_logs) is the record. 3CX is never written into it: this only reads both and reports differences.
+//   cxLogs  = toBreakLogs(...).logs        appLogs = rows of bt_logs ({user_id, agent_name, start_time, end_time})
+// Breaks are paired by overlap (at least 30 s, or half of the shorter one). What is left over is "only in 3CX" or "only in the
+// agent's log". An agent is flagged when something is left over, or the totals differ by more than breakToleranceSec.
+function compareBreaks(cxLogs, appLogs, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  const now = opts.now ?? Date.now();
+  const hm = ms => isoLocal(ms, o.tzOffsetHours).slice(11, 16);
+  const span = x => ({ s: Date.parse(x.start_time), e: x.end_time ? Date.parse(x.end_time) : now, open: !x.end_time });
+  const users = {};
+  const add = (list, side) => (list || []).forEach(x => {
+    const u = users[x.user_id] || (users[x.user_id] = { user_id: x.user_id, agent_name: x.agent_name, cx: [], app: [] });
+    u[side].push(span(x));
+  });
+  add(cxLogs, 'cx'); add(appLogs, 'app');
+  const overlap = (a, b) => Math.max(0, Math.min(a.e, b.e) - Math.max(a.s, b.s));
+  const out = [];
+  for (const u of Object.values(users)) {
+    u.cx.sort((a, b) => a.s - b.s); u.app.sort((a, b) => a.s - b.s);
+    const freeApp = new Set(u.app.map((_, i) => i)); const pairs = []; const onlyCx = [];
+    for (const c of u.cx) {
+      let best = -1, bo = 0;
+      for (const i of freeApp) { const ov = overlap(c, u.app[i]); if (ov > bo) { bo = ov; best = i; } }
+      const need = best < 0 ? Infinity : Math.min(30000, 0.5 * Math.min(c.e - c.s, u.app[best].e - u.app[best].s));
+      if (best >= 0 && bo >= need) { freeApp.delete(best); pairs.push({ cx: c, app: u.app[best] }); } else onlyCx.push(c);
+    }
+    const onlyApp = [...freeApp].map(i => u.app[i]);
+    const cxSecs = u.cx.reduce((t, x) => t + (x.e - x.s) / 1000, 0), appSecs = u.app.reduce((t, x) => t + (x.e - x.s) / 1000, 0);
+    const diffSecs = appSecs - cxSecs;                       // positive: the agent logged more than 3CX shows
+    const reasons = [];
+    onlyCx.forEach(x => reasons.push(`3CX shows a break ${hm(x.s)} to ${x.open ? 'now' : hm(x.e)} that is not in the agent's log`));
+    onlyApp.forEach(x => reasons.push(`The agent's log has a break ${hm(x.s)} to ${x.open ? 'now' : hm(x.e)} that 3CX doesn't show`));
+    if (Math.abs(diffSecs) > o.breakToleranceSec)
+      reasons.push(`Totals differ by ${fmtDur(Math.abs(diffSecs))}: agent's log ${fmtDur(appSecs)}, 3CX ${fmtDur(cxSecs)}`);
+    out.push({ user_id: u.user_id, agent_name: u.agent_name, cxCount: u.cx.length, appCount: u.app.length, cxSecs, appSecs, diffSecs,
+      pairs, onlyCx, onlyApp, reasons, flagged: reasons.length > 0 });
+  }
+  return out.sort((a, b) => String(a.agent_name).localeCompare(String(b.agent_name)));
+}
+
+/* ── text report ─────────────────────────────────────────────────── */
+function fmtDur(s) {
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h}h ${String(m).padStart(2, '0')}m` : m ? `${m}m ${String(x).padStart(2, '0')}s` : `${x}s`;
+}
+function report(result) {
+  const o = result.options, tz = o.tzOffsetHours;
+  const L = [];
+  L.push(`3CX report${o.day ? ' for ' + o.day : ''}  (clock UTC${tz >= 0 ? '+' : ''}${tz})`, '');
+  const pad = (v, n) => String(v).padEnd(n);
+  L.push([pad('Agent', 24), pad('Calls', 6), pad('Talk time', 11), pad('Avg', 8), pad('<' + o.shortCallSec + 's', 6),
+    pad('Rings', 6), pad('Ignored', 8), pad('Admin', 9), pad('Breaks', 7), 'Break time'].join(' '));
+  for (const a of Object.values(result.agents).sort((x, y) => x.agent.localeCompare(y.agent))) {
+    L.push([pad(a.agent, 24), pad(a.calls, 6), pad(fmtDur(a.callSecs), 11), pad(fmtDur(a.avgCallSecs), 8), pad(a.shortCalls, 6),
+      pad(a.rings, 6), pad(a.ignored, 8), pad(fmtDur(a.adminSecs), 9), pad(a.breaks, 7), fmtDur(a.breakSecs)].join(' '));
+  }
+  L.push('', `Alerts (${result.alerts.length})`);
+  for (const a of result.alerts) L.push(`  ${isoLocal(a.at, tz)}  [${a.severity}] ${a.message}`);
+  if (!result.alerts.length) L.push('  none');
+  return L.join('\n');
+}
+
+module.exports = { DEFAULTS, parseCsv, rowsFromStatusLog, parseStamp, dayRange, isoLocal, nameKey, displayName, buildIntervals, buildRings, buildCalls,
+  buildAlerts, analyze, toBreakLogs, compareBreaks, breakType, isBreak, fmtDur, report };
+
+return module.exports; })();
+const CX_SAMPLE = '';
+
 /* ── Icons ── */
 const PATHS = {
+  phone:    "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
   zap:      "M13 2L3 14h9l-1 8 10-12h-9z",
   logout:   ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4","M16 17l5-5-5-5","M21 12H9"],
   coffee:   ["M18 8h1a4 4 0 0 1 0 8h-1","M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z","M6 1v3","M10 1v3","M14 1v3"],
@@ -661,7 +1086,7 @@ const PATHS = {
   clock:    ["M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z","M12 6v6l4 2"],
   play:     "M5 3l14 9-14 9V3z",
   stop:     "M6 6h12v12H6z",
-  users:    ["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
+  users:    ["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2","M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z","M23 21v-2a4 4 0 0 0-3-3.87","M16 3.13a4 4 0 0 1 0 7.75"],
   grid:     ["M3 3h7v7H3z","M14 3h7v7h-7z","M14 14h7v7h-7z","M3 14h7v7H3z"],
   settings: ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"],
   chevron:  "M9 18l6-6-6-6",
@@ -2274,6 +2699,7 @@ function AdminApp({user,name,onLogout}){
   const go=id=>{ setTab(id); setNavOpen(false); window.scrollTo({top:0}); };
   const main=[
     {id:'home',      n:'home',     label:'Home'},
+    {id:'cx',        n:'phone',    label:'3CX'},
     {id:'live',      n:'activity', label:'Live Rack', badge:counts.live},
     {id:'clocks',    n:'clock',    label:'Clock In/Out'},
     {id:'analytics', n:'bars',     label:'Analytics'},
@@ -2351,6 +2777,7 @@ function AdminApp({user,name,onLogout}){
           {tab==='clocks'    &&<AClocks/>}
           {tab==='lunch'     &&<ALunch/>}
           {tab==='trainees'  &&<ATrainees/>}
+          {tab==='cx'        &&<A3cx go={go}/>}
           {tab==='swaps'     &&<ASwapRequests/>}
           {tab==='analytics' &&<AAnalytics/>}
           {tab==='logs'      &&<ALogs/>}
@@ -3847,6 +4274,614 @@ function ATrainees(){
     </div>
   );
 }
+
+/* ═══ 3CX settings (shown in Settings → "3CX call alerts") ═══
+   The values are kept in this browser (localStorage), not in the database. */
+const CX_CFG_KEY='bt_cx_cfg';
+// logTz: UTC offset of the PC that runs the 3CX logger (its clock wrote the log's timestamps)
+// Where the 3CX logger uploads to. The logger can use a different Supabase project from the app, so the 3CX page has its own
+// connection (a public anon key). Left empty it reads from the app's own project. A build can pre-fill it with window.BT_CX_DB.
+const CX_DB_PRESET=(typeof window!=='undefined'&&window.BT_CX_DB)||{};
+const CX_CFG_DEFAULT={logTz:0,ignoreRingSec:10,shortCallSec:60,repeatIgnoreCount:3,repeatIgnoreWindowMin:60,breakToleranceMin:3,breakCheckLeadMin:10,
+  dbUrl:CX_DB_PRESET.url||'',dbKey:CX_DB_PRESET.key||'',dbTable:CX_DB_PRESET.table||'status_log'};
+let _cxCfg=(()=>{ try{ return {...CX_CFG_DEFAULT,...JSON.parse(localStorage.getItem(CX_CFG_KEY)||'{}')}; }catch(e){ return {...CX_CFG_DEFAULT}; } })();
+const CX_SAMPLE_USERS=['Jane Doe','Rick Roe','Pat Poe','Max Moe','Lou Lee','Kay Kim','Finn Fox','Gail Gray'].map((n,i)=>({id:'sample-'+i,name:n}));
+
+function A3cxSettings(){
+  const [v,setV]=useState({..._cxCfg});
+  const [ok,setOk]=useState(false);
+  const set=k=>e=>setV(p=>({...p,[k]:e.target.value}));
+  const tzOk=v.logTz!==''&&Number.isFinite(Number(v.logTz))&&Number(v.logTz)>=-12&&Number(v.logTz)<=14;
+  const NUM=['ignoreRingSec','shortCallSec','repeatIgnoreCount','repeatIgnoreWindowMin','breakToleranceMin','breakCheckLeadMin'];
+  const dbOk=((v.dbUrl||'').trim()===''&&(v.dbKey||'').trim()==='')||(/^https?:\/\/\S+$/.test((v.dbUrl||'').trim())&&(v.dbKey||'').trim().length>20&&/^[a-z_][a-z0-9_]*$/i.test((v.dbTable||'').trim()||'status_log'));
+  const valid=tzOk&&dbOk&&NUM.every(k=>Number(v[k])>=1);
+  const save=()=>{
+    const c={logTz:Number(v.logTz),dbUrl:(v.dbUrl||'').trim().replace(/\/+$/,''),dbKey:(v.dbKey||'').trim(),dbTable:(v.dbTable||'').trim()||'status_log'};
+    for(const k of NUM) c[k]=Math.max(1,Math.round(Number(v[k])));
+    _cxCfg=c; try{ localStorage.setItem(CX_CFG_KEY,JSON.stringify(c)); }catch(e){}
+    setV(c); setOk(true); setTimeout(()=>setOk(false),3000);
+  };
+  const row=(label,k,unit)=>(
+    <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',marginBottom:14}}>
+      <span style={{minWidth:300,fontSize:15}}>{label}</span>
+      <input className="fi" type="number" min={k==='logTz'?-12:1} max={k==='logTz'?14:undefined} step={k==='logTz'?0.5:1} value={v[k]} onChange={set(k)} style={{width:100}}/>
+      <span style={{fontSize:15,color:'var(--mut)'}}>{unit}</span>
+    </div>
+  );
+  return(
+    <div className="sblk">
+      <h2 className="sh">3CX call alerts</h2>
+      <p className="sd">When the 3CX page raises an alert, and which time zone the logger's timestamps are in (the clock of the PC that runs the 3CX logger). These are saved in this browser only.</p>
+      {row('3CX logger PC clock: UTC offset','logTz','hours (UTC+0 = 0, UTC+1 = 1)')}
+      {row('Ignored call: a call rings at least','ignoreRingSec','seconds without being answered')}
+      {row('Possible dropped call: a call shorter than','shortCallSec','seconds')}
+      {row('Repeated ignores: this many ignored calls','repeatIgnoreCount','calls')}
+      {row('...within','repeatIgnoreWindowMin','minutes')}
+      {row('Break check: an agent\'s total break time may differ from 3CX by up to','breakToleranceMin','minutes')}
+      {row('Break check notification, before shift end by','breakCheckLeadMin','minutes (the shift end is set above)')}
+      <h3 style={{fontSize:16,fontWeight:400,margin:'26px 0 6px'}}>Where the 3CX logger uploads</h3>
+      <p className="sd" style={{marginBottom:12}}>The Supabase project the logger writes to, if it is not the one this app uses. Leave both empty to read from this app's own project. Use the project's public (anon) key, never a secret one.</p>
+      <div style={{display:'flex',flexDirection:'column',gap:10,maxWidth:640}}>
+        <input className="fi" type="text" spellCheck="false" placeholder="https://your-project.supabase.co" value={v.dbUrl||''} onChange={set('dbUrl')} aria-label="3CX data Supabase URL"/>
+        <input className="fi" type="text" spellCheck="false" placeholder="public anon key" value={v.dbKey||''} onChange={set('dbKey')} aria-label="3CX data public key"/>
+        <input className="fi" type="text" spellCheck="false" placeholder="table (status_log)" value={v.dbTable||''} onChange={set('dbTable')} style={{maxWidth:240}} aria-label="3CX data table"/>
+      </div>
+      <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
+        <button className="bp" onClick={save} disabled={!valid}>Save</button>
+        {ok&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>}
+      </div>
+    </div>
+  );
+}
+
+/* What the agents themselves entered on the sample day, so the break check has something to compare the sample 3CX log with. */
+const CX_SAMPLE_APP=(()=>{
+  const id=n=>(CX_SAMPLE_USERS.find(u=>u.name===n)||{}).id;
+  const row=(n,a,b)=>({id:'sa-'+n+a,user_id:id(n),agent_name:n,start_time:`2026-10-27T${a}:00.000Z`,end_time:b?`2026-10-27T${b}:00.000Z`:null,break_type:'Break'});
+  return [row('Kay Kim','11:00','11:15'),row('Kay Kim','11:30','12:20'),row('Jane Doe','10:00','10:10')];
+})();
+
+/* Shown only if Supabase refuses to let the admin read what the logger uploads. It only ADDS a read rule for admins; it does not turn on
+   row security, so it cannot stop the logger from writing. */
+const CX_READ_SQL=`-- Let signed-in admins read what the 3CX logger uploads (run once in the Supabase SQL Editor). Safe to run again.
+-- The logger's own insert-only rule is not touched.
+do $$ begin
+  create policy "admins read status_log" on public.status_log for select to authenticated
+    using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+exception when duplicate_object then null;
+end $$;
+grant select on public.status_log to authenticated;
+notify pgrst, 'reload schema';`;
+
+/* For the logger's own project: the page reads with the public key (it is not signed in there). This lets that key read the rows, nothing else. */
+const CX_READ_SQL_ANON=`-- Let the 3CX page read what the logger uploads (run once in the SQL Editor of the project the logger writes to).
+-- Note: this lets anyone with that project's public key read the status rows (agent names and statuses).
+do $$ begin
+  create policy "read status_log" on public.status_log for select to anon, authenticated using (true);
+exception when duplicate_object then null;
+end $$;`;
+
+/* One-time setup for the table the logger uploads to (the text comes from tools/3cx/status_log.sql when the page is built). */
+const CX_SETUP_SQL=`-- 3CX status log: one-time setup. Run in the Supabase SQL Editor of the project the 3CX logger uploads to.
+-- If the logger's own setup SQL already created the table (insert-only for the public key), you do NOT need this file:
+-- you only need the "admins read status_log" rule below (the page offers it as "Copy SQL to allow admins to read it").
+-- Safe to run again. It creates the table, lets the logger add rows (with the project's public key), and lets signed-in admins read them.
+
+create table if not exists public.status_log (
+  id          bigint generated always as identity primary key,
+  changed_at  timestamptz not null default now(),
+  extension   text not null,
+  agent       text,
+  old_status  text,
+  new_status  text not null,
+  detail      text
+);
+create index if not exists status_log_changed_at_idx on public.status_log (changed_at desc);
+create index if not exists status_log_extension_idx  on public.status_log (extension, changed_at desc);
+
+alter table public.status_log enable row level security;
+
+-- the logger: add rows only (it cannot read or change anything). Note: anyone with the project's public key could add rows.
+do $$ begin
+  create policy "logger can add rows" on public.status_log for insert to anon with check (true);
+exception when duplicate_object then null;
+end $$;
+
+-- the app: admins can read
+do $$ begin
+  create policy "admins read status_log" on public.status_log for select to authenticated
+    using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+exception when duplicate_object then null;
+end $$;
+
+grant insert on public.status_log to anon;
+grant select on public.status_log to authenticated;
+
+notify pgrst, 'reload schema';
+`;
+
+/* ═══ 3CX page: reads a status_log.csv from this PC and shows calls, ignored rings, short calls, admin time and
+   breaks per agent. Saves nothing in the database and never changes what agents entered. Only agents that exist in the app are shown. ═══ */
+const CXC={call:'#8e9cff',admin:'#ef6b5b',brk:'#f5a524',avail:'#2fb344',avail2:'#2ec4b6',away:'#7f8ab0',hol:'#2a8fe0',off:'#3a3d4a',ring:'#f5d04e',other:'#7d86a8'};   // the 3CX status colours: Available green, Away/Break orange, Do Not Disturb/Admin red, Available 2 teal, Holiday/Out of office blue
+const CX_LABEL={call:'On a call',admin:'Admin',brk:'On break',avail:'Available',avail2:'Available 2',hol:'Out of office',off:'Offline',ring:'Ringing',other:'Other'};
+const cxCat=s=>/^on call$/i.test(s)?'call':/admin|do not disturb|^dnd$/i.test(s)?'admin':/break|lunch|bathroom|toilet|^away/i.test(s)?'brk':/^ringing$/i.test(s)?'ring':/out of (the )?office|holiday/i.test(s)?'hol':/offline|not registered/i.test(s)?'off':/^available\s*2|remote/i.test(s)?'avail2':/^available/i.test(s)?'avail':'other';
+const CX_DISMISS_KEY='bt_cx_dismissed';
+// The 3CX data can live in a different Supabase project from the app: use its own client then (no sign-in, nothing stored).
+let _cxClient=null,_cxClientId='';
+function cxDb(){
+  const u=(_cxCfg.dbUrl||'').trim().replace(/\/+$/,''), k=(_cxCfg.dbKey||'').trim();
+  if(!u||!k) return SB;
+  const id=u+'|'+k;
+  if(_cxClientId!==id){ _cxClient=supabase.createClient(u,k,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}}); _cxClientId=id; }
+  return _cxClient;
+}
+const cxOwnDb=()=>!!((_cxCfg.dbUrl||'').trim()&&(_cxCfg.dbKey||'').trim());
+
+// smooth line through points for the chart
+const cxSmooth=pts=>{
+  if(pts.length<2) return '';
+  let d=`M${pts[0][0]},${pts[0][1]}`;
+  for(let i=1;i<pts.length;i++){ const [x0,y0]=pts[i-1],[x1,y1]=pts[i],mx=(x0+x1)/2; d+=` C${mx},${y0} ${mx},${y1} ${x1},${y1}`; }
+  return d;
+};
+function CxChart({labels,series}){
+  const W=760,H=300,L=34,R=24,T=14,B=28;
+  const max=Math.max(...series.flatMap(s=>s.vals),1);
+  const step=Math.max(1,Math.ceil(max/4)), top=step*4;
+  const x=i=>L+(W-L-R)*(labels.length>1?i/(labels.length-1):.5);
+  const y=v=>T+(H-T-B)*(1-v/top);
+  const area=series[0]&&labels.length>1?`${cxSmooth(series[0].vals.map((v,i)=>[x(i),y(v)]))} L${x(labels.length-1)},${y(0)} L${x(0)},${y(0)} Z`:'';
+  return(
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Calls per hour">
+      <defs><linearGradient id="cxg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={CXC.call} stopOpacity=".45"/><stop offset="1" stopColor={CXC.call} stopOpacity="0"/></linearGradient></defs>
+      {[0,1,2,3,4].map(i=>(<g key={i}><line x1={L} x2={W-R} y1={y(i*step)} y2={y(i*step)} stroke="#2b2b33" strokeWidth="1"/><text x={L-8} y={y(i*step)+4} textAnchor="end" fontSize="11" fill="#7c7c88">{i*step}</text></g>))}
+      {area&&<path d={area} fill="url(#cxg)"/>}
+      {series.map((s,k)=>labels.length>1
+        ?<path key={k} d={cxSmooth(s.vals.map((v,i)=>[x(i),y(v)]))} fill="none" stroke={s.color} strokeWidth="2.2" strokeDasharray={s.dashed?'5 5':undefined} strokeLinecap="round"/>
+        :<circle key={k} cx={x(0)} cy={y(s.vals[0]||0)} r="4" fill={s.color}/>)}
+      {labels.map((l,i)=>(i%Math.max(1,Math.ceil(labels.length/10))===0)&&<text key={i} x={x(i)} y={H-8} textAnchor="middle" fontSize="11" fill="#7c7c88">{l}</text>)}
+    </svg>
+  );
+}
+
+function A3cx({go}){
+  const [text,setText]=useState('');
+  const [fileName,setFileName]=useState('Supabase · live');
+  const [fileMod,setFileMod]=useState(0);
+  const [picked,setPicked]=useState(null);          // a day chosen by hand; null = always follow today
+  const [, setTick]=useState(0);
+  const [source,setSource]=useState('db');         // always 'db' (read live from the Supabase status_log table); 'file' is only reachable from the browser test hook below
+  const [dbRows,setDbRows]=useState([]);
+  const [dbErr,setDbErr]=useState('');
+  const [dbAt,setDbAt]=useState(0);
+  const [users,setUsers]=useState([]);
+  const [shiftEnd,setShiftEnd]=useState('16:30');
+  const [dbLogs,setDbLogs]=useState([]);            // what the agents entered (bt_logs) for the day
+  const [err,setErr]=useState('');
+  const [sel,setSel]=useState(null);
+  const [showDone,setShowDone]=useState(false);
+  const [dismissed,setDismissed]=useState(()=>{ try{ return JSON.parse(localStorage.getItem(CX_DISMISS_KEY)||'{}'); }catch(e){ return {}; } });
+  const tz=clockOff();
+  const isSample=fileName==='sample data';
+  const isDb=source==='db';
+  const missingTable=/could not find the table|does not exist|schema cache/i.test(dbErr);
+  const todayStr=todayISO();
+  const day=picked||todayStr;
+  const [from,to]=CX.dayRange(day,tz);
+  const inDay=t=>t>=from&&t<to;
+
+  useEffect(()=>{ const id=setInterval(()=>setTick(n=>n+1),30000); return()=>clearInterval(id); },[]);   // so "today" and the check time move on by themselves
+
+  useEffect(()=>{      // the app's agents: only agents who exist in the app are shown
+    Promise.all([
+      run(SB.from('bt_clocklogs').select('user_id,agent_name').order('clock_in',{ascending:false}).limit(2000)),
+      run(SB.from('bt_logs').select('user_id,agent_name').order('start_time',{ascending:false}).limit(2000)),
+      run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle()),
+    ]).then(([a,b,c])=>{
+      const m=new Map();
+      [...(a.data||[]),...(b.data||[])].forEach(r=>{ if(r.user_id&&r.agent_name&&!m.has(r.user_id)) m.set(r.user_id,{id:r.user_id,name:r.agent_name}); });
+      setUsers([...m.values()]);
+      if(c.data&&HM_RE.test(c.data.shift_end||'')) setShiftEnd(c.data.shift_end);
+    });
+  },[]);
+
+  const loadApp=useCallback(async()=>{     // read-only: the agents' own break entries for this day
+    const {data}=await run(SB.from('bt_logs').select('id,user_id,agent_name,start_time,end_time,break_type').gte('start_time',new Date(from).toISOString()).lt('start_time',new Date(to).toISOString()).order('start_time'));
+    setDbLogs(data||[]);
+  },[from,to]);
+  useEffect(()=>{ loadApp(); },[loadApp]);
+  useAutoRefresh(loadApp,30000);
+
+  const reloadDb=useCallback(async()=>{
+    const lo=new Date(from-36*3600000).toISOString(), hi=new Date(to).toISOString();   // a day and a half before, so each agent's status at the start of the day is known
+    let all=[],i=0,last=false;
+    while(!last&&i<60){
+      const {data,error}=await run(cxDb().from(_cxCfg.dbTable||'status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',lo).lt('changed_at',hi).order('changed_at',{ascending:true}).range(i*1000,i*1000+999));
+      if(error){ setDbErr(error.message||String(error)); return; }
+      all=all.concat(data||[]); last=!data||data.length<1000; i++;
+    }
+    setDbErr(''); setDbRows(all); setDbAt(appNow()); bumpSync();
+  },[from,to]);
+  useEffect(()=>{ if(source==='db') reloadDb(); },[source,reloadDb]);
+  const reloadIfLive=useCallback(()=>{ if(source==='db') return reloadDb(); },[source,reloadDb]);
+  useAutoRefresh(reloadIfLive,30000);                    // live: new rows every 30 seconds
+  const goLive=()=>{ setErr(''); setDbErr(''); setSel(null); setText(''); setFileMod(0); setFileName('Supabase · live'); setSource('db'); reloadDb(); };
+
+  const load=(t,name,mod)=>{
+    const rows=CX.parseCsv(t);
+    if(!rows.length){ setErr('That file has no rows yet. Let the logger run for a while and try again.'); return; }
+    setErr(''); setDbErr(''); setSource('file'); setText(t); setFileName(name); setFileMod(mod||0); setSel(null);   // the day is NOT changed: it stays on today (or the day you picked)
+  };
+  const chooseDay=d=>setPicked(!d||d===todayISO()?null:d);
+
+  const match=isSample?CX_SAMPLE_USERS:users;
+  const appLogs=isSample?CX_SAMPLE_APP.filter(l=>inDay(Date.parse(l.start_time))):dbLogs;
+  const logTz=_cxCfg.logTz;
+  const rowsAll=React.useMemo(()=>isDb?(dbAt?CX.rowsFromStatusLog(dbRows):null):(text?CX.parseCsv(text):null),[isDb,dbRows,dbAt,text]);
+  const R=React.useMemo(()=>{
+    if(!rowsAll) return null;
+    // a CSV is on the logger PC's clock; rows from Supabase are real instants, so the logger clock setting doesn't apply to them.
+    // "which day" and the times shown use the app's company clock.
+    try{ return CX.analyze(rowsAll,{day,now:appNow(),..._cxCfg,tzOffsetHours:isDb?0:logTz,dayOffsetHours:tz}); }
+    catch(e){ return {error:e.message}; }
+  },[rowsAll,day,tz,logTz,isDb]);
+  /* Warn if the file itself says the logger PC is on a different clock than Settings: the file's last save time
+     is (almost) the time of its last row, so the gap between the two is the logger PC's offset from UTC. */
+  const clockHint=React.useMemo(()=>{
+    if(isDb||!fileMod||!text||isSample) return null;
+    const last=CX.parseCsv(text).slice(-1)[0]; if(!last) return null;
+    const m=/^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)/.exec(last.timestamp||''); if(!m) return null;
+    const diffH=(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6])-fileMod)/3600000;
+    const off=Math.round(diffH);
+    if(Math.abs(diffH-off)>0.1) return null;            // not saved at about the time of its last row (copied or edited later): can't tell
+    return off!==logTz?off:null;
+  },[fileMod,text,isSample,logTz,isDb]);
+
+  /* everything below is limited to agents that match an app agent */
+  const ok=R&&!R.error;
+  const byKey=new Map(match.map(u=>[CX.nameKey(u.name),u]));
+  const all=ok?Object.values(R.agents):[];
+  const matchedAny=all.some(a=>byKey.has(CX.nameKey(a.agent)));
+  const agents=all.filter(a=>byKey.has(CX.nameKey(a.agent))&&Object.keys(a.statusSecs).some(st=>!['off','hol'].includes(cxCat(st)))).map(a=>({...a,app:byKey.get(CX.nameKey(a.agent)).name,uid:byKey.get(CX.nameKey(a.agent)).id})).sort((a,b)=>a.app.localeCompare(b.app));
+  const shown=new Set(agents.map(a=>a.ext));
+  const hidden=all.filter(a=>!byKey.has(CX.nameKey(a.agent))).length;
+  const tot=agents.reduce((t,a)=>({calls:t.calls+a.calls,talk:t.talk+a.callSecs,ans:t.ans+a.answered,ign:t.ign+a.ignored,short:t.short+a.shortCalls,admin:t.admin+a.adminSecs}),{calls:0,talk:0,ans:0,ign:0,short:0,admin:0});
+  const rate=tot.ans+tot.ign?Math.round(tot.ans/(tot.ans+tot.ign)*100)+'%':'–';
+
+  /* break check: 3CX against what the agents entered. Read-only, and only shown in its own table:
+     it is never added to the alerts or to notifications, and nothing the agents entered is changed. */
+  const uids=new Set(agents.map(a=>a.uid));
+  const cxBreaks=ok?CX.toBreakLogs(R.intervals,match,{tzOffsetHours:logTz}).logs.filter(l=>inDay(Date.parse(l.start_time))&&uids.has(l.user_id)):[];
+  const appBreaks=appLogs.filter(l=>uids.has(l.user_id));
+  const cmp=ok?CX.compareBreaks(cxBreaks,appBreaks,{tzOffsetHours:tz,now:R.now,breakToleranceSec:_cxCfg.breakToleranceMin*60}):[];
+  // a row differs when the totals are further apart than the tolerance, or the number of breaks isn't the same
+  const isDiff=c=>Math.abs(c.diffSecs)>_cxCfg.breakToleranceMin*60||c.cxCount!==c.appCount;
+  const flagged=cmp.filter(isDiff);
+  const extOfUid={}; agents.forEach(a=>{ extOfUid[a.uid]=a.ext; });
+
+  /* The ONLY thing the break check does besides the table: one notification a day, `breakCheckLeadMin` minutes before shift end
+     (Settings), if any agent's breaks differ. It is not added to the alerts list. */
+  const checkAt=addMin(shiftEnd,-_cxCfg.breakCheckLeadMin);
+  const notifyDue=day===todayStr&&wallHM()>=checkAt;
+  const names=flagged.map(c=>c.agent_name);
+  useEffect(()=>{
+    if(!ok||!notifyDue||names.length===0) return;
+    const k='bt_cx_notified_'+day;
+    try{ if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); }catch(e){}
+    fireNotification({title:'Break check',body:`${names.slice(0,4).join(', ')}${names.length>4?` and ${names.length-4} more`:''}: breaks in 3CX differ from what they logged`,type:'custom',duration:12000});
+  },[ok,notifyDue,names.length,day]);
+
+  /* alerts: the call alerts from the analysis */
+  const alertsAll=ok?R.alerts.filter(a=>shown.has(a.ext)).map(a=>({...a,agent:(byKey.get(CX.nameKey(a.agent))||{}).name||a.agent})).sort((a,b)=>a.at-b.at):[];
+  const akey=a=>`${a.type}|${a.ext}|${a.at}`;
+  const alerts=alertsAll.filter(a=>!dismissed[akey(a)]);
+  const done=alertsAll.filter(a=>dismissed[akey(a)]);
+  const saveDismissed=n=>{ setDismissed(n); try{ localStorage.setItem(CX_DISMISS_KEY,JSON.stringify(n)); }catch(e){} };
+  const dismiss=a=>saveDismissed({...dismissed,[akey(a)]:1});
+  const restore=a=>{ const n={...dismissed}; delete n[akey(a)]; saveDismissed(n); };
+  const clearAll=()=>{ const n={...dismissed}; alerts.forEach(a=>{ n[akey(a)]=1; }); saveDismissed(n); };
+
+  // days that appear in the log (company clock), plus today; newest 14
+  const days=ok?[...new Set([day,todayStr,...R.intervals.map(iv=>{ const w=wall(iv.start); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; })])].sort().slice(-14):[];
+  const dayLabel=new Date(day+'T00:00:00Z').toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'});
+
+  // chart range: real activity that started this day (idle "Available" and last night's carry-over don't set it)
+  let startH=8,endH=18,capEnd=appNow();
+  const mine=ok?R.intervals.filter(iv=>shown.has(iv.ext)):[];
+  if(ok&&mine.length){
+    const logEnd=Math.max(...mine.map(iv=>iv.end??iv.start));
+    capEnd=Math.min(appNow(),Math.max(logEnd,from));
+    const act=mine.filter(iv=>['call','ring','admin','brk'].includes(cxCat(iv.status))&&iv.start>=from&&iv.start<to);
+    if(act.length){
+      const mn=Math.min(...act.map(iv=>iv.start)), mx=Math.max(...act.map(iv=>Math.min(iv.end??capEnd,to)));
+      startH=Math.max(0,Math.floor((mn-from)/3600000)); endH=Math.min(24,Math.ceil((mx-from)/3600000)+1);
+      if(endH-startH<6) endH=Math.min(24,startH+6);
+    }
+  }
+  const hours=[...Array(Math.max(0,endH-startH)).keys()].map(i=>startH+i);
+  const callsAt=ok?R.calls.filter(c=>shown.has(c.ext)&&inDay(c.start)):[];
+  const look=ok?[...R.rings.filter(r=>shown.has(r.ext)&&r.outcome==='ignored'&&inDay(r.start)).map(r=>r.start),
+                 ...callsAt.filter(c=>!c.open&&!c.partialStart&&c.secs<_cxCfg.shortCallSec).map(c=>c.start)]:[];
+  const bucket=list=>hours.map(h=>list.filter(t=>Math.floor((t-from)/3600000)===h).length);
+  const chartCalls=bucket(callsAt.map(c=>c.start)), chartLook=bucket(look);
+
+  const latest={};
+  if(ok) for(const iv of R.intervals) if(iv.start<to&&(!latest[iv.ext]||iv.start>=latest[iv.ext].start)) latest[iv.ext]=iv;
+  const statusOf=ext=>latest[ext]?latest[ext].status:'';
+  const nowCount=cat=>agents.filter(a=>cxCat(statusOf(a.ext))===cat).length;
+
+  const sgn=d=>Math.abs(d)<1?'0s':`${d>0?'+':'−'}${CX.fmtDur(Math.abs(d))}`;   // the agent's log minus 3CX
+  const previewAlerts=()=>alerts.slice(0,5).forEach((a,i)=>setTimeout(()=>fireNotification({title:a.type==='short_call'?'Possible dropped call':a.type==='repeated_ignore'?'Repeated ignored calls':'Ignored call',body:alertText(a),type:'custom',duration:8000}),i*900));
+  const kind=a=>a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}
+    :a.type==='repeated_ignore'?{t:'Repeated',cls:'',ic:'brk',d:`${a.count} ignored calls within ${_cxCfg.repeatIgnoreWindowMin} min`,red:true}
+    :{t:'Ignored',cls:'b-brk',ic:'brk',d:`Rang ${a.secs}s, not answered`};
+  const alertText=a=>`${a.agent}: ${kind(a).d}`;
+  const redBadge={background:'rgba(220,38,38,.18)',color:'#fca5a5'};
+
+  const header=(
+    <>
+      <div className="acts">
+        <input className="fi" type="date" value={day} onChange={e=>chooseDay(e.target.value)} style={{width:190,height:47}} aria-label="Choose a day"/>
+        {picked&&<button className="bs" onClick={()=>setPicked(null)}>Today</button>}
+        {alerts.length>0&&<button className="bs" onClick={previewAlerts}><Ic n="bell" size={16}/> Preview alerts</button>}
+        <div className="acts-r"><ConnInstrument/></div>
+      </div>
+      {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
+      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the {_cxCfg.dbTable||'status_log'} table{cxOwnDb()?` in ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>{missingTable?'The table doesn\'t exist in this project yet. Run the SQL once in the Supabase SQL Editor (it also lets the logger add rows and admins read them), then reload the page. The logger must upload to this same project.':cxOwnDb()?'If it says "permission denied", the project needs a rule that lets the public key read it. If it says the table is not found, check the URL and key in Settings → 3CX call alerts.':'If it says "permission denied" or the table is empty when it shouldn\'t be, admins need permission to read it. If the logger uploads to a different Supabase project, set it in Settings → 3CX call alerts.'}</span>{missingTable?<CopySql sql={CX_SETUP_SQL} label="Copy SQL to create the table"/>:<CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/>}</div>}
+      {clockHint!==null&&<div className="ebox"><Ic n="alert" size={15}/>This file suggests the 3CX logger PC runs on UTC{clockHint>=0?'+':''}{clockHint}, but Settings says UTC{logTz>=0?'+':''}{logTz}. Calls and breaks still in progress will show the wrong length until it matches. <button className="bs" style={{marginLeft:10}} onClick={()=>go&&go('settings')}>Open Settings</button></div>}
+      {R&&R.error&&<div className="ebox"><Ic n="alert" size={15}/>{R.error}</div>}
+    </>
+  );
+
+  /* ─────────────── one agent's profile ─────────────── */
+  const profile=sel&&ok?agents.find(a=>a.ext===sel):null;
+  if(profile){
+    const a=profile, cat=cxCat(statusOf(a.ext)), col=CXC[cat];
+    const myCalls=R.calls.filter(c=>c.ext===a.ext&&inDay(c.start));
+    const myRings=R.rings.filter(r=>r.ext===a.ext&&inDay(r.start)&&r.outcome!=='ringing');
+    const myAdmin=R.intervals.filter(iv=>iv.ext===a.ext&&cxCat(iv.status)==='admin'&&inDay(iv.start));
+    const myAlerts=alerts.filter(x=>x.ext===a.ext);
+    const mine=cmp.find(c=>c.user_id===a.uid);
+    const ringLabel={answered:'Answered',ignored:'Not answered',taken_by_other:'Answered by a colleague',short_ring:'Caller hung up first'};
+    const longest=myCalls.reduce((m,c)=>Math.max(m,c.secs),0);
+    const split={}; Object.entries(a.statusSecs).forEach(([st,v])=>{ const c=cxCat(st); split[c]=(split[c]||0)+v; });
+    const order=['call','admin','brk','avail','avail2','hol','ring','other','off'].filter(c=>split[c]>0);
+    const total=order.reduce((t,c)=>t+split[c],0)||1;
+    const hmOf=ms=>wallHM(ms);
+    const row=(key,left,mid,right,flag)=>(
+      <div key={key} className="acc-row" style={{minHeight:54}}>
+        <div style={{width:112,fontVariantNumeric:'tabular-nums',color:'var(--mut)',fontSize:15}} className="pv">{left}</div>
+        <div className="acc-n pv" style={{fontSize:16}}>{mid}{flag}</div>
+        <div className="acc-v pv" style={{fontSize:16}}>{right}</div>
+      </div>
+    );
+    return(
+      <div className="page">
+        <button className="bs cx-back" onClick={()=>setSel(null)}><span aria-hidden="true">←</span> All agents</button>
+        {header}
+        <div className="cx-prof">
+          <div className="cx-av lg" style={{boxShadow:`inset 0 0 0 3px ${col}`}}>{ini(a.app)}</div>
+          <div>
+            <h1 className="pv">{a.app}</h1>
+            <p className="hello-s" style={{marginBottom:10}}><span className="pv">ext {a.ext}</span> · {dayLabel}</p>
+            <span className="cx-st" style={{'--c':col}}>{statusOf(a.ext)||'No activity'}</span>
+          </div>
+        </div>
+        <div className="card acc" style={{marginBottom:34}}>
+          <div className="cx-tiles pv">
+            <div><span>Calls</span><b>{a.calls}</b></div>
+            <div><span>Talk time</span><b>{CX.fmtDur(a.callSecs)}</b></div>
+            <div><span>Average call</span><b>{CX.fmtDur(a.avgCallSecs)}</b></div>
+            <div><span>Longest call</span><b>{CX.fmtDur(longest)}</b></div>
+            <div><span>Answer rate</span><b>{a.answerRate==null?'–':Math.round(a.answerRate*100)+'%'}</b></div>
+            <div><span>Ignored rings</span><b style={a.ignored?{color:'#ff8fa3'}:null}>{a.ignored}</b></div>
+            <div><span>Short calls</span><b style={a.shortCalls?{color:'#ffb86b'}:null}>{a.shortCalls}</b></div>
+            <div><span>Admin time</span><b>{CX.fmtDur(a.adminSecs)}</b></div>
+            <div><span>Breaks</span><b>{a.breaks}</b></div>
+            <div><span>Break time</span><b>{CX.fmtDur(a.breakSecs)}</b></div>
+          </div>
+          <div style={{padding:'0 12px'}}>
+            <div className="card-t" style={{fontSize:16,marginBottom:6}}>Where the time went</div>
+            <div className="cx-bar pv">{order.map(c=><i key={c} style={{width:`${split[c]/total*100}%`,background:CXC[c]}} title={`${CX_LABEL[c]} ${CX.fmtDur(split[c])}`}/>)}</div>
+            <div className="cx-split pv">{order.map(c=><div key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}<b>{CX.fmtDur(split[c])} · {Math.round(split[c]/total*100)}%</b></div>)}</div>
+          </div>
+        </div>
+        <div className="cx-two2">
+          <div className="card acc">
+            <div className="card-hd"><div className="card-t">Calls <span className="cx-list-sub">{myCalls.length}</span></div></div>
+            {myCalls.length===0?<div className="onb-empty"><div>No calls this day</div></div>:myCalls.map((c,i)=>row(i,`${hmOf(c.start)} – ${c.open?'now':hmOf(c.end)}`,'Call',CX.fmtDur(c.secs),
+              !c.open&&!c.partialStart&&c.secs<_cxCfg.shortCallSec?<span className="badge b-bath">Short</span>:c.partialStart?<span className="badge">Started before logging</span>:null))}
+          </div>
+          <div className="card acc">
+            <div className="card-hd"><div className="card-t">Rings <span className="cx-list-sub">{myRings.length}</span></div></div>
+            {myRings.length===0?<div className="onb-empty"><div>No rings this day</div></div>:myRings.map((r,i)=>row(i,hmOf(r.start),ringLabel[r.outcome]||r.outcome,`${Math.round(r.secs)}s`,
+              r.outcome==='ignored'?<span className="badge" style={redBadge}>Ignored</span>:null))}
+          </div>
+          <div className="card acc">
+            <div className="card-hd"><div className="card-t">Breaks: agent's log and 3CX <span className="cx-list-sub">{mine?(mine.flagged?'differs':'matches'):'none'}</span></div></div>
+            {!mine?<div className="onb-empty"><div>No breaks this day</div></div>:<>
+              {mine.pairs.map((p,i)=>row('p'+i,`${hmOf(p.cx.s)} – ${p.cx.open?'now':hmOf(p.cx.e)}`,'3CX',`log ${hmOf(p.app.s)} – ${p.app.open?'now':hmOf(p.app.e)}`,null))}
+              {mine.onlyCx.map((x,i)=>row('c'+i,`${hmOf(x.s)} – ${x.open?'now':hmOf(x.e)}`,'3CX only','',<span className="badge" style={redBadge}>Not in agent's log</span>))}
+              {mine.onlyApp.map((x,i)=>row('a'+i,`${hmOf(x.s)} – ${x.open?'now':hmOf(x.e)}`,"Agent's log only",'',<span className="badge" style={redBadge}>Not in 3CX</span>))}
+            </>}
+          </div>
+          <div className="card acc">
+            <div className="card-hd"><div className="card-t">Admin <span className="cx-list-sub">{myAdmin.length}</span></div></div>
+            {myAdmin.length===0?<div className="onb-empty"><div>No admin time this day</div></div>:myAdmin.map((iv,i)=>row(i,`${hmOf(iv.start)} – ${iv.end?hmOf(iv.end):'now'}`,iv.status,CX.fmtDur(((iv.end??capEnd)-iv.start)/1000),iv.partialStart?<span className="badge">Started before logging</span>:null))}
+          </div>
+          <div className="card acc" style={{gridColumn:'1 / -1'}}>
+            <div className="card-hd"><div className="card-t">Alerts <span className="cx-list-sub">{myAlerts.length}</span></div></div>
+            {myAlerts.length===0?<div className="onb-empty"><div>No open alerts for {a.app.split(' ')[0]} this day</div></div>:myAlerts.map((x,i)=>{ const k=kind(x); return(
+              <div key={i} className="acc-row" style={{minHeight:54}}>
+                <div style={{width:112,color:'var(--mut)',fontSize:15}} className="pv">{hmOf(x.at)}</div>
+                <div className="acc-n pv" style={{fontSize:16,whiteSpace:'normal'}}>{k.d} <span className={`badge ${k.cls}`} style={k.red?redBadge:null}>{k.t}</span></div>
+                <button className="cx-done" title="Mark as dealt with" aria-label="Mark as dealt with" onClick={()=>dismiss(x)}><Ic n="check" size={16}/></button>
+              </div>); })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─────────────── the team page ─────────────── */
+  return(
+    <div className="page">
+      <h1 className="hello">3CX calls</h1>
+      <p className="hello-s">{ok?`${dayLabel}${day===todayStr?' (today)':''} · ${tot.calls} calls · ${alerts.length} alert${alerts.length===1?'':'s'}`:'Reads what the 3CX logger uploads to Supabase · nothing is written'}</p>
+      {header}
+
+      {!R&&(
+        <div className="card acc"><div className="onb-empty">
+          <div className="es-ic"><Ic n="phone" size={24}/></div>
+          <div>{dbErr?'Waiting for the status log':'Reading the status_log table…'}</div>
+          <span>This reads what the 3CX logger uploads. Nothing is written.</span>
+        </div></div>
+      )}
+
+      {ok&&agents.length>0&&day===todayStr&&(()=>{
+        const T=[['call','On a call','phone'],['brk','On break','coffee'],['admin','On admin','edit'],['avail','Available','check']];
+        const here=agents.filter(a=>!['off','hol'].includes(cxCat(statusOf(a.ext)))).length, n=here||1, other=here-T.reduce((t,x)=>t+nowCount(x[0]),0);
+        return(<div className="cx-live" aria-label="Right now">
+          <div className="cx-live-t">Right now <small>{here} logged in</small></div>
+          <div className="cx-live-g">
+            {T.map(([c,l,ic])=>{ const v=nowCount(c); return(
+              <div key={c} className={`cx-lt${v?'':' zero'}`} style={{'--c':CXC[c]}}>
+                <div className="cx-lt-ic"><Ic n={ic} size={20}/></div>
+                <b>{v}</b><span>{l}</span>
+                <em><i style={{width:`${v/n*100}%`}}/></em>
+              </div>); })}
+          </div>
+          <div className="cx-mix" title="Whole team right now">
+            {T.map(([c,l])=>nowCount(c)>0&&<i key={c} style={{flex:nowCount(c),background:CXC[c]}} title={`${l} ${nowCount(c)}`}/>)}
+            {other>0&&<i style={{flex:other,background:'#3a3d4a'}} title={`Other ${other}`}/>}
+          </div>
+        </div>);
+      })()}
+
+      {ok&&all.length===0&&(
+        <div className="card acc"><div className="onb-empty">
+          <div className="es-ic"><Ic n="phone" size={24}/></div>
+          <div>No rows in the log for {dayLabel}</div>
+          <span>{isDb?'Either the logger has not uploaded anything for this period yet, or admins are not allowed to read the table (a table that only lets the logger add rows looks empty to everyone else).':'Let the logger run for a while and load the file again.'}</span>
+          {isDb&&<CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/>}
+        </div></div>
+      )}
+      {ok&&all.length>0&&!matchedAny&&(
+        <div className="card acc"><div className="onb-empty">
+          <div className="es-ic"><Ic n="users" size={24}/></div>
+          <div>No agents in this log match agents in the app</div>
+          <span>3CX names must match the agent's name in the app, in either order (for example "Sghir, Abdulkarim" and "Abdulkarim Sghir"). {all.length} 3CX extension{all.length===1?'':'s'} hidden.</span>
+        </div></div>
+      )}
+      {ok&&matchedAny&&agents.length===0&&(
+        <div className="card acc"><div className="onb-empty">
+          <div className="es-ic"><Ic n="phone" size={24}/></div>
+          <div>No 3CX activity on {dayLabel}</div>
+          <span>The log has activity on {days.filter(d=>d!==day&&R.intervals.some(iv=>{ const w=wall(iv.start); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`===d; })).map(d=>new Date(d+'T00:00:00Z').toLocaleDateString([],{day:'numeric',month:'short',timeZone:'UTC'})).join(', ')||'no other day'}. Pick one above.</span>
+        </div></div>
+      )}
+
+      {ok&&agents.length>0&&<>
+        <div className="cx-two">
+          <div className="card acc">
+            <div className="card-hd"><div><div className="card-t">Statistics</div></div></div>
+            <div className="cx-tiles pv">
+              <div><span>Calls</span><b>{tot.calls}</b></div>
+              <div><span>Talk time</span><b>{CX.fmtDur(tot.talk)}</b></div>
+              <div><span>Average call</span><b>{CX.fmtDur(tot.calls?tot.talk/tot.calls:0)}</b></div>
+              <div><span>Answer rate</span><b>{rate}</b></div>
+              <div><span>Ignored rings</span><b>{tot.ign}</b></div>
+              <div><span>Short calls</span><b>{tot.short}</b></div>
+              <div><span>Admin time</span><b>{CX.fmtDur(tot.admin)}</b></div>
+            </div>
+            <div className="cx-chart"><CxChart labels={hours.map(h=>`${String(h).padStart(2,'0')}:00`)} series={[{vals:chartCalls,color:CXC.call},{vals:chartLook,color:CXC.admin,dashed:true}]}/></div>
+            <div className="cx-leg"><span><i style={{background:CXC.call}}/>Calls started per hour</span><span><i style={{background:CXC.admin}}/>Ignored rings + short calls</span></div>
+          </div>
+
+          <div className="card acc onb cx-alerts">
+            <div className="card-hd">
+              <div>
+                <div className="card-t">Alerts</div>
+                <div className="big pv" style={{marginTop:6}}><Amt main={<TNum value={alerts.length}/>} sup=" open"/></div>
+              </div>
+              <div className="card-ctl">
+                {alerts.length>0&&<button className="bs" onClick={clearAll} title="Mark every alert as dealt with">Clear all</button>}
+                <button className="icb sm" onClick={()=>go&&go('settings')} title="3CX alert settings"><Ic n="settings" size={16}/></button>
+              </div>
+            </div>
+            {alerts.length===0?(
+              <div className="onb-empty">
+                <div className="es-ic"><Ic n="check" size={24}/></div>
+                <div>{done.length?'All alerts dealt with':'No alerts for this day'}</div>
+                <span>Ignored after {_cxCfg.ignoreRingSec}s · short call under {_cxCfg.shortCallSec}s</span>
+              </div>
+            ):alerts.slice(0,6).map(a=>{ const k=kind(a); return(
+              <div key={akey(a)} className="acc-row onb-row link" onClick={()=>a.ext&&setSel(a.ext)} title="Open profile">
+                <div className={`acc-ic ${k.ic}`}>{ini(a.agent)}</div>
+                <div className="onb-mid">
+                  <div className="acc-n pv">{a.agent}</div>
+                  <div className="cx-reason pv"><span className={`badge ${k.cls}`} style={k.red?redBadge:null}>{k.t}</span>{k.d}</div>
+                </div>
+                <div className="onb-r"><div className="acc-v pv">{wallHM(a.at)}</div></div>
+                <button className="cx-done" title="Mark as dealt with" aria-label="Mark as dealt with" onClick={e=>{ e.stopPropagation(); dismiss(a); }}><Ic n="check" size={16}/></button>
+              </div>
+            );})}
+            {alerts.length>6&&<div className="acc-row"><div className="acc-ic more">+{alerts.length-6}</div><div className="acc-n" style={{color:'var(--mut)'}}>more alerts</div></div>}
+            {done.length>0&&<div style={{padding:'10px 12px 0'}}>
+              <button className="bs" onClick={()=>setShowDone(v=>!v)}>Dealt with ({done.length})</button>
+              {showDone&&done.map(a=>(
+                <div key={akey(a)} className="acc-row" style={{minHeight:48,opacity:.7}}>
+                  <div className="acc-n pv" style={{fontSize:15}}>{a.agent} <small>{kind(a).t} · {wallHM(a.at)}</small></div>
+                  <button className="bs" onClick={()=>restore(a)}>Restore</button>
+                </div>))}
+            </div>}
+          </div>
+        </div>
+
+        <div className="cx-sec">Agents <small>{agents.length} in the app{hidden>0?` · ${hidden} other 3CX extension${hidden===1?'':'s'} ${hidden===1?'isn\'t':'aren\'t'} in the app and ${hidden===1?'is':'are'} hidden`:''}</small></div>
+        <div className="cx-grid">
+          {agents.map(a=>{ const st=statusOf(a.ext), col=CXC[cxCat(st)]; return(
+            <button key={a.ext} className="cx-card" onClick={()=>setSel(a.ext)} aria-label={`Open ${a.app}`}>
+              <div className="cx-top">
+                <div className="cx-av" style={{boxShadow:`inset 0 0 0 2px ${col}`}}>{ini(a.app)}</div>
+                <div className="cx-who"><div className="cx-name pv">{a.app}</div><span className="cx-st" style={{'--c':col}}>{st||'No activity'}</span></div>
+                <div className="cx-ext pv">ext {a.ext}</div>
+              </div>
+              <div className="cx-stats pv">
+                <div><span>Calls</span><b>{a.calls}</b></div>
+                <div><span>Talk time</span><b>{CX.fmtDur(a.callSecs)}</b></div>
+                <div><span>Break</span><b>{CX.fmtDur(a.breakSecs)}</b></div>
+                <div><span>Ignored</span><b className={a.ignored?'warn':''}>{a.ignored}</b></div>
+                <div><span>Short calls</span><b className={a.shortCalls?'note':''}>{a.shortCalls}</b></div>
+                <div><span>Admin</span><b>{CX.fmtDur(a.adminSecs)}</b></div>
+              </div>
+            </button>
+          );})}
+        </div>
+
+        <div className="cx-sec" style={{marginTop:34}}>Break check <small>agent's log vs 3CX</small></div>
+        <div className="cx-chips">
+          <span className="cx-chip"><b>{flagged.length}</b> differ</span>
+          <span className="cx-chip"><b>{cmp.length-flagged.length}</b> match</span>
+        </div>
+        <div className="card acc">
+          {cmp.length===0?(
+            <div className="onb-empty"><div className="es-ic"><Ic n="coffee" size={24}/></div><div>No breaks in 3CX or in the agents' log for this day</div></div>
+          ):<div className="tbl-wrap"><table className="dt cxr">
+            <thead><tr><th>Agent</th><th>Agent's log</th><th>3CX</th><th>Difference</th></tr></thead>
+            <tbody>{cmp.map(c=>{ const ext=extOfUid[c.user_id]; return(
+              <tr key={c.user_id} onClick={()=>ext&&setSel(ext)} style={ext?{cursor:'pointer'}:null}>
+                <td className="pv"><AvC name={c.agent_name}/></td>
+                <td className="pv">{c.appCount} · {CX.fmtDur(c.appSecs)}</td>
+                <td className="pv">{c.cxCount} · {CX.fmtDur(c.cxSecs)}</td>
+                <td className="pv" style={isDiff(c)?{color:'#ff8fa3',fontWeight:500}:{color:'var(--mut)'}}>{sgn(c.diffSecs)}</td>
+              </tr>); })}</tbody>
+          </table></div>}
+        </div>
+      </>}
+    </div>
+  );
+}
 function AShiftEnd(){
   const [val,setVal]=useState('16:30');
   const [needSetup,setNeedSetup]=useState(false);
@@ -3942,6 +4977,7 @@ function ASettings(){
       </div>
       <ASlotSchedule/>
       <AShiftEnd/>
+      <A3cxSettings/>
       <div className="sblk">
         <h2 className="sh">Lunch start time</h2>
         <p className="sd">When the first lunch group leaves. The second group goes one hour later, and the groups swap order every day.</p>
