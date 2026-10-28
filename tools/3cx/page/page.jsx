@@ -41,10 +41,8 @@ function A3cx({go}){
   const [, setTick]=useState(0);
   const [users,setUsers]=useState([]);
   const [dbLogs,setDbLogs]=useState([]);            // what the agents entered (bt_logs) for the day
-  const [shiftEnd,setShiftEnd]=useState('16:30');
   const [err,setErr]=useState('');
   const [sel,setSel]=useState(null);
-  const [forced,setForced]=useState(false);         // "Run break check now"
   const [showDone,setShowDone]=useState(false);
   const [dismissed,setDismissed]=useState(()=>{ try{ return JSON.parse(localStorage.getItem(CX_DISMISS_KEY)||'{}'); }catch(e){ return {}; } });
   const fileRef=useRef(null);
@@ -61,12 +59,10 @@ function A3cx({go}){
     Promise.all([
       run(SB.from('bt_clocklogs').select('user_id,agent_name').order('clock_in',{ascending:false}).limit(2000)),
       run(SB.from('bt_logs').select('user_id,agent_name').order('start_time',{ascending:false}).limit(2000)),
-      run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle()),
-    ]).then(([a,b,c])=>{
+    ]).then(([a,b])=>{
       const m=new Map();
       [...(a.data||[]),...(b.data||[])].forEach(r=>{ if(r.user_id&&r.agent_name&&!m.has(r.user_id)) m.set(r.user_id,{id:r.user_id,name:r.agent_name}); });
       setUsers([...m.values()]);
-      if(c.data&&HM_RE.test(c.data.shift_end||'')) setShiftEnd(c.data.shift_end);
     });
   },[]);
 
@@ -80,7 +76,7 @@ function A3cx({go}){
   const load=(t,name,mod)=>{
     const rows=CX.parseCsv(t);
     if(!rows.length){ setErr('That file has no rows yet. Let the logger run for a while and try again.'); return; }
-    setErr(''); setText(t); setFileName(name); setFileMod(mod||0); setSel(null); setForced(false);   // the day is NOT changed: it stays on today (or the day you picked)
+    setErr(''); setText(t); setFileName(name); setFileMod(mod||0); setSel(null);   // the day is NOT changed: it stays on today (or the day you picked)
   };
   const pick=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>load(String(r.result),f.name,f.lastModified); r.readAsText(f); e.target.value=''; };
   const chooseDay=d=>setPicked(!d||d===todayISO()?null:d);
@@ -117,42 +113,26 @@ function A3cx({go}){
   const tot=agents.reduce((t,a)=>({calls:t.calls+a.calls,talk:t.talk+a.callSecs,ans:t.ans+a.answered,ign:t.ign+a.ignored,short:t.short+a.shortCalls,admin:t.admin+a.adminSecs}),{calls:0,talk:0,ans:0,ign:0,short:0,admin:0});
   const rate=tot.ans+tot.ign?Math.round(tot.ans/(tot.ans+tot.ign)*100)+'%':'–';
 
-  /* break check: 3CX against what the agents entered. Read-only: nothing the agents entered is ever changed. */
-  const checkAt=addMin(shiftEnd,-_cxCfg.breakCheckLeadMin);
-  const hmNow=wallHM();
-  const due=forced||day<todayStr||(day===todayStr&&hmNow>=checkAt);
+  /* break check: 3CX against what the agents entered. Read-only, and only shown in its own table:
+     it is never added to the alerts or to notifications, and nothing the agents entered is changed. */
   const uids=new Set(agents.map(a=>a.uid));
   const cxBreaks=ok?CX.toBreakLogs(R.intervals,match,{tzOffsetHours:logTz}).logs.filter(l=>inDay(Date.parse(l.start_time))&&uids.has(l.user_id)):[];
   const appBreaks=appLogs.filter(l=>uids.has(l.user_id));
   const cmp=ok?CX.compareBreaks(cxBreaks,appBreaks,{tzOffsetHours:tz,now:R.now,breakToleranceSec:_cxCfg.breakToleranceMin*60}):[];
-  const flagged=cmp.filter(c=>c.flagged);
+  // a row differs when the totals are further apart than the tolerance, or the number of breaks isn't the same
+  const isDiff=c=>Math.abs(c.diffSecs)>_cxCfg.breakToleranceMin*60||c.cxCount!==c.appCount;
+  const flagged=cmp.filter(isDiff);
   const extOfUid={}; agents.forEach(a=>{ extOfUid[a.uid]=a.ext; });
-  const checkMs=from+(parseInt(checkAt.slice(0,2),10)*60+parseInt(checkAt.slice(3),10))*60000;
 
-  /* alerts: call alerts from the analysis, plus a break-check alert per flagged agent once the check is due */
-  const callAlerts=ok?R.alerts.filter(a=>shown.has(a.ext)).map(a=>({...a,agent:(byKey.get(CX.nameKey(a.agent))||{}).name||a.agent})):[];
-  const breakAlerts=due?flagged.map(c=>({type:'break_diff',severity:'warning',ext:extOfUid[c.user_id],agent:c.agent_name,at:checkMs,reasons:c.reasons})):[];
-  const alertsAll=[...callAlerts,...breakAlerts].sort((a,b)=>a.at-b.at);
-  const akey=a=>a.type==='break_diff'?`break_diff|${a.ext}|${day}`:`${a.type}|${a.ext}|${a.at}`;
+  /* alerts: the call alerts from the analysis */
+  const alertsAll=ok?R.alerts.filter(a=>shown.has(a.ext)).map(a=>({...a,agent:(byKey.get(CX.nameKey(a.agent))||{}).name||a.agent})).sort((a,b)=>a.at-b.at):[];
+  const akey=a=>`${a.type}|${a.ext}|${a.at}`;
   const alerts=alertsAll.filter(a=>!dismissed[akey(a)]);
   const done=alertsAll.filter(a=>dismissed[akey(a)]);
   const saveDismissed=n=>{ setDismissed(n); try{ localStorage.setItem(CX_DISMISS_KEY,JSON.stringify(n)); }catch(e){} };
   const dismiss=a=>saveDismissed({...dismissed,[akey(a)]:1});
   const restore=a=>{ const n={...dismissed}; delete n[akey(a)]; saveDismissed(n); };
   const clearAll=()=>{ const n={...dismissed}; alerts.forEach(a=>{ n[akey(a)]=1; }); saveDismissed(n); };
-
-  // tell the admin once a day, 10 minutes (set in Settings) before shift end, if 3CX and the agents' entries differ
-  const notifyDue=day===todayStr&&hmNow>=checkAt;
-  useEffect(()=>{
-    if(!ok||!notifyDue||flagged.length===0) return;
-    const k='bt_cx_notified_'+day;
-    try{ if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); }catch(e){}
-    fireNotification({title:'Break check',body:`${flagged.length} agent${flagged.length===1?' has':'s have'} breaks in 3CX that differ from their own log`,type:'custom',duration:12000});
-  },[ok,notifyDue,flagged.length,day]);
-  const runCheckNow=()=>{
-    setForced(true);
-    if(flagged.length) fireNotification({title:'Break check',body:`${flagged.length} agent${flagged.length===1?' has':'s have'} breaks in 3CX that differ from their own log`,type:'custom',duration:12000});
-  };
 
   // days that appear in the log (company clock), plus today; newest 14
   const days=ok?[...new Set([day,todayStr,...R.intervals.map(iv=>{ const w=wall(iv.start); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; })])].sort().slice(-14):[];
@@ -183,9 +163,9 @@ function A3cx({go}){
   const statusOf=ext=>latest[ext]?latest[ext].status:'';
   const nowCount=cat=>agents.filter(a=>cxCat(statusOf(a.ext))===cat).length;
 
-  const previewAlerts=()=>alerts.slice(0,5).forEach((a,i)=>setTimeout(()=>fireNotification({title:a.type==='break_diff'?'Break check':a.type==='short_call'?'Possible dropped call':a.type==='repeated_ignore'?'Repeated ignored calls':'Ignored call',body:alertText(a),type:'custom',duration:8000}),i*900));
-  const kind=a=>a.type==='break_diff'?{t:'Break check',cls:'b-lunch',ic:'lun',d:a.reasons[0]+(a.reasons.length>1?` (+${a.reasons.length-1} more)`:'')}
-    :a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}
+  const sgn=d=>Math.abs(d)<1?'0s':`${d>0?'+':'−'}${CX.fmtDur(Math.abs(d))}`;   // the agent's log minus 3CX
+  const previewAlerts=()=>alerts.slice(0,5).forEach((a,i)=>setTimeout(()=>fireNotification({title:a.type==='short_call'?'Possible dropped call':a.type==='repeated_ignore'?'Repeated ignored calls':'Ignored call',body:alertText(a),type:'custom',duration:8000}),i*900));
+  const kind=a=>a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}
     :a.type==='repeated_ignore'?{t:'Repeated',cls:'',ic:'brk',d:`${a.count} ignored calls within ${_cxCfg.repeatIgnoreWindowMin} min`,red:true}
     :{t:'Ignored',cls:'b-brk',ic:'brk',d:`Rang ${a.secs}s, not answered`};
   const alertText=a=>`${a.agent}: ${kind(a).d}`;
@@ -275,7 +255,6 @@ function A3cx({go}){
           <div className="card acc">
             <div className="card-hd"><div className="card-t">Breaks: agent's log and 3CX <span className="cx-list-sub">{mine?(mine.flagged?'differs':'matches'):'none'}</span></div></div>
             {!mine?<div className="onb-empty"><div>No breaks this day</div></div>:<>
-              {mine.reasons.map((r,i)=><div key={i} className="cx-reason pv" style={{padding:'0 12px 8px'}}>{r}</div>)}
               {mine.pairs.map((p,i)=>row('p'+i,`${hmOf(p.cx.s)} – ${p.cx.open?'now':hmOf(p.cx.e)}`,'3CX',`log ${hmOf(p.app.s)} – ${p.app.open?'now':hmOf(p.app.e)}`,null))}
               {mine.onlyCx.map((x,i)=>row('c'+i,`${hmOf(x.s)} – ${x.open?'now':hmOf(x.e)}`,'3CX only','',<span className="badge" style={redBadge}>Not in agent's log</span>))}
               {mine.onlyApp.map((x,i)=>row('a'+i,`${hmOf(x.s)} – ${x.open?'now':hmOf(x.e)}`,"Agent's log only",'',<span className="badge" style={redBadge}>Not in 3CX</span>))}
@@ -420,26 +399,24 @@ function A3cx({go}){
           );})}
         </div>
 
-        <div className="cx-sec" style={{marginTop:34}}>Break check <small>3CX compared with the agents' own break log · the agents' entries are never changed</small></div>
+        <div className="cx-sec" style={{marginTop:34}}>Break check <small>agent's log vs 3CX</small></div>
         <div className="cx-chips">
           <span className="cx-chip"><b>{flagged.length}</b> differ</span>
           <span className="cx-chip"><b>{cmp.length-flagged.length}</b> match</span>
-          <span className="cx-chip">{due?'Final check done':`Final check at ${checkAt}`}</span>
-          {!due&&<button className="bs" onClick={runCheckNow}>Run break check now</button>}
         </div>
         <div className="card acc">
           {cmp.length===0?(
             <div className="onb-empty"><div className="es-ic"><Ic n="coffee" size={24}/></div><div>No breaks in 3CX or in the agents' log for this day</div></div>
-          ):cmp.map(c=>{ const ext=extOfUid[c.user_id]; return(
-            <div key={c.user_id} className={`acc-row onb-row${ext?' link':''}`} onClick={()=>ext&&setSel(ext)}>
-              <div className={`acc-ic ${c.flagged?'brk':'bth'}`}>{ini(c.agent_name)}</div>
-              <div className="onb-mid">
-                <div className="acc-n pv">{c.agent_name} <span className={`badge ${c.flagged?'':'b-in'}`} style={c.flagged?redBadge:null}>{c.flagged?'Differs':'Matches'}</span></div>
-                <div className="cx-cmp pv"><span>Agent's log <b>{c.appCount} · {CX.fmtDur(c.appSecs)}</b></span><span>3CX <b>{c.cxCount} · {CX.fmtDur(c.cxSecs)}</b></span></div>
-                {c.reasons.map((r,i)=><div key={i} className="cx-reason pv">{r}</div>)}
-              </div>
-            </div>
-          );})}
+          ):<div className="tbl-wrap"><table className="dt cxr">
+            <thead><tr><th>Agent</th><th>Agent's log</th><th>3CX</th><th>Difference</th></tr></thead>
+            <tbody>{cmp.map(c=>{ const ext=extOfUid[c.user_id]; return(
+              <tr key={c.user_id} onClick={()=>ext&&setSel(ext)} style={ext?{cursor:'pointer'}:null}>
+                <td className="pv"><AvC name={c.agent_name}/></td>
+                <td className="pv">{c.appCount} · {CX.fmtDur(c.appSecs)}</td>
+                <td className="pv">{c.cxCount} · {CX.fmtDur(c.cxSecs)}</td>
+                <td className="pv" style={isDiff(c)?{color:'#ff8fa3',fontWeight:500}:{color:'var(--mut)'}}>{sgn(c.diffSecs)}</td>
+              </tr>); })}</tbody>
+          </table></div>}
         </div>
       </>}
     </div>

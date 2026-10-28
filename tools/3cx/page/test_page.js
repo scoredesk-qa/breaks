@@ -85,14 +85,22 @@ const mkdb = (extra = {}) => Object.assign({
 
   // break check: 3CX against what the agents entered
   body = await text(p);
-  check('K1 Break check section: 3 differ, 0 match, final check at 16:20 (shift end 16:30 minus 10)', /Break check/.test(body) && /3\s*differ/.test(await flat(p)) && /Final check at 16:20/.test(body), (body.match(/Final check[^\n]*/) || [''])[0]);
-  check('K2 each difference says why', /Totals differ by 10m 00s/.test(body) && /3CX shows a break 13:00 to now that is not in the agent's log/.test(body) && /The agent's log has a break 10:00 to 10:10 that 3CX doesn't show/.test(body));
-  check('K3 before the check time there are no break-check alerts', !/Break check\n/.test(await p.locator('.onb-row.link').allInnerTexts().then(a => a.join('\n'))) );
-  await p.click('button:has-text("Run break check now")'); await p.waitForTimeout(400);
-  body = await text(p);
-  check('K4 "Run break check now": 3 break-check alerts join the list (8 open) and a notification appears', /8\s*open/.test(await flat(p)) && /differ from their own log/.test(body), (await flat(p)).match(/\d+\s*open/)[0]);
-  check('K5 ...and the check now says done', /Final check done/.test(body));
-  await p.screenshot({ path: path.join(mods, 'cx_check.png'), fullPage: true });
+  check('K1 Break check section: 3 differ, 0 match (and nothing about a final check or notifications)', /Break check/.test(body) && /3\s*differ/.test(await flat(p)) && /0\s*match/.test(await flat(p)) && !/Final check|Run break check/.test(body));
+  const kr = async n => (await p.locator(`.cxr tr:has-text("${n}")`).innerText()).replace(/\s+/g, ' ');
+  check('K2 the break check is a small table: agent, agent\'s log, 3CX, difference (no sentences)', /Agent's log 3CX Difference/.test((await p.locator('.cxr thead').last().innerText()).replace(/\s+/g, ' ')) && !/that is not in the agent's log|that 3CX doesn't show|Totals differ/.test(body));
+  check('K2b Kay: log 2 · 1h 05m, 3CX 2 · 1h 15m, difference −10m 00s', /Kay Kim 2 · 1h 05m 2 · 1h 15m −10m 00s/.test(await kr('Kay Kim')), await kr('Kay Kim'));
+  check('K2c Finn: log 0 · 0s, 3CX 1 · 10m 00s, difference −10m 00s', /Finn Fox 0 · 0s 1 · 10m 00s −10m 00s/.test(await kr('Finn Fox')), await kr('Finn Fox'));
+  check('K2d Jane: log 1 · 10m 00s, 3CX 0 · 0s, difference +10m 00s', /Jane Doe 1 · 10m 00s 0 · 0s \+10m 00s/.test(await kr('Jane Doe')), await kr('Jane Doe'));
+  check('K3 break-check differences are NOT added to the alerts: still 5 open, no "Break check" badge', /5\s*open/.test(await flat(p)) && await p.locator('.cx-alerts .badge:has-text("Break check")').count() === 0);
+  check('K4 and no notification was raised', !/differ from their own log/.test(await text(p)) && await p.locator('button:has-text("Run break check")').count() === 0);
+  // the sample's checks above are in the table; here: totals 1s apart but the breaks sit an hour apart on the clock -> not a difference
+  const apart = mkdb({ bt_logs: [{ id: 'x1', user_id: 'u3', agent_name: 'Kay Kim', start_time: iso('10:00'), end_time: iso('10:15'), break_type: 'Break' }, { id: 'x2', user_id: 'u3', agent_name: 'Kay Kim', start_time: iso('10:30'), end_time: iso('11:30'), break_type: 'Lunch Break' }] });
+  const csvA = path.join(work, 'apart.csv'); fs.copyFileSync(path.join(__dirname, '..', 'fixtures', 'status_log.sample.csv'), csvA);
+  const tA = Date.UTC(2026, 9, 27, 14, 20, 1) / 1000; fs.utimesSync(csvA, tA, tA);
+  const pa = await open({ db: apart }); await pa.setInputFiles('input[type=file]', csvA); await pa.waitForSelector('.cx-card'); await pa.waitForTimeout(300);
+  const kayRow = (await pa.locator('.cxr tr:has-text("Kay Kim")').innerText()).replace(/\s+/g, ' ');
+  check('K6 same totals and counts but an hour apart on the clock: shows the plain difference (0s), not flagged', /Kay Kim 2 · 1h 15m 2 · 1h 15m 0s/.test(kayRow) && /0\s*differ/.test(await flat(pa)), kayRow);
+  await pa.context().close();
 
   // profile
   await rick.click(); await p.waitForSelector('text=All agents');
@@ -104,7 +112,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.click('text=All agents'); await p.waitForSelector('.cx-card');
   await p.click('.cx-card:has-text("Kay Kim")'); await p.waitForSelector('text=Where the time went');
   body = await text(p);
-  check('R4 Kay\'s profile compares her log with 3CX, with the reason', /Breaks: agent's log and 3CX/.test(body) && /Totals differ by 10m 00s/.test(body) && /3CX\s*log 11:00 – 11:15/.test(body.replace(/\n/g, ' ')), '');
+  check('R4 Kay\'s profile lists her breaks in 3CX next to her log, no explanations', /Breaks: agent's log and 3CX/.test(body) && /3CX\s*log 11:00 – 11:15/.test(body.replace(/\n/g, ' ')) && !/Totals differ/.test(body));
   await p.click('text=All agents');
   await p.click('.cx-card:has-text("Finn Fox")'); await p.waitForSelector('text=Where the time went');
   check('R5 Finn\'s profile: 3CX only, not in the agent\'s log', /3CX only/.test(await text(p)) && await p.locator('.badge:has-text("Not in agent\'s log")').count() === 1);
@@ -127,7 +135,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.click('text=Settings >> nth=0'); await p.waitForSelector('text=3CX call alerts');
   const box = p.locator('h2:has-text("3CX call alerts")').locator('xpath=..');
   const inputs = box.locator('input[type=number]');
-  check('T1 Settings has the 3CX section with seven values and the defaults', await inputs.count() === 7 && await inputs.nth(0).inputValue() === '0' && await inputs.nth(1).inputValue() === '10' && await inputs.nth(5).inputValue() === '3' && await inputs.nth(6).inputValue() === '10');
+  check('T1 Settings has the 3CX section with six values and the defaults', await inputs.count() === 6 && await inputs.nth(0).inputValue() === '0' && await inputs.nth(1).inputValue() === '10' && await inputs.nth(5).inputValue() === '3');
   await inputs.nth(1).fill('30'); await inputs.nth(5).fill('15'); await box.locator('button.bp').click(); await p.waitForTimeout(300);
   const saved = JSON.parse(await p.evaluate(() => localStorage.getItem('bt_cx_cfg') || '{}'));
   check('T2 saved in this browser', saved.ignoreRingSec === 30 && saved.breakToleranceMin === 15);
@@ -146,16 +154,12 @@ const mkdb = (extra = {}) => Object.assign({
   await p.click('button:text-is("Today")'); await p.waitForSelector('text=No 3CX activity on');
   await p.context().close();
 
-  // the end-of-day break check fires by itself 10 minutes before shift end (16:30 - 10 = 16:20)
-  p = await open({ now: TODAY + 'T16:19:00.000Z' });
-  await p.click('text=Use sample data'); await p.waitForSelector('.cx-card'); await p.waitForTimeout(500);
-  check('E1 at 16:19 nothing has fired yet', !/differ from their own log/.test(await text(p)) && /5\s*open/.test(await flat(p)));
-  await p.context().close();
+  // late in the day (after what used to be the check time) the differences stay out of the alerts and notifications
   p = await open({ now: TODAY + 'T16:21:00.000Z' });
   await p.click('text=Use sample data'); await p.waitForSelector('.cx-card'); await p.waitForTimeout(600);
   body = await text(p);
-  check('E2 at 16:21 the admin is notified and the 3 differences join the alerts (8 open)', /differ from their own log/.test(body) && /8\s*open/.test(await flat(p)));
-  check('E3 it is only sent once a day', await p.evaluate(() => localStorage.getItem('bt_cx_notified_2026-10-27')) === '1');
+  check('E1 at 16:21: still 5 open alerts, no notification, 3 agents differ in the table', /5\s*open/.test(await flat(p)) && !/differ from their own log/.test(body) && /3\s*differ/.test(await flat(p)));
+  check('E2 nothing was stored for a notification', await p.evaluate(() => localStorage.getItem('bt_cx_notified_2026-10-27')) === null);
   await p.context().close();
 
   // with a real log (not the sample), the agents' entries come from the database, read-only
@@ -168,7 +172,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.setInputFiles('input[type=file]', csv); await p.waitForSelector('.cx-card'); await p.waitForTimeout(300);
   body = await text(p);
   check('F1 a log from the app\'s own agents: 4 cards (Jane, Rick, Pat, Kay)', await p.locator('.cx-card').count() === 4, String(await p.locator('.cx-card').count()));
-  check('F2 Kay\'s entries in the database match 3CX exactly: "Matches", 0 differ', /0\s*differ/.test(await flat(p)) && /Kay Kim\s*Matches/.test(body.replace(/\n/g, ' ')));
+  check('F2 Kay\'s entries in the database match 3CX exactly: difference 0s, 0 differ', /0\s*differ/.test(await flat(p)) && /Kay Kim 2 · 1h 15m 2 · 1h 15m 0s/.test((await p.locator('.cxr tr:has-text("Kay Kim")').innerText()).replace(/\s+/g, ' ')));
   check('F3 logger clock UTC+0 matches the file: no warning', !/suggests the 3CX logger PC runs on/.test(body));
   const dbAfter = await p.evaluate(() => window.__DB.bt_logs);
   check('F4 the agents\' entries were not changed', dbAfter.length === 2 && dbAfter[1].end_time === iso('12:30'));
