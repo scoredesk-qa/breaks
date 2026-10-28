@@ -338,6 +338,26 @@ function A3cx({go}){
         </div></div>
       )}
 
+      {ok&&agents.length>0&&day===todayStr&&(()=>{
+        const T=[['call','On a call','phone'],['brk','On break','brk'],['admin','On admin','edit'],['avail','Available','check']];
+        const n=agents.length||1, other=agents.length-T.reduce((t,x)=>t+nowCount(x[0]),0);
+        return(<div className="cx-live" aria-label="Right now">
+          <div className="cx-live-t">Right now <small>{agents.length} agents</small></div>
+          <div className="cx-live-g">
+            {T.map(([c,l,ic])=>{ const v=nowCount(c); return(
+              <div key={c} className={`cx-lt${v?'':' zero'}`} style={{'--c':CXC[c]}}>
+                <div className="cx-lt-ic"><Ic n={ic} size={20}/></div>
+                <b>{v}</b><span>{l}</span>
+                <em><i style={{width:`${v/n*100}%`}}/></em>
+              </div>); })}
+          </div>
+          <div className="cx-mix" title="Whole team right now">
+            {T.map(([c,l])=>nowCount(c)>0&&<i key={c} style={{flex:nowCount(c),background:CXC[c]}} title={`${l} ${nowCount(c)}`}/>)}
+            {other>0&&<i style={{flex:other,background:'#3a3d4a'}} title={`Other / offline ${other}`}/>}
+          </div>
+        </div>);
+      })()}
+
       {ok&&<div className="cx-days" role="tablist" aria-label="Day">
         {days.map(d=>{ const dt=new Date(d+'T00:00:00Z'); return(
           <button key={d} role="tab" aria-selected={d===day} className={`cx-day${d===day?' on':''}`} onClick={()=>chooseDay(d)}>
@@ -426,12 +446,6 @@ function A3cx({go}){
         </div>
 
         <div className="cx-sec">Agents <small>{agents.length} in the app{hidden>0?` · ${hidden} other 3CX extension${hidden===1?'':'s'} ${hidden===1?'isn\'t':'aren\'t'} in the app and ${hidden===1?'is':'are'} hidden`:''}</small></div>
-        {day===todayStr&&<div className="cx-chips">
-          <span className="cx-chip"><b>{nowCount('call')}</b> on a call</span>
-          <span className="cx-chip"><b>{nowCount('brk')}</b> on break</span>
-          <span className="cx-chip"><b>{nowCount('admin')}</b> on admin</span>
-          <span className="cx-chip"><b>{nowCount('avail')}</b> available</span>
-        </div>}
         <div className="cx-grid">
           {agents.map(a=>{ const st=statusOf(a.ext), col=CXC[cxCat(st)]; return(
             <button key={a.ext} className="cx-card" onClick={()=>setSel(a.ext)} aria-label={`Open ${a.app}`}>

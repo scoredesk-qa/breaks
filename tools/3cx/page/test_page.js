@@ -59,6 +59,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('.cx-card');
   body = await text(p);
   check('S1 loading a log keeps today selected: subtitle shows the day, calls and alerts', /Tuesday, October 27 \(today\) · 3 calls · 5 alerts/.test(body), (body.match(/Tuesday[^\n]*/) || [''])[0]);
+  check('R1 a "Right now" strip sits above the day strip with 4 tiles, and the status chips under Agents are gone', await p.locator('.cx-live .cx-lt').count() === 4 && await p.locator('.cx-chip:has-text("on a call")').count() === 0 && (await p.locator('.cx-live').boundingBox()).y < (await p.locator('.cx-days').boundingBox()).y);
   check('S2 day strip shows the days in the log, today selected', await p.locator('.cx-day').count() === 2 && (await p.locator('.cx-day.on').innerText()).replace(/\s+/g, ' ') === '27 Tue');
   check('S3 Statistics card with tiles and a chart with two lines', /\nStatistics\n/.test(body) && await p.locator('.cx-chart svg').count() === 1 && await p.locator('.cx-chart svg path[stroke]').count() === 2);
   check('S4 one profile card per matching agent (8; Ada is not in the app)', await p.locator('.cx-card').count() === 8, String(await p.locator('.cx-card').count()));
