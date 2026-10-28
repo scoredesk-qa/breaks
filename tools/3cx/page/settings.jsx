@@ -3,7 +3,7 @@
    Test copy only: the values are kept in this browser (localStorage), not in the database. */
 const CX_CFG_KEY='bt_cx_cfg';
 // logTz: UTC offset of the PC that runs the 3CX logger (its clock wrote the log's timestamps)
-const CX_CFG_DEFAULT={logTz:0,ignoreRingSec:10,shortCallSec:60,repeatIgnoreCount:3,repeatIgnoreWindowMin:60,breakToleranceMin:3};
+const CX_CFG_DEFAULT={logTz:0,ignoreRingSec:10,shortCallSec:60,repeatIgnoreCount:3,repeatIgnoreWindowMin:60,breakToleranceMin:3,breakCheckLeadMin:10};
 let _cxCfg=(()=>{ try{ return {...CX_CFG_DEFAULT,...JSON.parse(localStorage.getItem(CX_CFG_KEY)||'{}')}; }catch(e){ return {...CX_CFG_DEFAULT}; } })();
 const CX_SAMPLE_USERS=['Jane Doe','Rick Roe','Pat Poe','Max Moe','Lou Lee','Kay Kim','Finn Fox','Gail Gray'].map((n,i)=>({id:'sample-'+i,name:n}));
 
@@ -35,6 +35,7 @@ function A3cxSettings(){
       {row('Repeated ignores: this many ignored calls','repeatIgnoreCount','calls')}
       {row('...within','repeatIgnoreWindowMin','minutes')}
       {row('Break check: an agent\'s total break time may differ from 3CX by up to','breakToleranceMin','minutes')}
+      {row('Break check notification, before shift end by','breakCheckLeadMin','minutes (the shift end is set above)')}
       <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
         <button className="bp" onClick={save} disabled={!valid}>Save</button>
         {ok&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>}

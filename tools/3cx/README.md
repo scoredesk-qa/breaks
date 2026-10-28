@@ -75,7 +75,8 @@ node tools/3cx/page/test_page.js BreakTrack_TEST_3cx.html <folder containing nod
    admin time, break time) and an alerts list. Alerts also go to the existing admin notification toast as they happen.
 3. **Breaks.** 3CX breaks are only *recorded* (in their own table) and compared with what the agents entered in the app (`bt_logs`).
    They are never written into `bt_logs` and never change an agent's entry (`compareBreaks`). The admin page shows, per agent,
-   what the agent logged, what 3CX shows and the difference. The comparison is **not** added to the alerts and raises no notification.
+   what the agent logged, what 3CX shows and the difference. The comparison is **not** added to the alerts. The only notification is one
+   a day, `breakCheckLeadMin` (10) minutes before the shift end set in Settings, naming the agents whose breaks differ (none if nothing does).
 4. **Alerts.** Raised as the rows arrive, so the admin sees an ignored call within seconds, not at the end of the day.
 
 Decisions that change the build: which is the source of truth for breaks (the app's button or 3CX); whether a

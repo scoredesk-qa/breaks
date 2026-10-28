@@ -40,6 +40,7 @@ function A3cx({go}){
   const [picked,setPicked]=useState(null);          // a day chosen by hand; null = always follow today
   const [, setTick]=useState(0);
   const [users,setUsers]=useState([]);
+  const [shiftEnd,setShiftEnd]=useState('16:30');
   const [dbLogs,setDbLogs]=useState([]);            // what the agents entered (bt_logs) for the day
   const [err,setErr]=useState('');
   const [sel,setSel]=useState(null);
@@ -59,10 +60,12 @@ function A3cx({go}){
     Promise.all([
       run(SB.from('bt_clocklogs').select('user_id,agent_name').order('clock_in',{ascending:false}).limit(2000)),
       run(SB.from('bt_logs').select('user_id,agent_name').order('start_time',{ascending:false}).limit(2000)),
-    ]).then(([a,b])=>{
+      run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle()),
+    ]).then(([a,b,c])=>{
       const m=new Map();
       [...(a.data||[]),...(b.data||[])].forEach(r=>{ if(r.user_id&&r.agent_name&&!m.has(r.user_id)) m.set(r.user_id,{id:r.user_id,name:r.agent_name}); });
       setUsers([...m.values()]);
+      if(c.data&&HM_RE.test(c.data.shift_end||'')) setShiftEnd(c.data.shift_end);
     });
   },[]);
 
@@ -123,6 +126,18 @@ function A3cx({go}){
   const isDiff=c=>Math.abs(c.diffSecs)>_cxCfg.breakToleranceMin*60||c.cxCount!==c.appCount;
   const flagged=cmp.filter(isDiff);
   const extOfUid={}; agents.forEach(a=>{ extOfUid[a.uid]=a.ext; });
+
+  /* The ONLY thing the break check does besides the table: one notification a day, `breakCheckLeadMin` minutes before shift end
+     (Settings), if any agent's breaks differ. It is not added to the alerts list. */
+  const checkAt=addMin(shiftEnd,-_cxCfg.breakCheckLeadMin);
+  const notifyDue=day===todayStr&&wallHM()>=checkAt;
+  const names=flagged.map(c=>c.agent_name);
+  useEffect(()=>{
+    if(!ok||!notifyDue||names.length===0) return;
+    const k='bt_cx_notified_'+day;
+    try{ if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); }catch(e){}
+    fireNotification({title:'Break check',body:`${names.slice(0,4).join(', ')}${names.length>4?` and ${names.length-4} more`:''}: breaks in 3CX differ from what they logged`,type:'custom',duration:12000});
+  },[ok,notifyDue,names.length,day]);
 
   /* alerts: the call alerts from the analysis */
   const alertsAll=ok?R.alerts.filter(a=>shown.has(a.ext)).map(a=>({...a,agent:(byKey.get(CX.nameKey(a.agent))||{}).name||a.agent})).sort((a,b)=>a.at-b.at):[];
