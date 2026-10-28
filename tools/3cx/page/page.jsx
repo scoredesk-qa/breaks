@@ -5,6 +5,16 @@ const CXC={call:'#8e9cff',admin:'#f5c451',brk:'#4fd1c5',avail:'#414760',off:'#27
 const CX_LABEL={call:'On a call',admin:'Admin',brk:'On break',avail:'Available',off:'Offline',ring:'Ringing',other:'Other'};
 const cxCat=s=>/^on call$/i.test(s)?'call':/^admin$/i.test(s)?'admin':/break|lunch|bathroom|toilet/i.test(s)?'brk':/^ringing$/i.test(s)?'ring':/offline|out of (the )?office|holiday|not registered/i.test(s)?'off':/^available/i.test(s)?'avail':'other';
 const CX_DISMISS_KEY='bt_cx_dismissed';
+// The 3CX data can live in a different Supabase project from the app: use its own client then (no sign-in, nothing stored).
+let _cxClient=null,_cxClientId='';
+function cxDb(){
+  const u=(_cxCfg.dbUrl||'').trim().replace(/\/+$/,''), k=(_cxCfg.dbKey||'').trim();
+  if(!u||!k) return SB;
+  const id=u+'|'+k;
+  if(_cxClientId!==id){ _cxClient=supabase.createClient(u,k,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}}); _cxClientId=id; }
+  return _cxClient;
+}
+const cxOwnDb=()=>!!((_cxCfg.dbUrl||'').trim()&&(_cxCfg.dbKey||'').trim());
 
 // smooth line through points for the chart
 const cxSmooth=pts=>{
@@ -85,7 +95,7 @@ function A3cx({go}){
     const lo=new Date(from-36*3600000).toISOString(), hi=new Date(to).toISOString();   // a day and a half before, so each agent's status at the start of the day is known
     let all=[],i=0,last=false;
     while(!last&&i<60){
-      const {data,error}=await run(SB.from('status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',lo).lt('changed_at',hi).order('changed_at',{ascending:true}).range(i*1000,i*1000+999));
+      const {data,error}=await run(cxDb().from(_cxCfg.dbTable||'status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',lo).lt('changed_at',hi).order('changed_at',{ascending:true}).range(i*1000,i*1000+999));
       if(error){ setDbErr(error.message||String(error)); return; }
       all=all.concat(data||[]); last=!data||data.length<1000; i++;
     }
@@ -218,10 +228,10 @@ function A3cx({go}){
         <input className="fi" type="date" value={day} onChange={e=>chooseDay(e.target.value)} style={{width:190,height:47}} aria-label="Choose a day"/>
         {picked&&<button className="bs" onClick={()=>setPicked(null)}>Today</button>}
         {alerts.length>0&&<button className="bs" onClick={previewAlerts}><Ic n="bell" size={16}/> Preview alerts</button>}
-        <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}{isDb&&dbAt?` · updated ${wallHM(dbAt)}`:''}</span>}</div>
+        <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}{isDb&&dbAt?` · updated ${wallHM(dbAt)}`:''}{isDb&&cxOwnDb()?` · ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}</span>}</div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
-      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the status_log table: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>If it says "permission denied" or the table is empty when it shouldn't be, admins need permission to read it.</span><CopySql sql={CX_READ_SQL} label="Copy SQL to allow admins to read it"/></div>}
+      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the {_cxCfg.dbTable||'status_log'} table{cxOwnDb()?` in ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>{cxOwnDb()?'If it says "permission denied", the project needs a rule that lets the public key read it. If it says the table is not found, check the URL and key in Settings → 3CX call alerts.':'If it says "permission denied" or the table is empty when it shouldn\'t be, admins need permission to read it. If the logger uploads to a different Supabase project, set it in Settings → 3CX call alerts.'}</span><CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/></div>}
       {clockHint!==null&&<div className="ebox"><Ic n="alert" size={15}/>This file suggests the 3CX logger PC runs on UTC{clockHint>=0?'+':''}{clockHint}, but Settings says UTC{logTz>=0?'+':''}{logTz}. Calls and breaks still in progress will show the wrong length until it matches. <button className="bs" style={{marginLeft:10}} onClick={()=>go&&go('settings')}>Open Settings</button></div>}
       {R&&R.error&&<div className="ebox"><Ic n="alert" size={15}/>{R.error}</div>}
     </>

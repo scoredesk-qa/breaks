@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Builds a LOCAL test copy of the app with the 3CX page added. Nothing is uploaded and index.html is not changed.
 
-  python3 tools/3cx/build_test_page.py <path to the app's index.html> <output .html>
+  python3 tools/3cx/build_test_page.py <path to the app's index.html> <output .html> [--cx-config path/to/supabase.json]
+
+With --cx-config (the logger's supabase.json) the page opens already pointed at the project the logger uploads to. That file holds a key, so it is
+read at build time only and never stored in the repository.
 
 Typical use, to test against what is on GitHub (main):
   git show origin/main:index.html > /tmp/main_index.html
@@ -10,7 +13,11 @@ Typical use, to test against what is on GitHub (main):
 import os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-src, out = sys.argv[1], sys.argv[2]
+args = sys.argv[1:]
+cx = None
+if '--cx-config' in args:
+    i = args.index('--cx-config'); cx = args[i + 1]; del args[i:i + 2]
+src, out = args[0], args[1]
 raw = open(src, newline='').read()
 crlf = '\r\n' in raw
 s = raw.replace('\r\n', '\n')
@@ -33,7 +40,12 @@ rep('</head>', '<style>\n.testribbon{position:fixed;left:50%;top:0;transform:tra
     'font:600 12px/1 system-ui,sans-serif;letter-spacing:.04em;padding:6px 14px;border-radius:0 0 8px 8px;pointer-events:none}\n'
     + css + '\n</style>\n</head>')
 rep('<title>', '<title>TEST COPY · ')
-rep('<div id="root"></div>', '<div class="testribbon">TEST COPY · not the live page · the 3CX page saves nothing</div>\n<div id="root"></div>')
+preset = ''
+if cx:
+    import json
+    c = json.load(open(cx))
+    preset = '<script>window.BT_CX_DB=' + json.dumps({'url': c['url'].rstrip('/'), 'key': c['key'], 'table': c.get('table', 'status_log')}) + ';</script>\n'
+rep('<div id="root"></div>', '<div class="testribbon">TEST COPY · not the live page · the 3CX page saves nothing</div>\n' + preset + '<div id="root"></div>')
 
 module = ('/* ═══ 3CX analysis (copy of tools/3cx/analyze.js) ═══ */\nconst CX = (function(){ const module = { exports: {} }; const exports = module.exports;\n'
           + analyze + '\nreturn module.exports; })();\nconst CX_SAMPLE = `' + sample + '`;\n')

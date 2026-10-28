@@ -32,10 +32,10 @@ const mkdb = (extra = {}) => Object.assign({
 (async () => {
   const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {}).catch(() => chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }));
   // open the app as admin on the 3CX page; `now` = the PC/server clock for this test
-  const open = async ({ cfg, w = 1500, now = TODAY + 'T13:10:00.000Z', db, errors } = {}) => {
+  const open = async ({ cfg, w = 1500, now = TODAY + 'T13:10:00.000Z', db, errors, cxdb } = {}) => {
     const c = await b.newContext({ timezoneId: 'UTC', viewport: { width: w, height: 1000 } });
     const q = await c.newPage(); q.on('pageerror', e => errs.push(e.message));
-    await q.addInitScript(([d, cf, er]) => { window.__USER = { id: 'adm', email: 'b@x.com', user_metadata: { role: 'admin', display_name: 'Boss' } }; window.__DB = d; if (er) window.__ERRORS = er; if (cf) localStorage.setItem('bt_cx_cfg', cf); }, [db || mkdb(), cfg || null, errors || null]);
+    await q.addInitScript(([d, cf, er, cd]) => { if (cd) window.BT_CX_DB = cd; window.__USER = { id: 'adm', email: 'b@x.com', user_metadata: { role: 'admin', display_name: 'Boss' } }; window.__DB = d; if (er) window.__ERRORS = er; if (cf) localStorage.setItem('bt_cx_cfg', cf); }, [db || mkdb(), cfg || null, errors || null, cxdb || null]);
     await q.clock.setFixedTime(new Date(now));
     await q.goto('file://' + page);
     await q.waitForSelector('text=3CX (test)', { timeout: 20000 });
@@ -215,6 +215,28 @@ const mkdb = (extra = {}) => Object.assign({
   p = await open({ db: mkdb({ status_log: [] }) });
   await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('text=No rows in the log for');
   check('L8 an empty table says so instead of "no agents match"', /The logger has not uploaded anything for this period yet/.test(await text(p)) && !/No agents in this log match/.test(await text(p)));
+  await p.context().close();
+
+  // the logger can upload to a different Supabase project than the one the app uses
+  const LOGGER = { url: 'https://logger-project.supabase.co', key: 'k'.repeat(60), table: 'status_log' };
+  p = await open({ db: mkdb({ status_log: tbl }) });
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  check('X1 with nothing set, the page reads from the app\'s own project (one connection only)', (await p.evaluate(() => window.__CLIENTS.length)) === 1);
+  await p.context().close();
+  p = await open({ db: mkdb({ status_log: tbl }), cxdb: LOGGER });
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  const cl = await p.evaluate(() => window.__CLIENTS);
+  check('X2 with the logger\'s project pre-filled, live data comes through a second connection to that project', cl.length === 2 && cl[1].url === LOGGER.url && cl[1].key === LOGGER.key, JSON.stringify(cl.map(c => c.url)));
+  check('X3 the page says which project it is reading', /Supabase · live · updated \d\d:\d\d · logger-project\.supabase\.co/.test(await text(p)));
+  check('X4 the app itself still uses its own project (first connection unchanged)', cl[0].url !== LOGGER.url);
+  await p.click('text=Settings >> nth=0'); await p.waitForSelector('text=Where the 3CX logger uploads');
+  check('X5 Settings shows the logger\'s project, pre-filled', await p.locator('input[aria-label="3CX data Supabase URL"]').inputValue() === LOGGER.url && await p.locator('input[aria-label="3CX data table"]').inputValue() === 'status_log');
+  await p.fill('input[aria-label="3CX data Supabase URL"]', 'not a url'); await p.waitForTimeout(100);
+  check('X6 a bad URL cannot be saved', await p.locator('h2:has-text("3CX call alerts")').locator('xpath=..').locator('button.bp').isDisabled());
+  await p.context().close();
+  p = await open({ db: mkdb(), cxdb: LOGGER, errors: { status_log: 'permission denied for table status_log' } });
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector("text=Couldn't read the status_log table");
+  check('X7 if that project refuses, the message names it and offers the SQL for the public key', /in logger-project\.supabase\.co/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow reading it")').count() === 1);
   await p.context().close();
 
   // narrow screen

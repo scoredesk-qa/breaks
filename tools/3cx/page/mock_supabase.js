@@ -66,5 +66,5 @@
       signOut: async () => ({ error: null }),
     },
   };
-  window.supabase = { createClient: () => client };
+  window.supabase = { createClient: (url, key) => { (window.__CLIENTS = window.__CLIENTS || []).push({ url, key }); return client; } };
 })();

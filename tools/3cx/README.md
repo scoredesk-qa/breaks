@@ -59,6 +59,11 @@ so the logger PC's time zone does not matter for them. The test page's **Live fr
 refreshed every 30 seconds). The key the logger uses is the public `anon` key, so the table needs a policy that lets the logger insert;
 admins need one that lets them read (the page offers the SQL if Supabase refuses).
 
+The logger may upload to a **different Supabase project** from the one the app uses. The 3CX page has its own connection for that:
+Settings → 3CX call alerts → *Where the 3CX logger uploads* (URL, public key, table). Left empty it uses the app's own project.
+`build_test_page.py ... --cx-config path/to/supabase.json` pre-fills it for the file you open; the key is read at build time only and is never
+stored in the repository. That project reads the table with its public key (no sign-in), so it needs a read rule for that key (the page offers the SQL).
+
 ## The test page (a local copy of the app with a 3CX page)
 
 `build_test_page.py` builds a copy of the app's `index.html` with a **3CX (test)** admin page and a "3CX call alerts"

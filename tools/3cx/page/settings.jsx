@@ -3,7 +3,11 @@
    Test copy only: the values are kept in this browser (localStorage), not in the database. */
 const CX_CFG_KEY='bt_cx_cfg';
 // logTz: UTC offset of the PC that runs the 3CX logger (its clock wrote the log's timestamps)
-const CX_CFG_DEFAULT={logTz:0,ignoreRingSec:10,shortCallSec:60,repeatIgnoreCount:3,repeatIgnoreWindowMin:60,breakToleranceMin:3,breakCheckLeadMin:10};
+// Where the 3CX logger uploads to. The logger can use a different Supabase project from the app, so the 3CX page has its own
+// connection (a public anon key). Left empty it reads from the app's own project. A build can pre-fill it with window.BT_CX_DB.
+const CX_DB_PRESET=(typeof window!=='undefined'&&window.BT_CX_DB)||{};
+const CX_CFG_DEFAULT={logTz:0,ignoreRingSec:10,shortCallSec:60,repeatIgnoreCount:3,repeatIgnoreWindowMin:60,breakToleranceMin:3,breakCheckLeadMin:10,
+  dbUrl:CX_DB_PRESET.url||'',dbKey:CX_DB_PRESET.key||'',dbTable:CX_DB_PRESET.table||'status_log'};
 let _cxCfg=(()=>{ try{ return {...CX_CFG_DEFAULT,...JSON.parse(localStorage.getItem(CX_CFG_KEY)||'{}')}; }catch(e){ return {...CX_CFG_DEFAULT}; } })();
 const CX_SAMPLE_USERS=['Jane Doe','Rick Roe','Pat Poe','Max Moe','Lou Lee','Kay Kim','Finn Fox','Gail Gray'].map((n,i)=>({id:'sample-'+i,name:n}));
 
@@ -12,9 +16,12 @@ function A3cxSettings(){
   const [ok,setOk]=useState(false);
   const set=k=>e=>setV(p=>({...p,[k]:e.target.value}));
   const tzOk=v.logTz!==''&&Number.isFinite(Number(v.logTz))&&Number(v.logTz)>=-12&&Number(v.logTz)<=14;
-  const valid=tzOk&&Object.keys(CX_CFG_DEFAULT).filter(k=>k!=='logTz').every(k=>Number(v[k])>=1);
+  const NUM=['ignoreRingSec','shortCallSec','repeatIgnoreCount','repeatIgnoreWindowMin','breakToleranceMin','breakCheckLeadMin'];
+  const dbOk=((v.dbUrl||'').trim()===''&&(v.dbKey||'').trim()==='')||(/^https?:\/\/\S+$/.test((v.dbUrl||'').trim())&&(v.dbKey||'').trim().length>20&&/^[a-z_][a-z0-9_]*$/i.test((v.dbTable||'').trim()||'status_log'));
+  const valid=tzOk&&dbOk&&NUM.every(k=>Number(v[k])>=1);
   const save=()=>{
-    const c={logTz:Number(v.logTz)}; for(const k of Object.keys(CX_CFG_DEFAULT)) if(k!=='logTz') c[k]=Math.max(1,Math.round(Number(v[k])));
+    const c={logTz:Number(v.logTz),dbUrl:(v.dbUrl||'').trim().replace(/\/+$/,''),dbKey:(v.dbKey||'').trim(),dbTable:(v.dbTable||'').trim()||'status_log'};
+    for(const k of NUM) c[k]=Math.max(1,Math.round(Number(v[k])));
     _cxCfg=c; try{ localStorage.setItem(CX_CFG_KEY,JSON.stringify(c)); }catch(e){}
     setV(c); setOk(true); setTimeout(()=>setOk(false),3000);
   };
@@ -36,6 +43,13 @@ function A3cxSettings(){
       {row('...within','repeatIgnoreWindowMin','minutes')}
       {row('Break check: an agent\'s total break time may differ from 3CX by up to','breakToleranceMin','minutes')}
       {row('Break check notification, before shift end by','breakCheckLeadMin','minutes (the shift end is set above)')}
+      <h3 style={{fontSize:16,fontWeight:400,margin:'26px 0 6px'}}>Where the 3CX logger uploads</h3>
+      <p className="sd" style={{marginBottom:12}}>The Supabase project the logger writes to, if it is not the one this app uses. Leave both empty to read from this app's own project. Use the project's public (anon) key, never a secret one.</p>
+      <div style={{display:'flex',flexDirection:'column',gap:10,maxWidth:640}}>
+        <input className="fi" type="text" spellCheck="false" placeholder="https://your-project.supabase.co" value={v.dbUrl||''} onChange={set('dbUrl')} aria-label="3CX data Supabase URL"/>
+        <input className="fi" type="text" spellCheck="false" placeholder="public anon key" value={v.dbKey||''} onChange={set('dbKey')} aria-label="3CX data public key"/>
+        <input className="fi" type="text" spellCheck="false" placeholder="table (status_log)" value={v.dbTable||''} onChange={set('dbTable')} style={{maxWidth:240}} aria-label="3CX data table"/>
+      </div>
       <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
         <button className="bp" onClick={save} disabled={!valid}>Save</button>
         {ok&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>}
@@ -57,5 +71,13 @@ const CX_READ_SQL=`-- Let admins read what the 3CX logger uploads (run once in t
 do $$ begin
   create policy "admins read status_log" on public.status_log for select to authenticated
     using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+exception when duplicate_object then null;
+end $$;`;
+
+/* For the logger's own project: the page reads with the public key (it is not signed in there). This lets that key read the rows, nothing else. */
+const CX_READ_SQL_ANON=`-- Let the 3CX page read what the logger uploads (run once in the SQL Editor of the project the logger writes to).
+-- Note: this lets anyone with that project's public key read the status rows (agent names and statuses).
+do $$ begin
+  create policy "read status_log" on public.status_log for select to anon, authenticated using (true);
 exception when duplicate_object then null;
 end $$;`;
