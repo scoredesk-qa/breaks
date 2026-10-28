@@ -339,7 +339,7 @@ function A3cx({go}){
       )}
 
       {ok&&agents.length>0&&day===todayStr&&(()=>{
-        const T=[['call','On a call','phone'],['brk','On break','brk'],['admin','On admin','edit'],['avail','Available','check']];
+        const T=[['call','On a call','phone'],['brk','On break','coffee'],['admin','On admin','edit'],['avail','Available','check']];
         const n=agents.length||1, other=agents.length-T.reduce((t,x)=>t+nowCount(x[0]),0);
         return(<div className="cx-live" aria-label="Right now">
           <div className="cx-live-t">Right now <small>{agents.length} agents</small></div>
