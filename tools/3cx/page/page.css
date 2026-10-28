@@ -49,7 +49,7 @@
 
 .cx-bar{display:flex;height:18px;border-radius:999px;overflow:hidden;background:#23252f;gap:2px;margin:6px 0 4px}
 .cx-bar i{display:block;height:100%;min-width:3px}
-.cx-split{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px 24px;padding:12px 0 0;font-size:14px}
+.cx-split{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 24px;padding:12px 0 0;font-size:14px}
 .cx-split>div{display:flex;align-items:center;gap:10px;color:var(--txt2)}
 .cx-split i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
 .cx-split b{font-weight:400;margin-left:auto;font-variant-numeric:tabular-nums;color:var(--txt)}
@@ -77,3 +77,16 @@
 .cx-lt.zero b{color:var(--mut)}
 .cx-mix{display:flex;height:8px;border-radius:99px;overflow:hidden;gap:2px;margin-top:12px;background:#23252f}
 @media(max-width:760px){.cx-live-g{grid-template-columns:repeat(2,minmax(0,1fr))}.cx-lt b{font-size:36px}}
+
+.cx-tl{margin:8px 0 6px}
+.cx-tl-track{position:relative;height:38px;border-radius:10px;background:#23252f}
+.cx-seg{position:absolute;top:0;bottom:0;min-width:2px;border-right:1px solid #18171f;opacity:.92;transition:opacity .12s,transform .12s}
+.cx-seg:first-child{border-radius:10px 0 0 10px}.cx-seg:last-child{border-radius:0 10px 10px 0;border-right:0}
+.cx-seg:hover{opacity:1;z-index:5;transform:scaleY(1.12)}
+.cx-tip{display:none;position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);z-index:20;background:#0f0f14;border:1px solid var(--bdr);border-radius:10px;padding:9px 12px;white-space:nowrap;font-size:13px;color:var(--txt);text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:none;font-variant-numeric:tabular-nums}
+.cx-tip b{display:block;font-weight:500;margin-bottom:2px}.cx-tip em{display:block;font-style:normal;color:var(--mut);font-size:12.5px;margin-top:2px}
+.cx-seg:hover .cx-tip{display:block}
+.cx-seg.l .cx-tip{left:0;transform:none}.cx-seg.r .cx-tip{left:auto;right:0;transform:none}
+.cx-tl-axis{position:relative;height:20px;margin-top:6px;font-size:12px;color:var(--mut)}
+.cx-tl-axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.cx-tl-axis span:first-child{transform:none}

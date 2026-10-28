@@ -101,19 +101,24 @@ const mkdb = (extra = {}) => Object.assign({
   // profile
   await rick.click(); await p.waitForSelector('text=All agents');
   body = await text(p);
-  check('R1 profile opens: name, ext, tiles, time split', /Rick Roe/.test(body) && /ext 602/.test(body) && /Ignored rings\n3/.test(body) && /Where the time went/.test(body));
+  check('R1 profile opens: name, ext, tiles, time split', /Rick Roe/.test(body) && /ext 602/.test(body) && /Ignored rings\n3/.test(body) && /Timeline of the day/.test(body));
   check('R2 profile lists the 3 rings as not answered, flagged Ignored', (await p.locator('.badge:text-is("Ignored")').count()) >= 3);
-  check('R3 time split is a bar with a legend, not dots', await p.locator('.cx-bar i').count() >= 2 && await p.locator('.cx-dot').count() === 0);
+  check('R3 the day is a timeline of every status change (segments + hour axis), not dots', await p.locator('.cx-seg').count() >= 3 && await p.locator('.cx-tl-axis span').count() >= 2 && await p.locator('.cx-dot').count() === 0);
+  const wi = await p.locator('.cx-seg').evaluateAll(els => els.map(e => e.getBoundingClientRect().width)); const seg = p.locator('.cx-seg').nth(wi.indexOf(Math.max(...wi))); await seg.hover();
+  const tip = (await seg.locator('.cx-tip').innerText()).replace(/\s+/g, ' ');
+  check('R3b hovering a colour shows the status, how long, and from-to', /\S.* \d+(s|m \d\ds|h \d\dm)\S* \d\d:\d\d – \d\d:\d\d/.test(tip) && await seg.locator('.cx-tip').isVisible(), tip);
+  const col = await seg.evaluate(e => getComputedStyle(e).backgroundColor);
+  check('R3c segment colours follow the 3CX status colours', ['rgb(47, 179, 68)', 'rgb(245, 165, 36)', 'rgb(239, 107, 91)', 'rgb(142, 156, 255)', 'rgb(245, 208, 78)', 'rgb(58, 61, 74)', 'rgb(46, 196, 182)', 'rgb(42, 143, 224)', 'rgb(125, 134, 168)'].includes(col), col);
   await p.screenshot({ path: path.join(mods, 'cx_profile.png'), fullPage: true });
   await p.click('text=All agents'); await p.waitForSelector('.cx-card');
-  await p.click('.cx-card:has-text("Kay Kim")'); await p.waitForSelector('text=Where the time went');
+  await p.click('.cx-card:has-text("Kay Kim")'); await p.waitForSelector('text=Timeline of the day');
   body = await text(p);
   check('R4 Kay\'s profile lists her breaks in 3CX next to her log, no explanations', /Breaks: agent's log and 3CX/.test(body) && /3CX\s*log 11:00 – 11:15/.test(body.replace(/\n/g, ' ')) && !/Totals differ/.test(body));
   await p.click('text=All agents');
-  await p.click('.cx-card:has-text("Finn Fox")'); await p.waitForSelector('text=Where the time went');
+  await p.click('.cx-card:has-text("Finn Fox")'); await p.waitForSelector('text=Timeline of the day');
   check('R5 Finn\'s profile: 3CX only, not in the agent\'s log', /3CX only/.test(await text(p)) && await p.locator('.badge:has-text("Not in agent\'s log")').count() === 1);
   await p.click('text=All agents');
-  await p.click('.onb-row.link >> nth=0'); await p.waitForSelector('text=Where the time went');
+  await p.click('.onb-row.link >> nth=0'); await p.waitForSelector('text=Timeline of the day');
   check('R6 clicking an alert opens that agent\'s profile', /Rick Roe/.test(await text(p)));
   await p.click('text=All agents');
 

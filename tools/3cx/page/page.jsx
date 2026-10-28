@@ -281,8 +281,21 @@ function A3cx({go}){
             <div><span>Break time</span><b>{CX.fmtDur(a.breakSecs)}</b></div>
           </div>
           <div style={{padding:'0 12px'}}>
-            <div className="card-t" style={{fontSize:16,marginBottom:6}}>Where the time went</div>
-            <div className="cx-bar pv">{order.map(c=><i key={c} style={{width:`${split[c]/total*100}%`,background:CXC[c]}} title={`${CX_LABEL[c]} ${CX.fmtDur(split[c])}`}/>)}</div>
+            <div className="card-t" style={{fontSize:16,marginBottom:6}}>Timeline of the day</div>
+            {(()=>{
+              const segs=R.intervals.filter(iv=>iv.ext===a.ext&&iv.start<to&&(iv.end==null?R.now:iv.end)>from).map(iv=>({st:iv.status,s:Math.max(iv.start,from),e:Math.min(iv.end==null?R.now:iv.end,to,R.now),part:iv.partialStart})).filter(x=>x.e>x.s).sort((p,q)=>p.s-q.s);
+              if(!segs.length) return null;
+              const t0=segs[0].s, t1=segs[segs.length-1].e, span=Math.max(t1-t0,1);
+              const h0=Math.ceil(wall(t0).getTime()/3600000), h1=Math.floor(wall(t1).getTime()/3600000);
+              const ticks=[]; for(let h=h0;h<=h1;h++) ticks.push(h);
+              return(<div className="cx-tl pv">
+                <div className="cx-tl-track">{segs.map((x,i)=>{ const l=(x.s-t0)/span*100, w=(x.e-x.s)/span*100, mid=l+w/2; return(
+                  <div key={i} className={`cx-seg${mid<14?' l':mid>86?' r':''}`} style={{left:`${l}%`,width:`${w}%`,background:CXC[cxCat(x.st)]}}>
+                    <span className="cx-tip"><b>{x.st}</b>{CX.fmtDur((x.e-x.s)/1000)}<em>{wallHM(x.s)} – {wallHM(x.e)}{x.part?' · started before logging':''}</em></span>
+                  </div>); })}</div>
+                <div className="cx-tl-axis">{ticks.map(h=>{ const p=(h*3600000-wall(0).getTime()-t0)/span*100; return <span key={h} style={{left:`${p}%`}}>{String(((h%24)+24)%24).padStart(2,'0')}:00</span>; })}</div>
+              </div>);
+            })()}
             <div className="cx-split pv">{order.map(c=><div key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}<b>{CX.fmtDur(split[c])} · {Math.round(split[c]/total*100)}%</b></div>)}</div>
           </div>
         </div>
