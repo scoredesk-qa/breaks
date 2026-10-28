@@ -211,7 +211,6 @@ function A3cx({go}){
   const nowCount=cat=>agents.filter(a=>cxCat(statusOf(a.ext))===cat).length;
 
   const sgn=d=>Math.abs(d)<1?'0s':`${d>0?'+':'−'}${CX.fmtDur(Math.abs(d))}`;   // the agent's log minus 3CX
-  const previewAlerts=()=>alerts.slice(0,5).forEach((a,i)=>setTimeout(()=>fireNotification({title:a.type==='short_call'?'Possible dropped call':a.type==='repeated_ignore'?'Repeated ignored calls':'Ignored call',body:alertText(a),type:'custom',duration:8000}),i*900));
   const kind=a=>a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}
     :a.type==='repeated_ignore'?{t:'Repeated',cls:'',ic:'brk',d:`${a.count} ignored calls within ${_cxCfg.repeatIgnoreWindowMin} min`,red:true}
     :{t:'Ignored',cls:'b-brk',ic:'brk',d:`Rang ${a.secs}s, not answered`};
@@ -223,7 +222,6 @@ function A3cx({go}){
       <div className="acts">
         <input className="fi" type="date" value={day} onChange={e=>chooseDay(e.target.value)} style={{width:190,height:47}} aria-label="Choose a day"/>
         {picked&&<button className="bs" onClick={()=>setPicked(null)}>Today</button>}
-        {alerts.length>0&&<button className="bs" onClick={previewAlerts}><Ic n="bell" size={16}/> Preview alerts</button>}
         <div className="acts-r"><ConnInstrument/></div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
