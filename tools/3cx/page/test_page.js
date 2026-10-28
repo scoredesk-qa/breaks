@@ -218,6 +218,13 @@ const mkdb = (extra = {}) => Object.assign({
   check('L8 an empty table says so instead of "no agents match", and offers the admin-read SQL (a table that only lets the logger insert looks empty to admins)', /logger has not uploaded anything for this period yet, or admins are not allowed to read the table/.test(await text(p)) && !/No agents in this log match/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow admins to read it")').count() === 1);
   await p.context().close();
 
+  // people who are offline / out of office are not monitored
+  const off = [{ changed_at: iso('08:00'), extension: '700', agent: 'Zoe, Zed', old_status: null, new_status: 'Offline', detail: null }, { changed_at: iso('09:00'), extension: '700', agent: 'Zoe, Zed', old_status: 'Offline', new_status: 'Holiday - OUT OF OFFICE', detail: null }];
+  p = await open({ db: mkdb({ status_log: tbl.concat(off), bt_clocklogs: ['Jane Doe', 'Rick Roe', 'Pat Poe', 'Kay Kim', 'Zed Zoe'].map((n, k) => ({ id: k + 1, user_id: 'u' + k, agent_name: n, clock_in: iso('08:00'), clock_out: null, date: TODAY })) }) });
+  await p.waitForSelector('.cx-card');
+  check('O1 an agent who was only offline / out of office all day gets no card and is not counted (Zed Zoe: still the 4 cards, and a "logged in" count)', await p.locator('.cx-card').count() === 4 && !/Zed Zoe/.test(await text(p)) && /\d+ logged in/.test(await text(p)));
+  await p.context().close();
+
   // the logger can upload to a different Supabase project than the one the app uses
   const LOGGER = { url: 'https://logger-project.supabase.co', key: 'k'.repeat(60), table: 'status_log' };
   p = await open({ db: mkdb({ status_log: tbl }) });

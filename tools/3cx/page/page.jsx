@@ -142,7 +142,7 @@ function A3cx({go}){
   const byKey=new Map(match.map(u=>[CX.nameKey(u.name),u]));
   const all=ok?Object.values(R.agents):[];
   const matchedAny=all.some(a=>byKey.has(CX.nameKey(a.agent)));
-  const agents=all.filter(a=>byKey.has(CX.nameKey(a.agent))&&Object.keys(a.statusSecs).length>0).map(a=>({...a,app:byKey.get(CX.nameKey(a.agent)).name,uid:byKey.get(CX.nameKey(a.agent)).id})).sort((a,b)=>a.app.localeCompare(b.app));
+  const agents=all.filter(a=>byKey.has(CX.nameKey(a.agent))&&Object.keys(a.statusSecs).some(st=>!['off','hol'].includes(cxCat(st)))).map(a=>({...a,app:byKey.get(CX.nameKey(a.agent)).name,uid:byKey.get(CX.nameKey(a.agent)).id})).sort((a,b)=>a.app.localeCompare(b.app));
   const shown=new Set(agents.map(a=>a.ext));
   const hidden=all.filter(a=>!byKey.has(CX.nameKey(a.agent))).length;
   const tot=agents.reduce((t,a)=>({calls:t.calls+a.calls,talk:t.talk+a.callSecs,ans:t.ans+a.answered,ign:t.ign+a.ignored,short:t.short+a.shortCalls,admin:t.admin+a.adminSecs}),{calls:0,talk:0,ans:0,ign:0,short:0,admin:0});
@@ -340,9 +340,9 @@ function A3cx({go}){
 
       {ok&&agents.length>0&&day===todayStr&&(()=>{
         const T=[['call','On a call','phone'],['brk','On break','coffee'],['admin','On admin','edit'],['avail','Available','check']];
-        const n=agents.length||1, other=agents.length-T.reduce((t,x)=>t+nowCount(x[0]),0);
+        const here=agents.filter(a=>!['off','hol'].includes(cxCat(statusOf(a.ext)))).length, n=here||1, other=here-T.reduce((t,x)=>t+nowCount(x[0]),0);
         return(<div className="cx-live" aria-label="Right now">
-          <div className="cx-live-t">Right now <small>{agents.length} agents</small></div>
+          <div className="cx-live-t">Right now <small>{here} logged in</small></div>
           <div className="cx-live-g">
             {T.map(([c,l,ic])=>{ const v=nowCount(c); return(
               <div key={c} className={`cx-lt${v?'':' zero'}`} style={{'--c':CXC[c]}}>
@@ -353,7 +353,7 @@ function A3cx({go}){
           </div>
           <div className="cx-mix" title="Whole team right now">
             {T.map(([c,l])=>nowCount(c)>0&&<i key={c} style={{flex:nowCount(c),background:CXC[c]}} title={`${l} ${nowCount(c)}`}/>)}
-            {other>0&&<i style={{flex:other,background:'#3a3d4a'}} title={`Other / offline ${other}`}/>}
+            {other>0&&<i style={{flex:other,background:'#3a3d4a'}} title={`Other ${other}`}/>}
           </div>
         </div>);
       })()}
