@@ -81,3 +81,6 @@ do $$ begin
   create policy "read status_log" on public.status_log for select to anon, authenticated using (true);
 exception when duplicate_object then null;
 end $$;`;
+
+/* One-time setup for the table the logger uploads to (the text comes from tools/3cx/status_log.sql when the page is built). */
+const CX_SETUP_SQL=`__CX_SETUP_SQL__`;

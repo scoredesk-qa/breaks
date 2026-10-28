@@ -64,6 +64,7 @@ function A3cx({go}){
   const tz=clockOff();
   const isSample=fileName==='sample data';
   const isDb=source==='db';
+  const missingTable=/could not find the table|does not exist|schema cache/i.test(dbErr);
   const todayStr=todayISO();
   const day=picked||todayStr;
   const [from,to]=CX.dayRange(day,tz);
@@ -231,7 +232,7 @@ function A3cx({go}){
         <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}{isDb&&dbAt?` · updated ${wallHM(dbAt)}`:''}{isDb&&cxOwnDb()?` · ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}</span>}</div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
-      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the {_cxCfg.dbTable||'status_log'} table{cxOwnDb()?` in ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>{cxOwnDb()?'If it says "permission denied", the project needs a rule that lets the public key read it. If it says the table is not found, check the URL and key in Settings → 3CX call alerts.':'If it says "permission denied" or the table is empty when it shouldn\'t be, admins need permission to read it. If the logger uploads to a different Supabase project, set it in Settings → 3CX call alerts.'}</span><CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/></div>}
+      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the {_cxCfg.dbTable||'status_log'} table{cxOwnDb()?` in ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>{missingTable?'The table doesn\'t exist in this project yet. Run the SQL once in the Supabase SQL Editor (it also lets the logger add rows and admins read them), then press Live from Supabase again. The logger must upload to this same project.':cxOwnDb()?'If it says "permission denied", the project needs a rule that lets the public key read it. If it says the table is not found, check the URL and key in Settings → 3CX call alerts.':'If it says "permission denied" or the table is empty when it shouldn\'t be, admins need permission to read it. If the logger uploads to a different Supabase project, set it in Settings → 3CX call alerts.'}</span>{missingTable?<CopySql sql={CX_SETUP_SQL} label="Copy SQL to create the table"/>:<CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/>}</div>}
       {clockHint!==null&&<div className="ebox"><Ic n="alert" size={15}/>This file suggests the 3CX logger PC runs on UTC{clockHint>=0?'+':''}{clockHint}, but Settings says UTC{logTz>=0?'+':''}{logTz}. Calls and breaks still in progress will show the wrong length until it matches. <button className="bs" style={{marginLeft:10}} onClick={()=>go&&go('settings')}>Open Settings</button></div>}
       {R&&R.error&&<div className="ebox"><Ic n="alert" size={15}/>{R.error}</div>}
     </>

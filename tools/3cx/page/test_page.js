@@ -239,6 +239,15 @@ const mkdb = (extra = {}) => Object.assign({
   check('X7 if that project refuses, the message names it and offers the SQL for the public key', /in logger-project\.supabase\.co/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow reading it")').count() === 1);
   await p.context().close();
 
+  // the table isn't there yet (e.g. a fresh local Supabase): the page offers the setup SQL
+  p = await open({ db: mkdb(), errors: { status_log: "Could not find the table 'public.status_log' in the schema cache" } });
+  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector("text=Couldn't read the status_log table");
+  body = await text(p);
+  check('X8 a missing table: the page says so and offers the SQL that creates it (and sets who can add/read rows)', /doesn't exist in this project yet/.test(body) && await p.locator('button:has-text("Copy SQL to create the table")').count() === 1 && await p.locator('button:has-text("Copy SQL to allow")').count() === 0);
+  const copied = await p.evaluate(async () => { let got = ''; navigator.clipboard.writeText = async t => { got = t; }; [...document.querySelectorAll('button')].find(b => /Copy SQL to create/.test(b.textContent)).click(); await new Promise(r => setTimeout(r, 50)); return got; });
+  check('X9 the copied SQL creates status_log, lets the logger insert and admins read', /create table if not exists public\.status_log/.test(copied) && /for insert to anon/.test(copied) && /for select to authenticated/.test(copied) && !/__CX_SETUP_SQL__/.test(copied));
+  await p.context().close();
+
   // narrow screen
   p = await open({ w: 520 });
   await p.click('text=Use sample data'); await p.waitForSelector('.cx-card');

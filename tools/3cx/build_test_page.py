@@ -25,6 +25,9 @@ s = raw.replace('\r\n', '\n')
 analyze = open(os.path.join(HERE, 'analyze.js')).read()
 sample = open(os.path.join(HERE, 'fixtures', 'status_log.sample.csv')).read()
 settings = open(os.path.join(HERE, 'page', 'settings.jsx')).read()
+setup_sql = open(os.path.join(HERE, 'status_log.sql')).read()
+assert '`' not in setup_sql and '${' not in setup_sql
+settings = settings.replace('__CX_SETUP_SQL__', setup_sql)
 page = open(os.path.join(HERE, 'page', 'page.jsx')).read()
 css = open(os.path.join(HERE, 'page', 'page.css')).read()
 assert '`' not in sample and '${' not in sample          # the sample is embedded in a template string
