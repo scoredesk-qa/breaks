@@ -93,7 +93,14 @@ eq('Y7 ...and the totals are not shifted', [sep.agents['601'].callSecs, sep.agen
 const open0 = A.analyze(A.parseCsv('timestamp,extension,agent,old_status,new_status,detail\n2026-10-27 12:00:00,1,"A, B",Available,Break,"break"\n'), { day: '2026-10-27', tzOffsetHours: 0, now: Date.UTC(2026, 9, 27, 12, 10) });
 eq('Y8 a break still open 10 minutes after it began says 10 minutes when the log clock is right', open0.agents['1'].breakSecs, 600);
 const open1 = A.analyze(A.parseCsv('timestamp,extension,agent,old_status,new_status,detail\n2026-10-27 12:00:00,1,"A, B",Available,Break,"break"\n'), { day: '2026-10-27', tzOffsetHours: 1, now: Date.UTC(2026, 9, 27, 12, 10) });
-eq('Y9 ...and 70 minutes if the log clock is wrongly set to UTC+1 (why the setting matters)', open1.agents['1'].breakSecs, 4200);
+eq('Y9 ...with the clock wrongly set to UTC+1 the same log looks an hour old, so the open break is cut at 30 minutes (why the setting matters)', open1.agents['1'].breakSecs, 1800);
+
+// a status that never changed does not run on forever once the log has stopped
+const later = A.analyze(rows, { day: '2026-10-29', now: Date.UTC(2026, 9, 29, 13, 10) });
+eq('Q1 two days after the log ended, nobody has activity', Object.values(later.agents).filter(a => Object.keys(a.statusSecs).length > 0).length, 0);
+eq('Q2 Finn\'s open break stops at the last row + 30 min (14:20 + 30m - 13:00 = 1h50m), not at "now"', A.analyze(rows, { day: '2026-10-27', now: Date.UTC(2026, 9, 29, 13, 10) }).agents['607'].breakSecs, 6600);
+eq('Q3 the result says what "now" was used (capped)', new Date(A.analyze(rows, { day: '2026-10-27', now: Date.UTC(2026, 9, 29, 13, 10) }).now).toISOString(), '2026-10-27T14:50:00.000Z');
+eq('Q4 while the log is current, "now" is the real now', A.analyze(rows, { day: '2026-10-27', now: NOW }).now, NOW);
 
 // ── break records for the app ─────────────────────────────────────
 const users = [{ id: 'u-kay', name: 'Kay Kim' }, { id: 'u-finn', name: 'Finn Fox' }, { id: 'u-jane', name: 'Jane Doe' }];
@@ -113,6 +120,32 @@ eq('L8 a 4s accidental break toggle is ignored', A.toBreakLogs(blip, [{ id: 'x',
 const midBreak = A.buildIntervals(A.parseCsv(head0 + '2026-10-27 10:00:00,1,"A, B",,Break,"break"\n2026-10-27 10:20:00,1,"A, B",Break,Available,"Available"\n'), {});
 eq('L10 a break already running at logger start is marked partial', A.toBreakLogs(midBreak, [{ id: 'x', name: 'B A' }]).logs[0].partial_start, true);
 eq('L9 break types from the status text', [A.breakType('Break', 'Bathroom break'), A.breakType('Lunch', ''), A.breakType('Break', 'break')], ['Bathroom Break', 'Lunch Break', 'Break']);
+
+// ── break check: 3CX against what the agents entered (never overwritten) ──
+const mk = (id, name, a, b) => ({ user_id: id, agent_name: name, start_time: '2026-10-27T' + a + ':00.000Z', end_time: b ? '2026-10-27T' + b + ':00.000Z' : null });
+const cxB = [mk('k', 'Kay Kim', '11:00', '11:15'), mk('k', 'Kay Kim', '11:30', '12:30'), mk('f', 'Finn Fox', '13:00', null),
+  mk('r', 'Rick Roe', '09:00', '09:10'), mk('s', 'Sam Soe', '10:00', '10:15')];
+const appB = [mk('k', 'Kay Kim', '11:00', '11:15'), mk('k', 'Kay Kim', '11:30', '12:20'), mk('j', 'Jane Doe', '10:00', '10:10'),
+  mk('r', 'Rick Roe', '09:00', '09:11'), mk('s', 'Sam Soe', '10:02', '10:14')];
+const cmp = A.compareBreaks(cxB, appB, { now: NOW });
+const who = n => cmp.find(c => c.agent_name === n);
+eq('K1 an agent whose breaks match is not flagged (1 minute apart is within the tolerance)', [who('Rick Roe').flagged, who('Rick Roe').reasons], [false, []]);
+eq('K2 breaks that overlap are paired even when the times differ a little', [who('Sam Soe').pairs.length, who('Sam Soe').flagged], [1, false]);
+eq('K3 Kay: both breaks paired, but the lunch is 10 minutes shorter in her log → flagged on the total', [who('Kay Kim').pairs.length, who('Kay Kim').flagged, Math.round(who('Kay Kim').diffSecs)], [2, true, -600]);
+check('K4 ...and the reason says so in plain words', /Totals differ by 10m 00s: agent's log 1h 05m, 3CX 1h 15m/.test(who('Kay Kim').reasons[0]), who('Kay Kim').reasons[0]);
+eq('K5 Finn: a break in 3CX that is not in the agent\'s log', [who('Finn Fox').onlyCx.length, who('Finn Fox').appCount, who('Finn Fox').flagged], [1, 0, true]);
+check('K6 ...the reason names the time and says it is still going', /3CX shows a break 13:00 to now that is not in the agent's log/.test(who('Finn Fox').reasons[0]), who('Finn Fox').reasons[0]);
+eq('K7 Jane: a break in her log that 3CX does not show', [who('Jane Doe').onlyApp.length, who('Jane Doe').cxCount, who('Jane Doe').flagged], [1, 0, true]);
+check('K8 ...and the reason says that', /The agent's log has a break 10:00 to 10:10 that 3CX doesn't show/.test(who('Jane Doe').reasons[0]));
+eq('K9 4 of 5 agents are compared, 3 flagged', [cmp.length, cmp.filter(c => c.flagged).length], [5, 3]);
+const strictCmp = A.compareBreaks(cxB, appB, { now: NOW, breakToleranceSec: 30 });
+eq('K10 a tighter tolerance (30 s) flags Rick\'s 1-minute difference too', strictCmp.find(c => c.agent_name === 'Rick Roe').flagged, true);
+const before = JSON.stringify(appB);
+A.compareBreaks(cxB, appB, { now: NOW });
+eq('K11 the agents\' own log is never changed', JSON.stringify(appB), before);
+eq('K12 no breaks anywhere → nothing to compare', A.compareBreaks([], [], {}), []);
+eq('K13 a 3CX break and an app break that do not overlap are not paired', (() => { const r = A.compareBreaks([mk('x', 'X', '09:00', '09:10')], [mk('x', 'X', '09:30', '09:40')], { now: NOW })[0]; return [r.pairs.length, r.onlyCx.length, r.onlyApp.length]; })(), [0, 1, 1]);
+check('K14 times in the reasons use the company clock', /3CX shows a break 12:00 to 12:10/.test(A.compareBreaks([mk('x', 'X', '11:00', '11:10')], [], { now: NOW, tzOffsetHours: 1 })[0].reasons[0]));
 
 // ── edge cases ─────────────────────────────────────────────────────
 const head = 'timestamp,extension,agent,old_status,new_status,detail\n';

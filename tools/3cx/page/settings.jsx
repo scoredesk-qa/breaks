@@ -3,7 +3,7 @@
    Test copy only: the values are kept in this browser (localStorage), not in the database. */
 const CX_CFG_KEY='bt_cx_cfg';
 // logTz: UTC offset of the PC that runs the 3CX logger (its clock wrote the log's timestamps)
-const CX_CFG_DEFAULT={logTz:0,ignoreRingSec:10,shortCallSec:60,repeatIgnoreCount:3,repeatIgnoreWindowMin:60};
+const CX_CFG_DEFAULT={logTz:0,ignoreRingSec:10,shortCallSec:60,repeatIgnoreCount:3,repeatIgnoreWindowMin:60,breakToleranceMin:3,breakCheckLeadMin:10};
 let _cxCfg=(()=>{ try{ return {...CX_CFG_DEFAULT,...JSON.parse(localStorage.getItem(CX_CFG_KEY)||'{}')}; }catch(e){ return {...CX_CFG_DEFAULT}; } })();
 const CX_SAMPLE_USERS=['Jane Doe','Rick Roe','Pat Poe','Max Moe','Lou Lee','Kay Kim','Finn Fox','Gail Gray'].map((n,i)=>({id:'sample-'+i,name:n}));
 
@@ -34,6 +34,8 @@ function A3cxSettings(){
       {row('Possible dropped call: a call shorter than','shortCallSec','seconds')}
       {row('Repeated ignores: this many ignored calls','repeatIgnoreCount','calls')}
       {row('...within','repeatIgnoreWindowMin','minutes')}
+      {row('Break check: an agent\'s total break time may differ from 3CX by up to','breakToleranceMin','minutes')}
+      {row('Break check runs before shift end by','breakCheckLeadMin','minutes (the shift end is set above)')}
       <div style={{marginTop:20,display:'flex',alignItems:'center',gap:12}}>
         <button className="bp" onClick={save} disabled={!valid}>Save</button>
         {ok&&<span style={{color:'var(--green)',fontSize:14,display:'flex',alignItems:'center',gap:6}}><Ic n="check" size={15}/> Saved</span>}
@@ -41,3 +43,10 @@ function A3cxSettings(){
     </div>
   );
 }
+
+/* What the agents themselves entered on the sample day, so the break check has something to compare the sample 3CX log with. */
+const CX_SAMPLE_APP=(()=>{
+  const id=n=>(CX_SAMPLE_USERS.find(u=>u.name===n)||{}).id;
+  const row=(n,a,b)=>({id:'sa-'+n+a,user_id:id(n),agent_name:n,start_time:`2026-10-27T${a}:00.000Z`,end_time:b?`2026-10-27T${b}:00.000Z`:null,break_type:'Break'});
+  return [row('Kay Kim','11:00','11:15'),row('Kay Kim','11:30','12:20'),row('Jane Doe','10:00','10:10')];
+})();

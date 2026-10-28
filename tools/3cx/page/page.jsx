@@ -1,9 +1,10 @@
 
 /* ═══ 3CX test page: reads a status_log.csv from this PC and shows calls, ignored rings, short calls, admin time and
-   breaks per agent. Saves nothing. Only agents that exist in the app are shown. ═══ */
+   breaks per agent. Saves nothing in the database and never changes what agents entered. Only agents that exist in the app are shown. ═══ */
 const CXC={call:'#8e9cff',admin:'#f5c451',brk:'#4fd1c5',avail:'#414760',off:'#272a36',ring:'#ff8a65',other:'#7d86a8'};
 const CX_LABEL={call:'On a call',admin:'Admin',brk:'On break',avail:'Available',off:'Offline',ring:'Ringing',other:'Other'};
 const cxCat=s=>/^on call$/i.test(s)?'call':/^admin$/i.test(s)?'admin':/break|lunch|bathroom|toilet/i.test(s)?'brk':/^ringing$/i.test(s)?'ring':/offline|out of office|not registered/i.test(s)?'off':/^available/i.test(s)?'avail':'other';
+const CX_DISMISS_KEY='bt_cx_dismissed';
 
 // smooth line through points for the chart
 const cxSmooth=pts=>{
@@ -32,70 +33,60 @@ function CxChart({labels,series}){
   );
 }
 
-// 30-minute dots across the working day: purple = on a call, yellow = admin, teal = break, grey = available.
-// A red ring marks an ignored call, an orange halo a short call.
-function cxSlots(ivs,rings,calls,from,startH,endH,capEnd,shortSec){
-  const out=[];
-  for(let i=0;i<(endH-startH)*2;i++){
-    const a=from+(startH*60+i*30)*60000, b=a+30*60000, ov={};
-    for(const iv of ivs){ const s=Math.max(iv.start,a), e=Math.min(iv.end??capEnd,b); if(e>s){ const c=cxCat(iv.status); ov[c]=(ov[c]||0)+(e-s); } }
-    let cat=['call','admin','brk'].find(c=>(ov[c]||0)>=60000);
-    if(!cat){ let best=0; for(const c in ov) if(ov[c]>best){ best=ov[c]; cat=c; } }
-    out.push({cat:cat||'off',a,
-      ign:rings.some(r=>r.outcome==='ignored'&&r.start>=a&&r.start<b),
-      sc:calls.some(c=>!c.open&&!c.partialStart&&c.secs<shortSec&&c.start>=a&&c.start<b)});
-  }
-  return out;
-}
-function CxTimeline({slots,big,startH,endH}){
-  return(<>
-    <div className={`cx-tl${big?' cx-tlbig':''}`}>
-      {slots.map((s,i)=><span key={i} className={`cx-dot${s.ign?' ign':''}${s.sc?' sc':''}`} style={{background:CXC[s.cat]}}
-        title={`${wallHM(s.a)} · ${CX_LABEL[s.cat]}${s.ign?' · ignored a call':''}${s.sc?' · short call':''}`}/>)}
-    </div>
-    {big&&<div className="cx-tlx"><span>{String(startH).padStart(2,'0')}:00</span><span>{String(endH).padStart(2,'0')}:00</span></div>}
-  </>);
-}
-const CxLegend=()=>(
-  <div className="cx-leg">
-    {['call','admin','brk','avail'].map(c=><span key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}</span>)}
-    <span><i style={{background:'transparent',boxShadow:'inset 0 0 0 2px #ff6b81'}}/>Ignored call</span>
-    <span><i style={{background:CXC.call,boxShadow:'0 0 0 2px rgba(255,184,107,.95)'}}/>Short call</span>
-  </div>
-);
-
 function A3cx({go}){
   const [text,setText]=useState('');
   const [fileName,setFileName]=useState('');
   const [fileMod,setFileMod]=useState(0);
-  const [day,setDay]=useState(todayISO());
+  const [picked,setPicked]=useState(null);          // a day chosen by hand; null = always follow today
+  const [, setTick]=useState(0);
   const [users,setUsers]=useState([]);
+  const [dbLogs,setDbLogs]=useState([]);            // what the agents entered (bt_logs) for the day
+  const [shiftEnd,setShiftEnd]=useState('16:30');
   const [err,setErr]=useState('');
   const [sel,setSel]=useState(null);
+  const [forced,setForced]=useState(false);         // "Run break check now"
+  const [showDone,setShowDone]=useState(false);
+  const [dismissed,setDismissed]=useState(()=>{ try{ return JSON.parse(localStorage.getItem(CX_DISMISS_KEY)||'{}'); }catch(e){ return {}; } });
   const fileRef=useRef(null);
   const tz=clockOff();
   const isSample=fileName==='sample data';
+  const todayStr=todayISO();
+  const day=picked||todayStr;
+  const [from,to]=CX.dayRange(day,tz);
+  const inDay=t=>t>=from&&t<to;
+
+  useEffect(()=>{ const id=setInterval(()=>setTick(n=>n+1),30000); return()=>clearInterval(id); },[]);   // so "today" and the check time move on by themselves
 
   useEffect(()=>{      // the app's agents: only agents who exist in the app are shown
     Promise.all([
       run(SB.from('bt_clocklogs').select('user_id,agent_name').order('clock_in',{ascending:false}).limit(2000)),
       run(SB.from('bt_logs').select('user_id,agent_name').order('start_time',{ascending:false}).limit(2000)),
-    ]).then(([a,b])=>{
+      run(SB.from('bt_settings').select('*').eq('id',1).maybeSingle()),
+    ]).then(([a,b,c])=>{
       const m=new Map();
       [...(a.data||[]),...(b.data||[])].forEach(r=>{ if(r.user_id&&r.agent_name&&!m.has(r.user_id)) m.set(r.user_id,{id:r.user_id,name:r.agent_name}); });
       setUsers([...m.values()]);
+      if(c.data&&HM_RE.test(c.data.shift_end||'')) setShiftEnd(c.data.shift_end);
     });
   },[]);
+
+  const loadApp=useCallback(async()=>{     // read-only: the agents' own break entries for this day
+    const {data}=await run(SB.from('bt_logs').select('id,user_id,agent_name,start_time,end_time,break_type').gte('start_time',new Date(from).toISOString()).lt('start_time',new Date(to).toISOString()).order('start_time'));
+    setDbLogs(data||[]);
+  },[from,to]);
+  useEffect(()=>{ loadApp(); },[loadApp]);
+  useAutoRefresh(loadApp,30000);
 
   const load=(t,name,mod)=>{
     const rows=CX.parseCsv(t);
     if(!rows.length){ setErr('That file has no rows yet. Let the logger run for a while and try again.'); return; }
-    setErr(''); setText(t); setFileName(name); setFileMod(mod||0); setSel(null);
-    setDay(String(rows[rows.length-1].timestamp||'').slice(0,10)||todayISO());
+    setErr(''); setText(t); setFileName(name); setFileMod(mod||0); setSel(null); setForced(false);   // the day is NOT changed: it stays on today (or the day you picked)
   };
   const pick=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>load(String(r.result),f.name,f.lastModified); r.readAsText(f); e.target.value=''; };
+  const chooseDay=d=>setPicked(!d||d===todayISO()?null:d);
 
   const match=isSample?CX_SAMPLE_USERS:users;
+  const appLogs=isSample?CX_SAMPLE_APP.filter(l=>inDay(Date.parse(l.start_time))):dbLogs;
   const logTz=_cxCfg.logTz;
   const R=React.useMemo(()=>{
     if(!text) return null;
@@ -119,26 +110,61 @@ function A3cx({go}){
   const ok=R&&!R.error;
   const byKey=new Map(match.map(u=>[CX.nameKey(u.name),u]));
   const all=ok?Object.values(R.agents):[];
-  const agents=all.filter(a=>byKey.has(CX.nameKey(a.agent))&&Object.keys(a.statusSecs).length>0).map(a=>({...a,app:byKey.get(CX.nameKey(a.agent)).name})).sort((a,b)=>a.app.localeCompare(b.app));
+  const matchedAny=all.some(a=>byKey.has(CX.nameKey(a.agent)));
+  const agents=all.filter(a=>byKey.has(CX.nameKey(a.agent))&&Object.keys(a.statusSecs).length>0).map(a=>({...a,app:byKey.get(CX.nameKey(a.agent)).name,uid:byKey.get(CX.nameKey(a.agent)).id})).sort((a,b)=>a.app.localeCompare(b.app));
   const shown=new Set(agents.map(a=>a.ext));
   const hidden=all.filter(a=>!byKey.has(CX.nameKey(a.agent))).length;
-  const alerts=ok?R.alerts.filter(a=>shown.has(a.ext)).map(a=>({...a,agent:(byKey.get(CX.nameKey(a.agent))||{}).name||a.agent})):[];
-  const [from,to]=CX.dayRange(day,tz);
-  const inDay=t=>t>=from&&t<to;
   const tot=agents.reduce((t,a)=>({calls:t.calls+a.calls,talk:t.talk+a.callSecs,ans:t.ans+a.answered,ign:t.ign+a.ignored,short:t.short+a.shortCalls,admin:t.admin+a.adminSecs}),{calls:0,talk:0,ans:0,ign:0,short:0,admin:0});
   const rate=tot.ans+tot.ign?Math.round(tot.ans/(tot.ans+tot.ign)*100)+'%':'–';
-  const breakRows=ok?CX.toBreakLogs(R.intervals,match,{tzOffsetHours:logTz}).logs.filter(l=>inDay(Date.parse(l.start_time))):[];
 
-  // day strip: the days that appear in the log (company clock), newest 14
-  const days=ok?[...new Set([day,...R.intervals.map(iv=>{ const w=wall(iv.start); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; })])].sort().slice(-14):[];
+  /* break check: 3CX against what the agents entered. Read-only: nothing the agents entered is ever changed. */
+  const checkAt=addMin(shiftEnd,-_cxCfg.breakCheckLeadMin);
+  const hmNow=wallHM();
+  const due=forced||day<todayStr||(day===todayStr&&hmNow>=checkAt);
+  const uids=new Set(agents.map(a=>a.uid));
+  const cxBreaks=ok?CX.toBreakLogs(R.intervals,match,{tzOffsetHours:logTz}).logs.filter(l=>inDay(Date.parse(l.start_time))&&uids.has(l.user_id)):[];
+  const appBreaks=appLogs.filter(l=>uids.has(l.user_id));
+  const cmp=ok?CX.compareBreaks(cxBreaks,appBreaks,{tzOffsetHours:tz,now:R.now,breakToleranceSec:_cxCfg.breakToleranceMin*60}):[];
+  const flagged=cmp.filter(c=>c.flagged);
+  const extOfUid={}; agents.forEach(a=>{ extOfUid[a.uid]=a.ext; });
+  const checkMs=from+(parseInt(checkAt.slice(0,2),10)*60+parseInt(checkAt.slice(3),10))*60000;
 
-  // working-day range for the timeline and chart
+  /* alerts: call alerts from the analysis, plus a break-check alert per flagged agent once the check is due */
+  const callAlerts=ok?R.alerts.filter(a=>shown.has(a.ext)).map(a=>({...a,agent:(byKey.get(CX.nameKey(a.agent))||{}).name||a.agent})):[];
+  const breakAlerts=due?flagged.map(c=>({type:'break_diff',severity:'warning',ext:extOfUid[c.user_id],agent:c.agent_name,at:checkMs,reasons:c.reasons})):[];
+  const alertsAll=[...callAlerts,...breakAlerts].sort((a,b)=>a.at-b.at);
+  const akey=a=>a.type==='break_diff'?`break_diff|${a.ext}|${day}`:`${a.type}|${a.ext}|${a.at}`;
+  const alerts=alertsAll.filter(a=>!dismissed[akey(a)]);
+  const done=alertsAll.filter(a=>dismissed[akey(a)]);
+  const saveDismissed=n=>{ setDismissed(n); try{ localStorage.setItem(CX_DISMISS_KEY,JSON.stringify(n)); }catch(e){} };
+  const dismiss=a=>saveDismissed({...dismissed,[akey(a)]:1});
+  const restore=a=>{ const n={...dismissed}; delete n[akey(a)]; saveDismissed(n); };
+  const clearAll=()=>{ const n={...dismissed}; alerts.forEach(a=>{ n[akey(a)]=1; }); saveDismissed(n); };
+
+  // tell the admin once a day, 10 minutes (set in Settings) before shift end, if 3CX and the agents' entries differ
+  const notifyDue=day===todayStr&&hmNow>=checkAt;
+  useEffect(()=>{
+    if(!ok||!notifyDue||flagged.length===0) return;
+    const k='bt_cx_notified_'+day;
+    try{ if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); }catch(e){}
+    fireNotification({title:'Break check',body:`${flagged.length} agent${flagged.length===1?' has':'s have'} breaks in 3CX that differ from their own log`,type:'custom',duration:12000});
+  },[ok,notifyDue,flagged.length,day]);
+  const runCheckNow=()=>{
+    setForced(true);
+    if(flagged.length) fireNotification({title:'Break check',body:`${flagged.length} agent${flagged.length===1?' has':'s have'} breaks in 3CX that differ from their own log`,type:'custom',duration:12000});
+  };
+
+  // days that appear in the log (company clock), plus today; newest 14
+  const days=ok?[...new Set([day,todayStr,...R.intervals.map(iv=>{ const w=wall(iv.start); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; })])].sort().slice(-14):[];
+  const dayLabel=new Date(day+'T00:00:00Z').toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'});
+
+  // chart range: real activity that started this day (idle "Available" and last night's carry-over don't set it)
   let startH=8,endH=18,capEnd=appNow();
   const mine=ok?R.intervals.filter(iv=>shown.has(iv.ext)):[];
   if(ok&&mine.length){
     const logEnd=Math.max(...mine.map(iv=>iv.end??iv.start));
     capEnd=Math.min(appNow(),Math.max(logEnd,from));
-    const act=mine.filter(iv=>['call','ring','admin','brk'].includes(cxCat(iv.status))&&iv.start>=from&&iv.start<to);   // real activity that started this day (idle "Available" and last night's carry-over don't set the range)
+    const act=mine.filter(iv=>['call','ring','admin','brk'].includes(cxCat(iv.status))&&iv.start>=from&&iv.start<to);
     if(act.length){
       const mn=Math.min(...act.map(iv=>iv.start)), mx=Math.max(...act.map(iv=>Math.min(iv.end??capEnd,to)));
       startH=Math.max(0,Math.floor((mn-from)/3600000)); endH=Math.min(24,Math.ceil((mx-from)/3600000)+1);
@@ -146,23 +172,23 @@ function A3cx({go}){
     }
   }
   const hours=[...Array(Math.max(0,endH-startH)).keys()].map(i=>startH+i);
-  const perHour=pred=>hours.map(h=>pred(h));
-  const callsAt=agents.length&&ok?R.calls.filter(c=>shown.has(c.ext)&&inDay(c.start)):[];
+  const callsAt=ok?R.calls.filter(c=>shown.has(c.ext)&&inDay(c.start)):[];
   const look=ok?[...R.rings.filter(r=>shown.has(r.ext)&&r.outcome==='ignored'&&inDay(r.start)).map(r=>r.start),
                  ...callsAt.filter(c=>!c.open&&!c.partialStart&&c.secs<_cxCfg.shortCallSec).map(c=>c.start)]:[];
-  const bucket=(list)=>perHour(h=>list.filter(t=>Math.floor((t-from)/3600000)===h).length);
+  const bucket=list=>hours.map(h=>list.filter(t=>Math.floor((t-from)/3600000)===h).length);
   const chartCalls=bucket(callsAt.map(c=>c.start)), chartLook=bucket(look);
 
   const latest={};
   if(ok) for(const iv of R.intervals) if(iv.start<to&&(!latest[iv.ext]||iv.start>=latest[iv.ext].start)) latest[iv.ext]=iv;
   const statusOf=ext=>latest[ext]?latest[ext].status:'';
-  const isToday=day===todayISO();
   const nowCount=cat=>agents.filter(a=>cxCat(statusOf(a.ext))===cat).length;
 
-  const slotsFor=ext=>cxSlots(R.intervals.filter(iv=>iv.ext===ext),R.rings.filter(r=>r.ext===ext),R.calls.filter(c=>c.ext===ext),from,startH,endH,capEnd,_cxCfg.shortCallSec);
-  const previewAlerts=()=>alerts.slice(0,5).forEach((a,i)=>setTimeout(()=>fireNotification({title:a.type==='short_call'?'Possible dropped call':a.type==='repeated_ignore'?'Repeated ignored calls':'Ignored call',body:a.message,type:'custom',duration:8000}),i*900));
-  const dayLabel=new Date(day+'T00:00:00Z').toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'});
-  const kind=a=>a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}:a.type==='repeated_ignore'?{t:'Repeated',cls:'',ic:'brk',d:`${a.count} ignored calls within ${_cxCfg.repeatIgnoreWindowMin} min`,red:true}:{t:'Ignored',cls:'b-brk',ic:'brk',d:`Rang ${a.secs}s, not answered`};
+  const previewAlerts=()=>alerts.slice(0,5).forEach((a,i)=>setTimeout(()=>fireNotification({title:a.type==='break_diff'?'Break check':a.type==='short_call'?'Possible dropped call':a.type==='repeated_ignore'?'Repeated ignored calls':'Ignored call',body:alertText(a),type:'custom',duration:8000}),i*900));
+  const kind=a=>a.type==='break_diff'?{t:'Break check',cls:'b-lunch',ic:'lun',d:a.reasons[0]+(a.reasons.length>1?` (+${a.reasons.length-1} more)`:'')}
+    :a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}
+    :a.type==='repeated_ignore'?{t:'Repeated',cls:'',ic:'brk',d:`${a.count} ignored calls within ${_cxCfg.repeatIgnoreWindowMin} min`,red:true}
+    :{t:'Ignored',cls:'b-brk',ic:'brk',d:`Rang ${a.secs}s, not answered`};
+  const alertText=a=>`${a.agent}: ${kind(a).d}`;
   const redBadge={background:'rgba(220,38,38,.18)',color:'#fca5a5'};
 
   const header=(
@@ -171,6 +197,8 @@ function A3cx({go}){
         <button className="bp" onClick={()=>fileRef.current&&fileRef.current.click()}><Ic n="download" size={17}/> Load log</button>
         <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={pick} style={{display:'none'}}/>
         <button className="bs" onClick={()=>load(CX_SAMPLE,'sample data')}><Ic n="play" size={16}/> Use sample data</button>
+        <input className="fi" type="date" value={day} onChange={e=>chooseDay(e.target.value)} style={{width:190,height:47}} aria-label="Choose a day"/>
+        {picked&&<button className="bs" onClick={()=>setPicked(null)}>Today</button>}
         {alerts.length>0&&<button className="bs" onClick={previewAlerts}><Ic n="bell" size={16}/> Preview alerts</button>}
         <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}</span>}</div>
       </div>
@@ -186,10 +214,15 @@ function A3cx({go}){
     const a=profile, cat=cxCat(statusOf(a.ext)), col=CXC[cat];
     const myCalls=R.calls.filter(c=>c.ext===a.ext&&inDay(c.start));
     const myRings=R.rings.filter(r=>r.ext===a.ext&&inDay(r.start)&&r.outcome!=='ringing');
-    const myStretches=R.intervals.filter(iv=>iv.ext===a.ext&&(cxCat(iv.status)==='admin'||cxCat(iv.status)==='brk')&&inDay(iv.start));
+    const myAdmin=R.intervals.filter(iv=>iv.ext===a.ext&&cxCat(iv.status)==='admin'&&inDay(iv.start));
     const myAlerts=alerts.filter(x=>x.ext===a.ext);
+    const mine=cmp.find(c=>c.user_id===a.uid);
     const ringLabel={answered:'Answered',ignored:'Not answered',taken_by_other:'Answered by a colleague',short_ring:'Caller hung up first'};
     const longest=myCalls.reduce((m,c)=>Math.max(m,c.secs),0);
+    const split={}; Object.entries(a.statusSecs).forEach(([st,v])=>{ const c=cxCat(st); split[c]=(split[c]||0)+v; });
+    const order=['call','admin','brk','avail','ring','other','off'].filter(c=>split[c]>0);
+    const total=order.reduce((t,c)=>t+split[c],0)||1;
+    const hmOf=ms=>wallHM(ms);
     const row=(key,left,mid,right,flag)=>(
       <div key={key} className="acc-row" style={{minHeight:54}}>
         <div style={{width:112,fontVariantNumeric:'tabular-nums',color:'var(--mut)',fontSize:15}} className="pv">{left}</div>
@@ -223,30 +256,43 @@ function A3cx({go}){
             <div><span>Break time</span><b>{CX.fmtDur(a.breakSecs)}</b></div>
           </div>
           <div style={{padding:'0 12px'}}>
-            <div className="card-t" style={{fontSize:16,marginBottom:6}}>Day at a glance</div>
-            <CxTimeline slots={slotsFor(a.ext)} big startH={startH} endH={endH}/>
+            <div className="card-t" style={{fontSize:16,marginBottom:6}}>Where the time went</div>
+            <div className="cx-bar pv">{order.map(c=><i key={c} style={{width:`${split[c]/total*100}%`,background:CXC[c]}} title={`${CX_LABEL[c]} ${CX.fmtDur(split[c])}`}/>)}</div>
+            <div className="cx-split pv">{order.map(c=><div key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}<b>{CX.fmtDur(split[c])} · {Math.round(split[c]/total*100)}%</b></div>)}</div>
           </div>
-          <CxLegend/>
         </div>
         <div className="cx-two2">
           <div className="card acc">
             <div className="card-hd"><div className="card-t">Calls <span className="cx-list-sub">{myCalls.length}</span></div></div>
-            {myCalls.length===0?<div className="onb-empty"><div>No calls this day</div></div>:myCalls.map((c,i)=>row(i,`${wallHM(c.start)} – ${c.open?'now':wallHM(c.end)}`,'Call',CX.fmtDur(c.secs),
+            {myCalls.length===0?<div className="onb-empty"><div>No calls this day</div></div>:myCalls.map((c,i)=>row(i,`${hmOf(c.start)} – ${c.open?'now':hmOf(c.end)}`,'Call',CX.fmtDur(c.secs),
               !c.open&&!c.partialStart&&c.secs<_cxCfg.shortCallSec?<span className="badge b-bath">Short</span>:c.partialStart?<span className="badge">Started before logging</span>:null))}
           </div>
           <div className="card acc">
             <div className="card-hd"><div className="card-t">Rings <span className="cx-list-sub">{myRings.length}</span></div></div>
-            {myRings.length===0?<div className="onb-empty"><div>No rings this day</div></div>:myRings.map((r,i)=>row(i,wallHM(r.start),ringLabel[r.outcome]||r.outcome,`${Math.round(r.secs)}s`,
+            {myRings.length===0?<div className="onb-empty"><div>No rings this day</div></div>:myRings.map((r,i)=>row(i,hmOf(r.start),ringLabel[r.outcome]||r.outcome,`${Math.round(r.secs)}s`,
               r.outcome==='ignored'?<span className="badge" style={redBadge}>Ignored</span>:null))}
           </div>
           <div className="card acc">
-            <div className="card-hd"><div className="card-t">Admin and breaks <span className="cx-list-sub">{myStretches.length}</span></div></div>
-            {myStretches.length===0?<div className="onb-empty"><div>None this day</div></div>:myStretches.map((iv,i)=>row(i,`${wallHM(iv.start)} – ${iv.end?wallHM(iv.end):'now'}`,iv.status,CX.fmtDur((iv.end??capEnd)-iv.start>0?((iv.end??capEnd)-iv.start)/1000:0),
-              iv.partialStart?<span className="badge">Started before logging</span>:null))}
+            <div className="card-hd"><div className="card-t">Breaks: agent's log and 3CX <span className="cx-list-sub">{mine?(mine.flagged?'differs':'matches'):'none'}</span></div></div>
+            {!mine?<div className="onb-empty"><div>No breaks this day</div></div>:<>
+              {mine.reasons.map((r,i)=><div key={i} className="cx-reason pv" style={{padding:'0 12px 8px'}}>{r}</div>)}
+              {mine.pairs.map((p,i)=>row('p'+i,`${hmOf(p.cx.s)} – ${p.cx.open?'now':hmOf(p.cx.e)}`,'3CX',`log ${hmOf(p.app.s)} – ${p.app.open?'now':hmOf(p.app.e)}`,null))}
+              {mine.onlyCx.map((x,i)=>row('c'+i,`${hmOf(x.s)} – ${x.open?'now':hmOf(x.e)}`,'3CX only','',<span className="badge" style={redBadge}>Not in agent's log</span>))}
+              {mine.onlyApp.map((x,i)=>row('a'+i,`${hmOf(x.s)} – ${x.open?'now':hmOf(x.e)}`,"Agent's log only",'',<span className="badge" style={redBadge}>Not in 3CX</span>))}
+            </>}
           </div>
           <div className="card acc">
+            <div className="card-hd"><div className="card-t">Admin <span className="cx-list-sub">{myAdmin.length}</span></div></div>
+            {myAdmin.length===0?<div className="onb-empty"><div>No admin time this day</div></div>:myAdmin.map((iv,i)=>row(i,`${hmOf(iv.start)} – ${iv.end?hmOf(iv.end):'now'}`,iv.status,CX.fmtDur(((iv.end??capEnd)-iv.start)/1000),iv.partialStart?<span className="badge">Started before logging</span>:null))}
+          </div>
+          <div className="card acc" style={{gridColumn:'1 / -1'}}>
             <div className="card-hd"><div className="card-t">Alerts <span className="cx-list-sub">{myAlerts.length}</span></div></div>
-            {myAlerts.length===0?<div className="onb-empty"><div>No alerts for {a.app.split(' ')[0]} this day</div></div>:myAlerts.map((x,i)=>{ const k=kind(x); return row(i,wallHM(x.at),k.d,'',<span className={`badge ${k.cls}`} style={k.red?redBadge:null}>{k.t}</span>); })}
+            {myAlerts.length===0?<div className="onb-empty"><div>No open alerts for {a.app.split(' ')[0]} this day</div></div>:myAlerts.map((x,i)=>{ const k=kind(x); return(
+              <div key={i} className="acc-row" style={{minHeight:54}}>
+                <div style={{width:112,color:'var(--mut)',fontSize:15}} className="pv">{hmOf(x.at)}</div>
+                <div className="acc-n pv" style={{fontSize:16,whiteSpace:'normal'}}>{k.d} <span className={`badge ${k.cls}`} style={k.red?redBadge:null}>{k.t}</span></div>
+                <button className="cx-done" title="Mark as dealt with" aria-label="Mark as dealt with" onClick={()=>dismiss(x)}><Ic n="check" size={16}/></button>
+              </div>); })}
           </div>
         </div>
       </div>
@@ -257,7 +303,7 @@ function A3cx({go}){
   return(
     <div className="page">
       <h1 className="hello">3CX calls</h1>
-      <p className="hello-s">{ok?`${dayLabel} · ${tot.calls} calls · ${alerts.length} alert${alerts.length===1?'':'s'}`:'Test page · reads a status log from this PC · nothing is saved or sent anywhere'}</p>
+      <p className="hello-s">{ok?`${dayLabel}${day===todayStr?' (today)':''} · ${tot.calls} calls · ${alerts.length} alert${alerts.length===1?'':'s'}`:'Test page · reads a status log from this PC · nothing is saved or sent anywhere'}</p>
       {header}
 
       {!R&&(
@@ -268,22 +314,29 @@ function A3cx({go}){
         </div></div>
       )}
 
-      {ok&&agents.length===0&&(
+      {ok&&<div className="cx-days" role="tablist" aria-label="Day">
+        {days.map(d=>{ const dt=new Date(d+'T00:00:00Z'); return(
+          <button key={d} role="tab" aria-selected={d===day} className={`cx-day${d===day?' on':''}`} onClick={()=>chooseDay(d)}>
+            <b>{String(dt.getUTCDate()).padStart(2,'0')}</b><span>{dt.toLocaleDateString([],{weekday:'short',timeZone:'UTC'})}</span>
+          </button>); })}
+      </div>}
+
+      {ok&&!matchedAny&&(
         <div className="card acc"><div className="onb-empty">
           <div className="es-ic"><Ic n="users" size={24}/></div>
           <div>No agents in this log match agents in the app</div>
           <span>3CX names must match the agent's name in the app, in either order (for example "Sghir, Abdulkarim" and "Abdulkarim Sghir"). {all.length} 3CX extension{all.length===1?'':'s'} hidden.</span>
         </div></div>
       )}
+      {ok&&matchedAny&&agents.length===0&&(
+        <div className="card acc"><div className="onb-empty">
+          <div className="es-ic"><Ic n="phone" size={24}/></div>
+          <div>No 3CX activity on {dayLabel}</div>
+          <span>The log has activity on {days.filter(d=>d!==day&&R.intervals.some(iv=>{ const w=wall(iv.start); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`===d; })).map(d=>new Date(d+'T00:00:00Z').toLocaleDateString([],{day:'numeric',month:'short',timeZone:'UTC'})).join(', ')||'no other day'}. Pick one above.</span>
+        </div></div>
+      )}
 
       {ok&&agents.length>0&&<>
-        <div className="cx-days" role="tablist" aria-label="Day">
-          {days.map(d=>{ const dt=new Date(d+'T00:00:00Z'); return(
-            <button key={d} role="tab" aria-selected={d===day} className={`cx-day${d===day?' on':''}`} onClick={()=>setDay(d)}>
-              <b>{String(dt.getUTCDate()).padStart(2,'0')}</b><span>{dt.toLocaleDateString([],{weekday:'short',timeZone:'UTC'})}</span>
-            </button>); })}
-        </div>
-
         <div className="cx-two">
           <div className="card acc">
             <div className="card-hd"><div><div className="card-t">Statistics</div></div></div>
@@ -300,36 +353,48 @@ function A3cx({go}){
             <div className="cx-leg"><span><i style={{background:CXC.call}}/>Calls started per hour</span><span><i style={{background:CXC.admin}}/>Ignored rings + short calls</span></div>
           </div>
 
-          <div className="card acc onb">
+          <div className="card acc onb cx-alerts">
             <div className="card-hd">
               <div>
                 <div className="card-t">Alerts</div>
-                <div className="big pv" style={{marginTop:6}}><Amt main={<TNum value={alerts.length}/>} sup=" today"/></div>
+                <div className="big pv" style={{marginTop:6}}><Amt main={<TNum value={alerts.length}/>} sup=" open"/></div>
               </div>
-              <div className="card-ctl"><button className="icb sm" onClick={()=>go&&go('settings')} title="3CX alert settings"><Ic n="settings" size={16}/></button></div>
+              <div className="card-ctl">
+                {alerts.length>0&&<button className="bs" onClick={clearAll} title="Mark every alert as dealt with">Clear all</button>}
+                <button className="icb sm" onClick={()=>go&&go('settings')} title="3CX alert settings"><Ic n="settings" size={16}/></button>
+              </div>
             </div>
             {alerts.length===0?(
               <div className="onb-empty">
                 <div className="es-ic"><Ic n="check" size={24}/></div>
-                <div>No alerts for this day</div>
+                <div>{done.length?'All alerts dealt with':'No alerts for this day'}</div>
                 <span>Ignored after {_cxCfg.ignoreRingSec}s · short call under {_cxCfg.shortCallSec}s</span>
               </div>
-            ):alerts.slice(0,6).map((a,i)=>{ const k=kind(a); return(
-              <div key={i} className="acc-row onb-row link" onClick={()=>setSel(a.ext)} title="Open profile">
+            ):alerts.slice(0,6).map(a=>{ const k=kind(a); return(
+              <div key={akey(a)} className="acc-row onb-row link" onClick={()=>a.ext&&setSel(a.ext)} title="Open profile">
                 <div className={`acc-ic ${k.ic}`}>{ini(a.agent)}</div>
                 <div className="onb-mid">
-                  <div className="acc-n pv">{a.agent} <span className={`badge ${k.cls}`} style={k.red?redBadge:null}>{k.t}</span></div>
-                  <small style={{color:'var(--mut)',fontSize:14}}>{k.d}</small>
+                  <div className="acc-n pv">{a.agent}</div>
+                  <div className="cx-reason pv"><span className={`badge ${k.cls}`} style={k.red?redBadge:null}>{k.t}</span>{k.d}</div>
                 </div>
                 <div className="onb-r"><div className="acc-v pv">{wallHM(a.at)}</div></div>
+                <button className="cx-done" title="Mark as dealt with" aria-label="Mark as dealt with" onClick={e=>{ e.stopPropagation(); dismiss(a); }}><Ic n="check" size={16}/></button>
               </div>
             );})}
             {alerts.length>6&&<div className="acc-row"><div className="acc-ic more">+{alerts.length-6}</div><div className="acc-n" style={{color:'var(--mut)'}}>more alerts</div></div>}
+            {done.length>0&&<div style={{padding:'10px 12px 0'}}>
+              <button className="bs" onClick={()=>setShowDone(v=>!v)}>Dealt with ({done.length})</button>
+              {showDone&&done.map(a=>(
+                <div key={akey(a)} className="acc-row" style={{minHeight:48,opacity:.7}}>
+                  <div className="acc-n pv" style={{fontSize:15}}>{a.agent} <small>{kind(a).t} · {wallHM(a.at)}</small></div>
+                  <button className="bs" onClick={()=>restore(a)}>Restore</button>
+                </div>))}
+            </div>}
           </div>
         </div>
 
         <div className="cx-sec">Agents <small>{agents.length} in the app{hidden>0?` · ${hidden} other 3CX extension${hidden===1?'':'s'} ${hidden===1?'isn\'t':'aren\'t'} in the app and ${hidden===1?'is':'are'} hidden`:''}</small></div>
-        {isToday&&<div className="cx-chips">
+        {day===todayStr&&<div className="cx-chips">
           <span className="cx-chip"><b>{nowCount('call')}</b> on a call</span>
           <span className="cx-chip"><b>{nowCount('brk')}</b> on break</span>
           <span className="cx-chip"><b>{nowCount('admin')}</b> on admin</span>
@@ -351,24 +416,28 @@ function A3cx({go}){
                 <div><span>Short calls</span><b className={a.shortCalls?'note':''}>{a.shortCalls}</b></div>
                 <div><span>Admin</span><b>{CX.fmtDur(a.adminSecs)}</b></div>
               </div>
-              <CxTimeline slots={slotsFor(a.ext)}/>
             </button>
           );})}
         </div>
-        <CxLegend/>
 
-        <div className="cx-sec" style={{marginTop:34}}>Breaks from 3CX <small>what would be added to the break log · nothing is added now</small></div>
+        <div className="cx-sec" style={{marginTop:34}}>Break check <small>3CX compared with the agents' own break log · the agents' entries are never changed</small></div>
+        <div className="cx-chips">
+          <span className="cx-chip"><b>{flagged.length}</b> differ</span>
+          <span className="cx-chip"><b>{cmp.length-flagged.length}</b> match</span>
+          <span className="cx-chip">{due?'Final check done':`Final check at ${checkAt}`}</span>
+          {!due&&<button className="bs" onClick={runCheckNow}>Run break check now</button>}
+        </div>
         <div className="card acc">
-          {breakRows.length===0?(
-            <div className="onb-empty"><div className="es-ic"><Ic n="coffee" size={24}/></div><div>No breaks in 3CX for this day</div></div>
-          ):breakRows.map((l,i)=>{ const cls=l.break_type==='Lunch Break'?'lun':l.break_type==='Bathroom Break'?'bth':'brk'; return(
-            <div key={i} className="acc-row onb-row">
-              <div className={`acc-ic ${cls}`}>{ini(l.agent_name)}</div>
+          {cmp.length===0?(
+            <div className="onb-empty"><div className="es-ic"><Ic n="coffee" size={24}/></div><div>No breaks in 3CX or in the agents' log for this day</div></div>
+          ):cmp.map(c=>{ const ext=extOfUid[c.user_id]; return(
+            <div key={c.user_id} className={`acc-row onb-row${ext?' link':''}`} onClick={()=>ext&&setSel(ext)}>
+              <div className={`acc-ic ${c.flagged?'brk':'bth'}`}>{ini(c.agent_name)}</div>
               <div className="onb-mid">
-                <div className="acc-n pv">{l.agent_name} <span className={`badge ${BCLS[l.break_type]||'b-brk'}`}>{l.break_type==='Bathroom Break'?'Bathroom':l.break_type==='Lunch Break'?'Lunch':'Break'}</span></div>
-                <small style={{color:'var(--mut)',fontSize:14}}>{wallHM(l.start_time)} – {l.end_time?wallHM(l.end_time):'still on break'}{l.partial_start?' · started before logging':''}</small>
+                <div className="acc-n pv">{c.agent_name} <span className={`badge ${c.flagged?'':'b-in'}`} style={c.flagged?redBadge:null}>{c.flagged?'Differs':'Matches'}</span></div>
+                <div className="cx-cmp pv"><span>Agent's log <b>{c.appCount} · {CX.fmtDur(c.appSecs)}</b></span><span>3CX <b>{c.cxCount} · {CX.fmtDur(c.cxSecs)}</b></span></div>
+                {c.reasons.map((r,i)=><div key={i} className="cx-reason pv">{r}</div>)}
               </div>
-              <div className="onb-r"><div className="acc-v pv">{l.duration_secs==null?'–':CX.fmtDur(l.duration_secs)}</div></div>
             </div>
           );})}
         </div>

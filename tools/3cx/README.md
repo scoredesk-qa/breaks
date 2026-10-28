@@ -8,7 +8,7 @@ agent's presence changes (`Available`, `Ringing`, `On call`, `Break`, `Admin`, `
 
 | Wanted | How it is worked out |
 |---|---|
-| **Agent breaks, pulled from 3CX** | every `Break`/`Lunch`/`Bathroom` stretch becomes a record shaped like a `bt_logs` row (`toBreakLogs`) |
+| **Agent breaks, pulled from 3CX** | every `Break`/`Lunch`/`Bathroom` stretch is recorded and compared with the agent's own entries (`toBreakLogs`, `compareBreaks`); 3CX never overwrites them |
 | **Admin time per agent** | total time in the `Admin` status |
 | **Calls and total call time per agent** | every `On call` stretch is a call; talk time is the sum |
 | **Ringing but not answered** | a `Ringing` stretch that ends in anything other than `On call` |
@@ -18,7 +18,7 @@ agent's presence changes (`Available`, `Ringing`, `On call`, `Break`, `Admin`, `
 ## Run it
 
 ```
-node tools/3cx/test.js                                   # 71 checks on made-up data (tools/3cx/fixtures)
+node tools/3cx/test.js                                   # 89 checks on made-up data (tools/3cx/fixtures)
 node tools/3cx/report.js path/to/status_log.csv 2026-10-27 --tz 0     # --tz = UTC offset of the logger PC
 CX_REAL_CSV=path/to/status_log.csv node tools/3cx/test.js   # also sanity-checks a real log
 ```
@@ -73,8 +73,10 @@ node tools/3cx/page/test_page.js BreakTrack_TEST_3cx.html <folder containing nod
    `bt_3cx_events (id, at timestamptz, ext, agent, old_status, new_status, detail)`. The key stays on the logger PC only.
 2. **Admin page "3CX".** Day picker, one row per agent (calls, talk time, average, short calls, rings, ignored,
    admin time, break time) and an alerts list. Alerts also go to the existing admin notification toast as they happen.
-3. **Breaks.** `toBreakLogs` rows go into `bt_logs` with a `source` column set to `3cx`, de-duplicated by
-   `(user_id, start_time)`.
+3. **Breaks.** 3CX breaks are only *recorded* (in their own table) and compared with what the agents entered in the app (`bt_logs`).
+   They are never written into `bt_logs` and never change an agent's entry (`compareBreaks`). Ten minutes before shift end
+   each day (Settings → shift end, minus the lead time) the admin is notified if any agent's breaks differ: a break only in
+   3CX, a break only in the agent's log, or totals more than a few minutes apart.
 4. **Alerts.** Raised as the rows arrive, so the admin sees an ignored call within seconds, not at the end of the day.
 
 Decisions that change the build: which is the source of truth for breaks (the app's button or 3CX); whether a

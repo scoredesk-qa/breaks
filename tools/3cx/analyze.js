@@ -17,6 +17,8 @@ const DEFAULTS = {
   repeatIgnoreCount: 3,    // this many ignored rings ...
   repeatIgnoreWindowMin: 60, // ... inside this many minutes raises a "repeated" alert
   minBreakSec: 10,         // ignore break blips shorter than this when building break records
+  quietCapMin: 30,         // a status with no change keeps running only this long after the log's last row (the logger may have stopped)
+  breakToleranceSec: 180,  // break check: an agent's total break time may differ from 3CX by this much before it is flagged
 };
 
 const S = { CALL: 'On call', RING: 'Ringing', ADMIN: 'Admin', BREAK: 'Break', OFFLINE: 'Offline' };
@@ -175,8 +177,11 @@ function buildAlerts(rings, calls, o, now) {
 /* ── per-agent statistics for one day ────────────────────────────── */
 function analyze(rows, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
-  const now = opts.now ?? Date.now();
   const intervals = buildIntervals(rows, o);
+  // 3CX only writes a row when a status changes, so an unchanged status runs on until now. But if the log stopped growing
+  // (logger off, a later day, nobody working), don't invent activity: stop at the last row plus a short allowance.
+  const logEnd = intervals.reduce((m, iv) => Math.max(m, iv.start, iv.end ?? 0), -Infinity);
+  const now = Math.min(opts.now ?? Date.now(), logEnd + o.quietCapMin * 60000);
   const rings = buildRings(intervals, now, o);
   const calls = buildCalls(intervals, now);
   const alerts = buildAlerts(rings, calls, o, now);
@@ -218,7 +223,7 @@ function analyze(rows, opts = {}) {
     a.answerRate = a.answered + a.ignored ? a.answered / (a.answered + a.ignored) : null;
   }
   const dayAlerts = alerts.filter(a => inDay(a.at));
-  return { agents, rings, calls, alerts: dayAlerts, intervals, options: o };
+  return { agents, rings, calls, alerts: dayAlerts, intervals, options: o, now };
 }
 
 /* ── break records for the app ───────────────────────────────────── */
@@ -250,6 +255,48 @@ function toBreakLogs(intervals, users, opts = {}) {
   return { logs, unmatched: [...unmatched] };
 }
 
+
+/* ── break check: 3CX against what the agents entered ────────────── */
+// The agents' own break log (bt_logs) is the record. 3CX is never written into it: this only reads both and reports differences.
+//   cxLogs  = toBreakLogs(...).logs        appLogs = rows of bt_logs ({user_id, agent_name, start_time, end_time})
+// Breaks are paired by overlap (at least 30 s, or half of the shorter one). What is left over is "only in 3CX" or "only in the
+// agent's log". An agent is flagged when something is left over, or the totals differ by more than breakToleranceSec.
+function compareBreaks(cxLogs, appLogs, opts = {}) {
+  const o = { ...DEFAULTS, ...opts };
+  const now = opts.now ?? Date.now();
+  const hm = ms => isoLocal(ms, o.tzOffsetHours).slice(11, 16);
+  const span = x => ({ s: Date.parse(x.start_time), e: x.end_time ? Date.parse(x.end_time) : now, open: !x.end_time });
+  const users = {};
+  const add = (list, side) => (list || []).forEach(x => {
+    const u = users[x.user_id] || (users[x.user_id] = { user_id: x.user_id, agent_name: x.agent_name, cx: [], app: [] });
+    u[side].push(span(x));
+  });
+  add(cxLogs, 'cx'); add(appLogs, 'app');
+  const overlap = (a, b) => Math.max(0, Math.min(a.e, b.e) - Math.max(a.s, b.s));
+  const out = [];
+  for (const u of Object.values(users)) {
+    u.cx.sort((a, b) => a.s - b.s); u.app.sort((a, b) => a.s - b.s);
+    const freeApp = new Set(u.app.map((_, i) => i)); const pairs = []; const onlyCx = [];
+    for (const c of u.cx) {
+      let best = -1, bo = 0;
+      for (const i of freeApp) { const ov = overlap(c, u.app[i]); if (ov > bo) { bo = ov; best = i; } }
+      const need = best < 0 ? Infinity : Math.min(30000, 0.5 * Math.min(c.e - c.s, u.app[best].e - u.app[best].s));
+      if (best >= 0 && bo >= need) { freeApp.delete(best); pairs.push({ cx: c, app: u.app[best] }); } else onlyCx.push(c);
+    }
+    const onlyApp = [...freeApp].map(i => u.app[i]);
+    const cxSecs = u.cx.reduce((t, x) => t + (x.e - x.s) / 1000, 0), appSecs = u.app.reduce((t, x) => t + (x.e - x.s) / 1000, 0);
+    const diffSecs = appSecs - cxSecs;                       // positive: the agent logged more than 3CX shows
+    const reasons = [];
+    onlyCx.forEach(x => reasons.push(`3CX shows a break ${hm(x.s)} to ${x.open ? 'now' : hm(x.e)} that is not in the agent's log`));
+    onlyApp.forEach(x => reasons.push(`The agent's log has a break ${hm(x.s)} to ${x.open ? 'now' : hm(x.e)} that 3CX doesn't show`));
+    if (Math.abs(diffSecs) > o.breakToleranceSec)
+      reasons.push(`Totals differ by ${fmtDur(Math.abs(diffSecs))}: agent's log ${fmtDur(appSecs)}, 3CX ${fmtDur(cxSecs)}`);
+    out.push({ user_id: u.user_id, agent_name: u.agent_name, cxCount: u.cx.length, appCount: u.app.length, cxSecs, appSecs, diffSecs,
+      pairs, onlyCx, onlyApp, reasons, flagged: reasons.length > 0 });
+  }
+  return out.sort((a, b) => String(a.agent_name).localeCompare(String(b.agent_name)));
+}
+
 /* ── text report ─────────────────────────────────────────────────── */
 function fmtDur(s) {
   s = Math.round(s);
@@ -274,4 +321,4 @@ function report(result) {
 }
 
 module.exports = { DEFAULTS, parseCsv, parseStamp, dayRange, isoLocal, nameKey, displayName, buildIntervals, buildRings, buildCalls,
-  buildAlerts, analyze, toBreakLogs, breakType, isBreak, fmtDur, report };
+  buildAlerts, analyze, toBreakLogs, compareBreaks, breakType, isBreak, fmtDur, report };
