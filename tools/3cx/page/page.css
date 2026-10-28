@@ -49,10 +49,10 @@
 
 .cx-bar{display:flex;height:18px;border-radius:999px;overflow:hidden;background:#23252f;gap:2px;margin:6px 0 4px}
 .cx-bar i{display:block;height:100%;min-width:3px}
-.cx-split{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 24px;padding:12px 0 0;font-size:14px}
+.cx-split{display:flex;flex-wrap:wrap;gap:10px 32px;padding:12px 0 0;font-size:14px}
 .cx-split>div{display:flex;align-items:center;gap:10px;color:var(--txt2)}
 .cx-split i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
-.cx-split b{font-weight:400;margin-left:auto;font-variant-numeric:tabular-nums;color:var(--txt)}
+.cx-split b{font-weight:400;margin-left:4px;font-variant-numeric:tabular-nums;color:var(--txt)}
 .cx-reason{font-size:13.5px;color:var(--mut);line-height:1.5}
 .cx-ok{background:var(--green-d);color:var(--green)}
 .cx-bad{background:rgba(220,38,38,.18);color:#fca5a5}
