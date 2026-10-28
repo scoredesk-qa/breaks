@@ -223,6 +223,17 @@ const mkdb = (extra = {}) => Object.assign({
   check('L8 an empty table says so instead of "no agents match", and offers the admin-read SQL (a table that only lets the logger insert looks empty to admins)', /logger has not uploaded anything for this period yet, or admins are not allowed to read the table/.test(await text(p)) && !/No agents in this log match/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow admins to read it")').count() === 1);
   await p.context().close();
 
+  // live updates: new rows show up on their own within a few seconds, fetched incrementally by id
+  const withId = tbl.map((r, k) => ({ id: k + 1, ...r }));
+  p = await open({ db: mkdb({ status_log: withId }) });
+  await p.waitForSelector('.cx-card');
+  check('U1 Kay starts as Available', /Available/.test(await p.locator('.cx-card:has-text("Kay Kim")').innerText()));
+  await p.evaluate(iso => { window.__DB.status_log.push({ id: 100000, changed_at: iso, extension: '606', agent: 'Kim, Kay', old_status: 'Available', new_status: 'On call', detail: null }); }, iso('13:05'));
+  await p.waitForFunction(() => [...document.querySelectorAll('.cx-card')].some(c => /Kay Kim/.test(c.innerText) && /On call/.test(c.innerText)), null, { timeout: 12000 });
+  check('U2 without touching the page, Kay shows On call after the next refresh (under 12 s)', true);
+  check('U3 still 4 cards, no duplicates after the incremental read', await p.locator('.cx-card').count() === 4);
+  await p.context().close();
+
   // people who are offline / out of office are not monitored
   const off = [{ changed_at: iso('08:00'), extension: '700', agent: 'Zoe, Zed', old_status: null, new_status: 'Offline', detail: null }, { changed_at: iso('09:00'), extension: '700', agent: 'Zoe, Zed', old_status: 'Offline', new_status: 'Holiday - OUT OF OFFICE', detail: null }];
   p = await open({ db: mkdb({ status_log: tbl.concat(off), bt_clocklogs: ['Jane Doe', 'Rick Roe', 'Pat Poe', 'Kay Kim', 'Zed Zoe'].map((n, k) => ({ id: k + 1, user_id: 'u' + k, agent_name: n, clock_in: iso('08:00'), clock_out: null, date: TODAY })) }) });

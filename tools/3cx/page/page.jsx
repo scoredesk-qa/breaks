@@ -69,7 +69,7 @@ function A3cx({go}){
   const [from,to]=CX.dayRange(day,tz);
   const inDay=t=>t>=from&&t<to;
 
-  useEffect(()=>{ const id=setInterval(()=>setTick(n=>n+1),30000); return()=>clearInterval(id); },[]);   // so "today" and the check time move on by themselves
+  useEffect(()=>{ const id=setInterval(()=>setTick(n=>n+1),5000); return()=>clearInterval(id); },[]);   // so "today" and the check time move on by themselves
 
   useEffect(()=>{      // the app's agents: only agents who exist in the app are shown
     Promise.all([
@@ -91,19 +91,37 @@ function A3cx({go}){
   useEffect(()=>{ loadApp(); },[loadApp]);
   useAutoRefresh(loadApp,30000);
 
+  // Live: the first read for a day gets everything; after that only rows newer than the last one seen (by id) are fetched, every 5 seconds,
+  // and a full re-read every 2 minutes in case anything was missed.
+  const dbKeyRef=useRef(''), dbLastIdRef=useRef(null), dbFullAtRef=useRef(0), dbBusyRef=useRef(false), dbAllRef=useRef([]);
   const reloadDb=useCallback(async()=>{
-    const lo=new Date(from-36*3600000).toISOString(), hi=new Date(to).toISOString();   // a day and a half before, so each agent's status at the start of the day is known
-    let all=[],i=0,last=false;
-    while(!last&&i<60){
-      const {data,error}=await run(cxDb().from(_cxCfg.dbTable||'status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',lo).lt('changed_at',hi).order('changed_at',{ascending:true}).range(i*1000,i*1000+999));
-      if(error){ setDbErr(error.message||String(error)); return; }
-      all=all.concat(data||[]); last=!data||data.length<1000; i++;
-    }
-    setDbErr(''); setDbRows(all); setDbAt(appNow()); bumpSync();
+    if(dbBusyRef.current) return; dbBusyRef.current=true;
+    try{
+      const lo=new Date(from-36*3600000).toISOString(), hi=new Date(to).toISOString();   // a day and a half before, so each agent's status at the start of the day is known
+      const key=lo+'|'+hi+'|'+(_cxCfg.dbUrl||'')+'|'+(_cxCfg.dbTable||'');
+      const full=key!==dbKeyRef.current||dbLastIdRef.current==null||Date.now()-dbFullAtRef.current>120000;
+      const cols='id,changed_at,extension,agent,old_status,new_status,detail', tbl=_cxCfg.dbTable||'status_log';
+      let got=[],i=0,last=false;
+      while(!last&&i<60){
+        let q=cxDb().from(tbl).select(cols).gte('changed_at',lo).lt('changed_at',hi);
+        q=full?q.order('changed_at',{ascending:true}):q.gt('id',dbLastIdRef.current).order('id',{ascending:true});
+        const {data,error}=await run(q.range(i*1000,i*1000+999));
+        if(error){ setDbErr(error.message||String(error)); return; }
+        got=got.concat(data||[]); last=!data||data.length<1000; i++;
+      }
+      let all;
+      if(full) all=got;
+      else if(got.length){ const seen=new Set(dbAllRef.current.map(r=>r.id)); all=dbAllRef.current.concat(got.filter(r=>!seen.has(r.id))).sort((a,b)=>Date.parse(a.changed_at)-Date.parse(b.changed_at)); }
+      else all=dbAllRef.current;
+      const ids=all.map(r=>Number(r.id)).filter(Number.isFinite);
+      dbKeyRef.current=key; dbAllRef.current=all; dbLastIdRef.current=ids.length&&ids.length===all.length?Math.max(...ids):null;   // rows without an id can't be read incrementally: always re-read everything
+      if(full) dbFullAtRef.current=Date.now();
+      setDbErr(''); if(full||got.length||!dbAt) setDbRows(all); setDbAt(appNow()); bumpSync();
+    } finally { dbBusyRef.current=false; }
   },[from,to]);
   useEffect(()=>{ if(source==='db') reloadDb(); },[source,reloadDb]);
   const reloadIfLive=useCallback(()=>{ if(source==='db') return reloadDb(); },[source,reloadDb]);
-  useAutoRefresh(reloadIfLive,30000);                    // live: new rows every 30 seconds
+  useAutoRefresh(reloadIfLive,5000);                     // live: new rows every 5 seconds
   const goLive=()=>{ setErr(''); setDbErr(''); setSel(null); setText(''); setFileMod(0); setFileName('Supabase · live'); setSource('db'); reloadDb(); };
 
   const load=(t,name,mod)=>{
