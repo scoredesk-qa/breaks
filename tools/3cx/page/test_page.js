@@ -39,7 +39,7 @@ const mkdb = (extra = {}) => Object.assign({
     await q.clock.setFixedTime(new Date(now));
     await q.goto('file://' + page);
     await q.waitForSelector('text=3CX (test)', { timeout: 20000 });
-    await q.locator('text=3CX (test)').first().evaluate(el => el.click()); await q.waitForSelector('text=Load log');   // works when the menu is collapsed (phone width)
+    await q.locator('text=3CX (test)').first().evaluate(el => el.click()); await q.waitForSelector('.acts input[type=date]');   // works when the menu is collapsed (phone width)
     return q;
   };
   const text = q => q.locator('body').innerText();
@@ -52,11 +52,11 @@ const mkdb = (extra = {}) => Object.assign({
   const ic = await p.evaluate(() => { const t = [...document.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent === 'Trainees'); const svg = t.parentElement.querySelector('svg'); const b = svg.getBBox(); return [b.y, b.y + b.height, b.x, b.x + b.width]; });
   check('N3 the Trainees icon is no longer cut off at the top (its drawing sits inside the 24x24 box)', ic[0] >= 0 && ic[1] <= 24 && ic[2] >= 0 && ic[3] <= 24, ic.map(v => v.toFixed(1)).join(' '));
   let body = await text(p);
-  check('P1 empty state before a log is loaded', /Load a 3CX status log/.test(body) && await p.locator('.cx-card').count() === 0);
-  check('P2 Home-style header (title, subtitle, action buttons)', await p.locator('.hello').count() === 1 && await p.locator('.acts .bp').count() === 1);
+  check('P1 it reads live on its own: an empty table shows the empty state, no cards', /No rows in the log for|Reading the status_log table/.test(body) && await p.locator('.cx-card').count() === 0);
+  check('P2 Home-style header (title, subtitle, action buttons)', await p.locator('.hello').count() === 1 && await p.locator('.acts input[type=date]').count() === 1);
   check('P3 a calendar is there from the start, set to today', await p.locator('.acts input[type=date]').inputValue() === TODAY);
 
-  await p.click('text=Use sample data'); await p.waitForSelector('.cx-card');
+  await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('.cx-card');
   body = await text(p);
   check('S1 loading a log keeps today selected: subtitle shows the day, calls and alerts', /Tuesday, October 27 \(today\) · 3 calls · 5 alerts/.test(body), (body.match(/Tuesday[^\n]*/) || [''])[0]);
   check('S2 day strip shows the days in the log, today selected', await p.locator('.cx-day').count() === 2 && (await p.locator('.cx-day.on').innerText()).replace(/\s+/g, ' ') === '27 Tue');
@@ -134,13 +134,13 @@ const mkdb = (extra = {}) => Object.assign({
   await inputs.nth(1).fill('30'); await inputs.nth(5).fill('15'); await box.locator('button.bp').click(); await p.waitForTimeout(300);
   const saved = JSON.parse(await p.evaluate(() => localStorage.getItem('bt_cx_cfg') || '{}'));
   check('T2 saved in this browser', saved.ignoreRingSec === 30 && saved.breakToleranceMin === 15);
-  await p.click('text=3CX (test)'); await p.waitForSelector('text=Load log'); await p.click('text=Use sample data'); await p.waitForSelector('.cx-card');
+  await p.click('text=3CX (test)'); await p.waitForSelector('.acts input[type=date]'); await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('.cx-card');
   check('T3 the new limits are used: ignored after 30s (2 call alerts) and totals within 15 min are fine for Kay (Finn and Jane still differ)', /3 calls · 2 alerts/.test(await text(p)) && /2\s*differ/.test(await flat(p)), (await flat(p)).match(/\d+\s*differ/)[0]);
   await p.context().close();
 
   // the day follows today, not the log
   p = await open({ now: '2026-10-29T13:10:00.000Z' });
-  await p.click('text=Use sample data'); await p.waitForSelector('text=No 3CX activity on');
+  await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('text=No 3CX activity on');
   body = await text(p);
   check('D4 a log with nothing for today still shows today, and says where the activity is', /Thursday, October 29 \(today\)/.test(body) && /No 3CX activity on Thursday, October 29/.test(body) && /The log has activity on (26 Oct, 27 Oct|Oct 26, Oct 27)/.test(body), (body.match(/The log has[^\n]*/) || [''])[0]);
   check('D5 today is in the day strip and selected', (await p.locator('.cx-day.on').innerText()).replace(/\s+/g, ' ') === '29 Thu');
@@ -151,11 +151,11 @@ const mkdb = (extra = {}) => Object.assign({
 
   // the notification: once a day, 10 minutes before shift end (16:30 - 10 = 16:20), only if something differs, never in the alerts
   p = await open({ now: TODAY + 'T16:19:00.000Z' });
-  await p.click('text=Use sample data'); await p.waitForSelector('.cx-card'); await p.waitForTimeout(500);
+  await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('.cx-card'); await p.waitForTimeout(500);
   check('E1 at 16:19 nothing has been sent', !/breaks in 3CX differ from what they logged/.test(await text(p)));
   await p.context().close();
   p = await open({ now: TODAY + 'T16:21:00.000Z' });
-  await p.click('text=Use sample data'); await p.waitForSelector('.cx-card'); await p.waitForSelector('text=breaks in 3CX differ from what they logged', { timeout: 5000 });
+  await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('.cx-card'); await p.waitForSelector('text=breaks in 3CX differ from what they logged', { timeout: 5000 });
   body = await text(p);
   check('E2 at 16:21 one notification names the agents who differ', /Finn Fox, Jane Doe, Kay Kim: breaks in 3CX differ from what they logged/.test(body), (body.match(/[^\n]*breaks in 3CX differ[^\n]*/) || [''])[0]);
   check('E3 it is NOT added to the alerts: still 5 open, no "Break check" badge', /5\s*open/.test(await flat(p)) && await p.locator('.cx-alerts .badge:has-text("Break check")').count() === 0);
@@ -169,7 +169,7 @@ const mkdb = (extra = {}) => Object.assign({
   const csv = path.join(work, 'logger.csv'); fs.copyFileSync(path.join(__dirname, '..', 'fixtures', 'status_log.sample.csv'), csv);
   const t = Date.UTC(2026, 9, 27, 14, 20, 1) / 1000; fs.utimesSync(csv, t, t);       // saved right after its last row (14:20:00), logger PC on UTC+0
   p = await open({ db: logsDb });
-  await p.setInputFiles('input[type=file]', csv); await p.waitForSelector('.cx-card'); await p.waitForTimeout(300);
+  await p.evaluate(t=>window.__CX_TEST.csv(t[0],'logger.csv',t[1]), [fs.readFileSync(csv,'utf8'), fs.statSync(csv).mtimeMs]); await p.waitForSelector('.cx-card'); await p.waitForTimeout(300);
   body = await text(p);
   check('F1 a log from the app\'s own agents: 4 cards (Jane, Rick, Pat, Kay)', await p.locator('.cx-card').count() === 4, String(await p.locator('.cx-card').count()));
   check('F2 Kay\'s entries in the database match 3CX exactly: difference 0s, 0 differ', /0\s*differ/.test(await flat(p)) && /Kay Kim 2 · 1h 15m 2 · 1h 15m 0s/.test((await p.locator('.cxr tr:has-text("Kay Kim")').innerText()).replace(/\s+/g, ' ')));
@@ -178,11 +178,11 @@ const mkdb = (extra = {}) => Object.assign({
   check('F4 the agents\' entries were not changed', dbAfter.length === 2 && dbAfter[1].end_time === iso('12:30'));
   await p.context().close();
   p = await open({ db: logsDb, now: TODAY + 'T16:21:00.000Z' });
-  await p.setInputFiles('input[type=file]', csv); await p.waitForSelector('.cx-card'); await p.waitForTimeout(1200);
+  await p.evaluate(t=>window.__CX_TEST.csv(t[0],'logger.csv',t[1]), [fs.readFileSync(csv,'utf8'), fs.statSync(csv).mtimeMs]); await p.waitForSelector('.cx-card'); await p.waitForTimeout(1200);
   check('F5 when nothing differs there is no notification', /0\s*differ/.test(await flat(p)) && !/breaks in 3CX differ from what they logged/.test(await text(p)));
   await p.context().close();
   p = await open({ cfg: JSON.stringify({ logTz: 1 }) });
-  await p.setInputFiles('input[type=file]', csv); await p.waitForSelector('.cx-card'); await p.waitForTimeout(200);
+  await p.evaluate(t=>window.__CX_TEST.csv(t[0],'logger.csv',t[1]), [fs.readFileSync(csv,'utf8'), fs.statSync(csv).mtimeMs]); await p.waitForSelector('.cx-card'); await p.waitForTimeout(200);
   check('Z1 logger clock set to UTC+1: a warning says the logger PC looks like UTC+0', /suggests the 3CX logger PC runs on UTC\+0, but Settings says UTC\+1/.test(await text(p)));
   await p.click('button:has-text("Open Settings")'); await p.waitForSelector('text=3CX call alerts');
   check('Z2 the warning\'s button opens Settings', true);
@@ -194,8 +194,8 @@ const mkdb = (extra = {}) => Object.assign({
   const tbl = fx.map(r => ({ changed_at: new Date(AZ.parseStamp(r.timestamp, 0)).toISOString(), extension: r.extension, agent: r.agent, old_status: r.old_status || null, new_status: r.new_status, detail: r.detail || null }));
   tbl.push({ changed_at: iso('09:00'), extension: '000', agent: 'connection test', old_status: null, new_status: 'Test', detail: 'delete me' });
   p = await open({ db: mkdb({ status_log: tbl }) });
-  check('L0 there is a "Live from Supabase" button', await p.locator('button:has-text("Live from Supabase")').count() === 1);
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  check('L0 no Load log / Live / Sample buttons and no file input: the page only reads live', await p.locator('button:has-text("Load log"), button:has-text("Live from Supabase"), button:has-text("Use sample data"), input[type=file]').count() === 0 && await p.locator('.acts input[type=date]').count() === 1);
+  await p.waitForSelector('.cx-card');
   body = await text(p);
   check('L1 live: reads the table and shows today\'s agents that exist in the app (4 cards), 3 calls, 5 alerts', await p.locator('.cx-card').count() === 4 && /Tuesday, October 27 \(today\) · 3 calls · 5 alerts/.test(body), (body.match(/Tuesday[^\n]*/) || [''])[0]);
   check('L2 the page says it is live and when it was updated', /Supabase · live · updated \d\d:\d\d/.test(body));
@@ -204,27 +204,27 @@ const mkdb = (extra = {}) => Object.assign({
   check('L5 no clock warning for live data', !/suggests the 3CX logger PC runs on/.test(body));
   await p.context().close();
   p = await open({ cfg: JSON.stringify({ logTz: 1 }), db: mkdb({ status_log: tbl }) });
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  await p.waitForSelector('.cx-card');
   check('L6 the logger-clock setting does not move live data (rows are real instants): same 3 calls · 5 alerts even with the setting at UTC+1', /3 calls · 5 alerts/.test(await text(p)));
   await p.context().close();
   p = await open({ db: mkdb(), errors: { status_log: 'permission denied for table status_log' } });
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector("text=Couldn't read the status_log table");
+  await p.waitForSelector("text=Couldn't read the status_log table");
   body = await text(p);
   check('L7 if Supabase refuses, the page says why and offers the SQL to let admins read it', /permission denied for table status_log/.test(body) && await p.locator('button:has-text("Copy SQL to allow admins to read it")').count() === 1);
   await p.context().close();
   p = await open({ db: mkdb({ status_log: [] }) });
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('text=No rows in the log for');
+  await p.waitForSelector('text=No rows in the log for');
   check('L8 an empty table says so instead of "no agents match", and offers the admin-read SQL (a table that only lets the logger insert looks empty to admins)', /logger has not uploaded anything for this period yet, or admins are not allowed to read the table/.test(await text(p)) && !/No agents in this log match/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow admins to read it")').count() === 1);
   await p.context().close();
 
   // the logger can upload to a different Supabase project than the one the app uses
   const LOGGER = { url: 'https://logger-project.supabase.co', key: 'k'.repeat(60), table: 'status_log' };
   p = await open({ db: mkdb({ status_log: tbl }) });
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  await p.waitForSelector('.cx-card');
   check('X1 with nothing set, the page reads from the app\'s own project (one connection only)', (await p.evaluate(() => window.__CLIENTS.length)) === 1);
   await p.context().close();
   p = await open({ db: mkdb({ status_log: tbl }), cxdb: LOGGER });
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector('.cx-card');
+  await p.waitForSelector('.cx-card');
   const cl = await p.evaluate(() => window.__CLIENTS);
   check('X2 with the logger\'s project pre-filled, live data comes through a second connection to that project', cl.length === 2 && cl[1].url === LOGGER.url && cl[1].key === LOGGER.key, JSON.stringify(cl.map(c => c.url)));
   check('X3 the page says which project it is reading', /Supabase · live · updated \d\d:\d\d · logger-project\.supabase\.co/.test(await text(p)));
@@ -235,13 +235,13 @@ const mkdb = (extra = {}) => Object.assign({
   check('X6 a bad URL cannot be saved', await p.locator('h2:has-text("3CX call alerts")').locator('xpath=..').locator('button.bp').isDisabled());
   await p.context().close();
   p = await open({ db: mkdb(), cxdb: LOGGER, errors: { status_log: 'permission denied for table status_log' } });
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector("text=Couldn't read the status_log table");
+  await p.waitForSelector("text=Couldn't read the status_log table");
   check('X7 if that project refuses, the message names it and offers the SQL for the public key', /in logger-project\.supabase\.co/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow reading it")').count() === 1);
   await p.context().close();
 
   // the table isn't there yet (e.g. a fresh local Supabase): the page offers the setup SQL
   p = await open({ db: mkdb(), errors: { status_log: "Could not find the table 'public.status_log' in the schema cache" } });
-  await p.click('button:has-text("Live from Supabase")'); await p.waitForSelector("text=Couldn't read the status_log table");
+  await p.waitForSelector("text=Couldn't read the status_log table");
   body = await text(p);
   check('X8 a missing table: the page says so and offers the SQL that creates it (and sets who can add/read rows)', /doesn't exist in this project yet/.test(body) && await p.locator('button:has-text("Copy SQL to create the table")').count() === 1 && await p.locator('button:has-text("Copy SQL to allow")').count() === 0);
   const copied = await p.evaluate(async () => { let got = ''; navigator.clipboard.writeText = async t => { got = t; }; [...document.querySelectorAll('button')].find(b => /Copy SQL to create/.test(b.textContent)).click(); await new Promise(r => setTimeout(r, 50)); return got; });
@@ -250,7 +250,7 @@ const mkdb = (extra = {}) => Object.assign({
 
   // narrow screen
   p = await open({ w: 520 });
-  await p.click('text=Use sample data'); await p.waitForSelector('.cx-card');
+  await p.evaluate(()=>window.__CX_TEST.sample()); await p.waitForSelector('.cx-card');
   check('M1 phone width: no sideways scroll', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), await p.evaluate(() => document.documentElement.scrollWidth + ' vs ' + window.innerWidth));
   await p.screenshot({ path: path.join(mods, 'cx_phone.png') });
   const dbNow = await p.evaluate(() => window.__DB);

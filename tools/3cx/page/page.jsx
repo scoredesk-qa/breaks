@@ -1,9 +1,9 @@
 
 /* ═══ 3CX test page: reads a status_log.csv from this PC and shows calls, ignored rings, short calls, admin time and
    breaks per agent. Saves nothing in the database and never changes what agents entered. Only agents that exist in the app are shown. ═══ */
-const CXC={call:'#8e9cff',admin:'#f5c451',brk:'#4fd1c5',avail:'#414760',off:'#272a36',ring:'#ff8a65',other:'#7d86a8'};
-const CX_LABEL={call:'On a call',admin:'Admin',brk:'On break',avail:'Available',off:'Offline',ring:'Ringing',other:'Other'};
-const cxCat=s=>/^on call$/i.test(s)?'call':/^admin$/i.test(s)?'admin':/break|lunch|bathroom|toilet/i.test(s)?'brk':/^ringing$/i.test(s)?'ring':/offline|out of (the )?office|holiday|not registered/i.test(s)?'off':/^available/i.test(s)?'avail':'other';
+const CXC={call:'#8e9cff',admin:'#ef6b5b',brk:'#f5a524',avail:'#2fb344',avail2:'#2ec4b6',away:'#7f8ab0',hol:'#2a8fe0',off:'#3a3d4a',ring:'#f5d04e',other:'#7d86a8'};   // the 3CX status colours: Available green, Away/Break orange, Do Not Disturb/Admin red, Available 2 teal, Holiday/Out of office blue
+const CX_LABEL={call:'On a call',admin:'Admin',brk:'On break',avail:'Available',avail2:'Available 2',hol:'Out of office',off:'Offline',ring:'Ringing',other:'Other'};
+const cxCat=s=>/^on call$/i.test(s)?'call':/admin|do not disturb|^dnd$/i.test(s)?'admin':/break|lunch|bathroom|toilet|^away/i.test(s)?'brk':/^ringing$/i.test(s)?'ring':/out of (the )?office|holiday/i.test(s)?'hol':/offline|not registered/i.test(s)?'off':/^available\s*2|remote/i.test(s)?'avail2':/^available/i.test(s)?'avail':'other';
 const CX_DISMISS_KEY='bt_cx_dismissed';
 // The 3CX data can live in a different Supabase project from the app: use its own client then (no sign-in, nothing stored).
 let _cxClient=null,_cxClientId='';
@@ -45,11 +45,11 @@ function CxChart({labels,series}){
 
 function A3cx({go}){
   const [text,setText]=useState('');
-  const [fileName,setFileName]=useState('');
+  const [fileName,setFileName]=useState('Supabase · live');
   const [fileMod,setFileMod]=useState(0);
   const [picked,setPicked]=useState(null);          // a day chosen by hand; null = always follow today
   const [, setTick]=useState(0);
-  const [source,setSource]=useState('');          // '' | 'file' (a CSV or the sample) | 'db' (read live from the Supabase status_log table)
+  const [source,setSource]=useState('db');         // always 'db' (read live from the Supabase status_log table); 'file' is only reachable from the browser test hook below
   const [dbRows,setDbRows]=useState([]);
   const [dbErr,setDbErr]=useState('');
   const [dbAt,setDbAt]=useState(0);
@@ -60,7 +60,6 @@ function A3cx({go}){
   const [sel,setSel]=useState(null);
   const [showDone,setShowDone]=useState(false);
   const [dismissed,setDismissed]=useState(()=>{ try{ return JSON.parse(localStorage.getItem(CX_DISMISS_KEY)||'{}'); }catch(e){ return {}; } });
-  const fileRef=useRef(null);
   const tz=clockOff();
   const isSample=fileName==='sample data';
   const isDb=source==='db';
@@ -112,7 +111,7 @@ function A3cx({go}){
     if(!rows.length){ setErr('That file has no rows yet. Let the logger run for a while and try again.'); return; }
     setErr(''); setDbErr(''); setSource('file'); setText(t); setFileName(name); setFileMod(mod||0); setSel(null);   // the day is NOT changed: it stays on today (or the day you picked)
   };
-  const pick=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>load(String(r.result),f.name,f.lastModified); r.readAsText(f); e.target.value=''; };
+  useEffect(()=>{ window.__CX_TEST={ sample:()=>load(CX_SAMPLE,'sample data'), csv:(t,n,m)=>load(t,n||'test.csv',m), live:goLive }; });   // browser tests only: there is no manual upload in the page
   const chooseDay=d=>setPicked(!d||d===todayISO()?null:d);
 
   const match=isSample?CX_SAMPLE_USERS:users;
@@ -222,17 +221,13 @@ function A3cx({go}){
   const header=(
     <>
       <div className="acts">
-        <button className="bp" onClick={()=>fileRef.current&&fileRef.current.click()}><Ic n="download" size={17}/> Load log</button>
-        <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={pick} style={{display:'none'}}/>
-        <button className="bs" onClick={goLive}><Ic n="activity" size={16}/> Live from Supabase</button>
-        <button className="bs" onClick={()=>load(CX_SAMPLE,'sample data')}><Ic n="play" size={16}/> Use sample data</button>
         <input className="fi" type="date" value={day} onChange={e=>chooseDay(e.target.value)} style={{width:190,height:47}} aria-label="Choose a day"/>
         {picked&&<button className="bs" onClick={()=>setPicked(null)}>Today</button>}
         {alerts.length>0&&<button className="bs" onClick={previewAlerts}><Ic n="bell" size={16}/> Preview alerts</button>}
         <div className="acts-r">{fileName&&<span style={{color:'var(--mut)',fontSize:15}}>{fileName}{isDb&&dbAt?` · updated ${wallHM(dbAt)}`:''}{isDb&&cxOwnDb()?` · ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}</span>}</div>
       </div>
       {err&&<div className="ebox"><Ic n="alert" size={15}/>{err}</div>}
-      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the {_cxCfg.dbTable||'status_log'} table{cxOwnDb()?` in ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>{missingTable?'The table doesn\'t exist in this project yet. Run the SQL once in the Supabase SQL Editor (it also lets the logger add rows and admins read them), then press Live from Supabase again. The logger must upload to this same project.':cxOwnDb()?'If it says "permission denied", the project needs a rule that lets the public key read it. If it says the table is not found, check the URL and key in Settings → 3CX call alerts.':'If it says "permission denied" or the table is empty when it shouldn\'t be, admins need permission to read it. If the logger uploads to a different Supabase project, set it in Settings → 3CX call alerts.'}</span>{missingTable?<CopySql sql={CX_SETUP_SQL} label="Copy SQL to create the table"/>:<CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/>}</div>}
+      {isDb&&dbErr&&<div className="ebox" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}><span><Ic n="alert" size={15}/> Couldn't read the {_cxCfg.dbTable||'status_log'} table{cxOwnDb()?` in ${(_cxCfg.dbUrl||'').replace(/^https?:\/\//,'')}`:''}: {dbErr}</span><span style={{color:'var(--mut)',fontSize:14}}>{missingTable?'The table doesn\'t exist in this project yet. Run the SQL once in the Supabase SQL Editor (it also lets the logger add rows and admins read them), then reload the page. The logger must upload to this same project.':cxOwnDb()?'If it says "permission denied", the project needs a rule that lets the public key read it. If it says the table is not found, check the URL and key in Settings → 3CX call alerts.':'If it says "permission denied" or the table is empty when it shouldn\'t be, admins need permission to read it. If the logger uploads to a different Supabase project, set it in Settings → 3CX call alerts.'}</span>{missingTable?<CopySql sql={CX_SETUP_SQL} label="Copy SQL to create the table"/>:<CopySql sql={cxOwnDb()?CX_READ_SQL_ANON:CX_READ_SQL} label={cxOwnDb()?'Copy SQL to allow reading it':'Copy SQL to allow admins to read it'}/>}</div>}
       {clockHint!==null&&<div className="ebox"><Ic n="alert" size={15}/>This file suggests the 3CX logger PC runs on UTC{clockHint>=0?'+':''}{clockHint}, but Settings says UTC{logTz>=0?'+':''}{logTz}. Calls and breaks still in progress will show the wrong length until it matches. <button className="bs" style={{marginLeft:10}} onClick={()=>go&&go('settings')}>Open Settings</button></div>}
       {R&&R.error&&<div className="ebox"><Ic n="alert" size={15}/>{R.error}</div>}
     </>
@@ -250,7 +245,7 @@ function A3cx({go}){
     const ringLabel={answered:'Answered',ignored:'Not answered',taken_by_other:'Answered by a colleague',short_ring:'Caller hung up first'};
     const longest=myCalls.reduce((m,c)=>Math.max(m,c.secs),0);
     const split={}; Object.entries(a.statusSecs).forEach(([st,v])=>{ const c=cxCat(st); split[c]=(split[c]||0)+v; });
-    const order=['call','admin','brk','avail','ring','other','off'].filter(c=>split[c]>0);
+    const order=['call','admin','brk','avail','avail2','hol','ring','other','off'].filter(c=>split[c]>0);
     const total=order.reduce((t,c)=>t+split[c],0)||1;
     const hmOf=ms=>wallHM(ms);
     const row=(key,left,mid,right,flag)=>(
@@ -332,14 +327,14 @@ function A3cx({go}){
   return(
     <div className="page">
       <h1 className="hello">3CX calls</h1>
-      <p className="hello-s">{ok?`${dayLabel}${day===todayStr?' (today)':''} · ${tot.calls} calls · ${alerts.length} alert${alerts.length===1?'':'s'}`:'Test page · reads a status log from this PC · nothing is saved or sent anywhere'}</p>
+      <p className="hello-s">{ok?`${dayLabel}${day===todayStr?' (today)':''} · ${tot.calls} calls · ${alerts.length} alert${alerts.length===1?'':'s'}`:'Test page · reads what the 3CX logger uploads to Supabase · nothing is written'}</p>
       {header}
 
       {!R&&(
         <div className="card acc"><div className="onb-empty">
           <div className="es-ic"><Ic n="phone" size={24}/></div>
-          <div>{isDb&&!dbErr?'Reading the status_log table…':'Load a 3CX status log, or read it live from Supabase'}</div>
-          <span>{isDb?'This reads what the 3CX logger uploads. Nothing is written.':'Pick the status_log.csv your 3CX logger writes, or try the sample data. A file stays on this computer.'}</span>
+          <div>{dbErr?'Waiting for the status log':'Reading the status_log table…'}</div>
+          <span>This reads what the 3CX logger uploads. Nothing is written.</span>
         </div></div>
       )}
 

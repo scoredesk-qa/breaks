@@ -230,7 +230,7 @@ function analyze(rows, opts = {}) {
     else if (r.outcome === 'short_ring') a.shortRings++;
   }
   for (const a of Object.values(agents)) {
-    a.adminSecs = a.statusSecs[S.ADMIN] || 0;
+    a.adminSecs = Object.entries(a.statusSecs).reduce((t, [st, v]) => t + (/admin/i.test(st) ? v : 0), 0);   // 'Admin' or 3CX's 'Do Not Disturb - ADMIN'
     a.avgCallSecs = a.calls ? a.callSecs / a.calls : 0;
     a.answerRate = a.answered + a.ignored ? a.answered / (a.answered + a.ignored) : null;
   }
