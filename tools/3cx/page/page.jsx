@@ -250,7 +250,7 @@ function A3cx({go}){
   const statusOf=ext=>latest[ext]?latest[ext].status:'';
   const nowCount=cat=>agents.filter(a=>cxCat(statusOf(a.ext))===cat).length;
 
-  const sgn=d=>Math.abs(d)<1?'0s':`${d>0?'+':'−'}${CX.fmtDur(Math.abs(d))}`;   // the agent's log minus 3CX
+  const sgn=d=>Math.abs(d)<1?'0s':`+${CX.fmtDur(Math.abs(d))}`;   // how far the two totals are apart (both values are in the columns next to it)
   const kind=a=>a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}
     :a.type==='repeated_ignore'?{t:'Repeated',cls:'',ic:'brk',d:`${a.count} ignored calls within ${_cxCfg.repeatIgnoreWindowMin} min`,red:true}
     :{t:'Ignored',cls:'b-brk',ic:'brk',d:`Rang ${a.secs}s, not answered`};
@@ -282,9 +282,6 @@ function A3cx({go}){
     const mine=cmp.find(c=>c.user_id===a.uid);
     const ringLabel={answered:'Answered',ignored:'Not answered',taken_by_other:'Answered by a colleague',short_ring:'Caller hung up first'};
     const longest=myCalls.reduce((m,c)=>Math.max(m,c.secs),0);
-    const split={}; Object.entries(a.statusSecs).forEach(([st,v])=>{ const c=cxCat(st); split[c]=(split[c]||0)+v; });
-    const order=['call','admin','brk','avail','avail2','hol','ring','other','off'].filter(c=>split[c]>0);
-    const total=order.reduce((t,c)=>t+split[c],0)||1;
     const hmOf=ms=>wallHM(ms);
     const row=(key,left,mid,right,flag)=>(
       <div key={key} className="acc-row" style={{minHeight:54}}>
@@ -321,20 +318,21 @@ function A3cx({go}){
           <div style={{padding:'0 12px'}}>
             <div className="card-t" style={{fontSize:16,marginBottom:6}}>Timeline of the day</div>
             {(()=>{
-              const segs=R.intervals.filter(iv=>iv.ext===a.ext&&iv.start<to&&(iv.end==null?R.now:iv.end)>from).map(iv=>({st:iv.status,s:Math.max(iv.start,from),e:Math.min(iv.end==null?R.now:iv.end,to,R.now),part:iv.partialStart})).filter(x=>x.e>x.s).sort((p,q)=>p.s-q.s);
-              if(!segs.length) return null;
-              const t0=segs[0].s, t1=segs[segs.length-1].e, span=Math.max(t1-t0,1);
-              const h0=Math.ceil(wall(t0).getTime()/3600000), h1=Math.floor(wall(t1).getTime()/3600000);
-              const ticks=[]; for(let h=h0;h<=h1;h++) ticks.push(h);
+              const H0=_cxCfg.timelineStart, H1=_cxCfg.timelineEnd, ws=from+H0*3600000, we=from+H1*3600000, span=we-ws;   // only the working window (company clock)
+              const segs=R.intervals.filter(iv=>iv.ext===a.ext).map(iv=>({st:iv.status,s:Math.max(iv.start,ws),e:Math.min(iv.end==null?R.now:iv.end,we,R.now),part:iv.partialStart})).filter(x=>x.e>x.s).sort((p,q)=>p.s-q.s);
+              const split={}; segs.forEach(x=>{ const c=cxCat(x.st); split[c]=(split[c]||0)+(x.e-x.s)/1000; });
+              const order=['call','admin','brk','avail','avail2','hol','ring','other','off'].filter(c=>split[c]>0);
+              const total=order.reduce((t,c)=>t+split[c],0)||1;
+              const ticks=[]; for(let h=H0;h<=H1;h++) ticks.push(h);
               return(<div className="cx-tl pv">
-                <div className="cx-tl-track">{segs.map((x,i)=>{ const l=(x.s-t0)/span*100, w=(x.e-x.s)/span*100, mid=l+w/2; return(
-                  <div key={i} className={`cx-seg${mid<14?' l':mid>86?' r':''}`} style={{left:`${l}%`,width:`${w}%`,background:CXC[cxCat(x.st)]}}>
+                <div className="cx-tl-track">{segs.map((x,k)=>{ const l=(x.s-ws)/span*100, w=(x.e-x.s)/span*100, mid=l+w/2; return(
+                  <div key={k} className={`cx-seg${mid<14?' l':mid>86?' r':''}`} style={{left:`${l}%`,width:`${w}%`,background:CXC[cxCat(x.st)]}}>
                     <span className="cx-tip"><b>{x.st}</b>{CX.fmtDur((x.e-x.s)/1000)}<em>{wallHM(x.s)} – {wallHM(x.e)}{x.part?' · started before logging':''}</em></span>
                   </div>); })}</div>
-                <div className="cx-tl-axis">{ticks.map(h=>{ const p=(h*3600000-wall(0).getTime()-t0)/span*100; return <span key={h} style={{left:`${p}%`}}>{String(((h%24)+24)%24).padStart(2,'0')}:00</span>; })}</div>
+                <div className="cx-tl-axis">{ticks.map(h=><span key={h} style={{left:`${(h-H0)/(H1-H0)*100}%`}}>{String(h%24).padStart(2,'0')}:00</span>)}</div>
+                <div className="cx-split pv">{order.map(c=><div key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}<b>{CX.fmtDur(split[c])} · {Math.round(split[c]/total*100)}%</b></div>)}</div>
               </div>);
             })()}
-            <div className="cx-split pv">{order.map(c=><div key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}<b>{CX.fmtDur(split[c])} · {Math.round(split[c]/total*100)}%</b></div>)}</div>
           </div>
         </div>
         <div className="cx-two2">
