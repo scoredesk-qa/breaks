@@ -93,8 +93,8 @@ const mkdb = (extra = {}) => Object.assign({
   check('K1 Break check section: 3 differ, 0 match (and nothing about a final check or notifications)', /Break check/.test(body) && /3\s*differ/.test(await flat(p)) && /0\s*match/.test(await flat(p)) && !/Final check|Run break check/.test(body));
   const kr = async n => (await p.locator(`.cxr tr:has-text("${n}")`).innerText()).replace(/\s+/g, ' ');
   check('K2 the break check is a small table: agent, agent\'s log, 3CX, difference (no sentences)', /Agent's log 3CX Difference/.test((await p.locator('.cxr thead').last().innerText()).replace(/\s+/g, ' ')) && !/that is not in the agent's log|that 3CX doesn't show|Totals differ/.test(body));
-  check('K2b Kay: log 2 · 1h 05m, 3CX 2 · 1h 15m, difference −10m 00s', /Kay Kim 2 · 1h 05m 2 · 1h 15m −10m 00s/.test(await kr('Kay Kim')), await kr('Kay Kim'));
-  check('K2c Finn: log 0 · 0s, 3CX 1 · 10m 00s, difference −10m 00s', /Finn Fox 0 · 0s 1 · 10m 00s −10m 00s/.test(await kr('Finn Fox')), await kr('Finn Fox'));
+  check('K2b Kay: log 2 · 1h 05m, 3CX 2 · 1h 15m, difference +10m 00s', /Kay Kim 2 · 1h 05m 2 · 1h 15m \+10m 00s/.test(await kr('Kay Kim')), await kr('Kay Kim'));
+  check('K2c Finn: log 0 · 0s, 3CX 1 · 10m 00s, difference +10m 00s', /Finn Fox 0 · 0s 1 · 10m 00s \+10m 00s/.test(await kr('Finn Fox')), await kr('Finn Fox'));
   check('K2d Jane: log 1 · 10m 00s, 3CX 0 · 0s, difference +10m 00s', /Jane Doe 1 · 10m 00s 0 · 0s \+10m 00s/.test(await kr('Jane Doe')), await kr('Jane Doe'));
   check('K3 break-check differences are NOT added to the alerts: still 5 open, no "Break check" badge', /5\s*open/.test(await flat(p)) && await p.locator('.cx-alerts .badge:has-text("Break check")').count() === 0);
   check('K4 before the check time (16:20) there is no notification yet and no "Run check" button', !/breaks in 3CX differ from what they logged/.test(await text(p)) && await p.locator('button:has-text("Run break check")').count() === 0);
@@ -103,6 +103,10 @@ const mkdb = (extra = {}) => Object.assign({
   body = await text(p);
   check('R1 profile opens: name, ext, tiles, time split', /Rick Roe/.test(body) && /ext 602/.test(body) && /Ignored rings\n3/.test(body) && /Timeline of the day/.test(body));
   check('R2 profile lists the 3 rings as not answered, flagged Ignored', (await p.locator('.badge:text-is("Ignored")').count()) >= 3);
+  const ax = await p.locator('.cx-tl-axis span').allInnerTexts();
+  check('R3d the timeline covers only 07:00 to 18:00 (axis, and nothing drawn outside it)', ax[0] === '07:00' && ax[ax.length - 1] === '18:00' && ax.length === 12 && await p.evaluate(() => [...document.querySelectorAll('.cx-seg')].every(e => parseFloat(e.style.left) >= 0 && parseFloat(e.style.left) + parseFloat(e.style.width) <= 100.01)), ax.join(' '));
+  const sc = await p.locator('.cx-two2 > .card').first().evaluate(e => { const c = getComputedStyle(e); return [c.overflowY, c.maxHeight]; });
+  check('R3e the Calls / Rings / Breaks / Admin lists scroll inside their card instead of growing', sc[0] === 'auto' && sc[1] === '380px', sc.join(' '));
   check('R3 the day is a timeline of every status change (segments + hour axis), not dots', await p.locator('.cx-seg').count() >= 3 && await p.locator('.cx-tl-axis span').count() >= 2 && await p.locator('.cx-dot').count() === 0);
   const wi = await p.locator('.cx-seg').evaluateAll(els => els.map(e => e.getBoundingClientRect().width)); const seg = p.locator('.cx-seg').nth(wi.indexOf(Math.max(...wi))); await seg.hover();
   const tip = (await seg.locator('.cx-tip').innerText()).replace(/\s+/g, ' ');
@@ -136,7 +140,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.click('text=Settings >> nth=0'); await p.waitForSelector('text=3CX call alerts');
   const box = p.locator('h2:has-text("3CX call alerts")').locator('xpath=..');
   const inputs = box.locator('input[type=number]');
-  check('T1 Settings has the 3CX section with seven values and the defaults (incl. tolerance 3 and notification 10 minutes before shift end)', await inputs.count() === 7 && await inputs.nth(0).inputValue() === '0' && await inputs.nth(1).inputValue() === '10' && await inputs.nth(5).inputValue() === '3' && await inputs.nth(6).inputValue() === '10');
+  check('T1 Settings has the 3CX section with nine values and the defaults (incl. timeline 7 to 18) (incl. tolerance 3 and notification 10 minutes before shift end)', await inputs.count() === 9 && await inputs.nth(7).inputValue() === '7' && await inputs.nth(8).inputValue() === '18' && await inputs.nth(0).inputValue() === '0' && await inputs.nth(1).inputValue() === '10' && await inputs.nth(5).inputValue() === '3' && await inputs.nth(6).inputValue() === '10');
   await inputs.nth(1).fill('30'); await inputs.nth(5).fill('15'); await box.locator('button.bp').click(); await p.waitForTimeout(300);
   const saved = JSON.parse(await p.evaluate(() => localStorage.getItem('bt_cx_cfg') || '{}'));
   check('T2 saved in this browser', saved.ignoreRingSec === 30 && saved.breakToleranceMin === 15);
@@ -221,6 +225,20 @@ const mkdb = (extra = {}) => Object.assign({
   p = await open({ db: mkdb({ status_log: [] }) });
   await p.waitForSelector('text=No rows in the log for');
   check('L8 an empty table says so instead of "no agents match", and offers the admin-read SQL (a table that only lets the logger insert looks empty to admins)', /logger has not uploaded anything for this period yet, or admins are not allowed to read the table/.test(await text(p)) && !/No agents in this log match/.test(await text(p)) && await p.locator('button:has-text("Copy SQL to allow admins to read it")').count() === 1);
+  await p.context().close();
+
+  // live updates: new rows show up on their own within a few seconds, fetched incrementally by id
+  const withId = tbl.map((r, k) => ({ id: k + 1, ...r }));
+  p = await open({ db: mkdb({ status_log: withId }) });
+  await p.waitForSelector('.cx-card');
+  check('U1 Kay starts as Available', /Available/.test(await p.locator('.cx-card:has-text("Kay Kim")').innerText()));
+  const t0 = Date.now();
+  await p.evaluate(iso => { const row = { id: 100000, changed_at: iso, extension: '606', agent: 'Kim, Kay', old_status: 'Available', new_status: 'On call', detail: null }; window.__DB.status_log.push(row); window.__RT.forEach(h => h.cb({ new: row })); }, iso('13:05'));
+  await p.waitForFunction(() => [...document.querySelectorAll('.cx-card')].some(c => /Kay Kim/.test(c.innerText) && /On call/.test(c.innerText)), null, { timeout: 3000 });
+  check('U2 the moment Supabase pushes a new row, Kay shows On call (no polling, no reload)', Date.now() - t0 < 3000, (Date.now() - t0) + ' ms');
+  await p.evaluate(() => window.__RT.forEach(h => h.cb({ new: { id: 100000, changed_at: '2026-10-27T13:05:00.000Z', extension: '606', agent: 'Kim, Kay', new_status: 'On call' } })));
+  await p.waitForTimeout(300);
+  check('U3 still 4 cards; the same row delivered twice is not duplicated', await p.locator('.cx-card').count() === 4);
   await p.context().close();
 
   // people who are offline / out of office are not monitored

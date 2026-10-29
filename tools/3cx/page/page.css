@@ -90,3 +90,9 @@
 .cx-tl-axis{position:relative;height:20px;margin-top:6px;font-size:12px;color:var(--mut)}
 .cx-tl-axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .cx-tl-axis span:first-child{transform:none}
+
+.cx-two2>.card{max-height:380px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#3a3d4a transparent}
+.cx-two2>.card{padding-top:0}
+.cx-two2>.card>.card-hd{position:sticky;top:0;z-index:2;background:var(--surf);padding:26px 0 12px}
+.cx-two2>.card::-webkit-scrollbar{width:8px}.cx-two2>.card::-webkit-scrollbar-thumb{background:#3a3d4a;border-radius:99px}
+.cx-tl-axis span:last-child{transform:translateX(-100%)}

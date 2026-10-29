@@ -52,7 +52,7 @@
       return { data: rows, error: null };
     }
   }
-  const chan = () => { const c = { on: () => c, subscribe: cb => { if (cb) setTimeout(() => cb('SUBSCRIBED'), 0); return c; }, send: async () => 'ok', unsubscribe: () => {} }; return c; };
+  const chan = () => { const c = { on: (t, f, cb) => { (window.__RT = window.__RT || []).push({ f, cb }); return c; }, subscribe: cb => { if (cb) setTimeout(() => cb('SUBSCRIBED'), 0); return c; }, send: async () => 'ok', unsubscribe: () => {} }; return c; };
   const client = {
     from: t => new Q(t),
     rpc: async n => ({ data: n === 'bt_slot_sync' ? (typeof window.__SYNC === 'function' ? window.__SYNC() : (window.__SYNC || { v: 4, ok: true, cron: true })) : null, error: null }),

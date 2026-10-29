@@ -69,7 +69,7 @@ function A3cx({go}){
   const [from,to]=CX.dayRange(day,tz);
   const inDay=t=>t>=from&&t<to;
 
-  useEffect(()=>{ const id=setInterval(()=>setTick(n=>n+1),30000); return()=>clearInterval(id); },[]);   // so "today" and the check time move on by themselves
+  useEffect(()=>{ const id=setInterval(()=>setTick(n=>n+1),5000); return()=>clearInterval(id); },[]);   // so "today" and the check time move on by themselves
 
   useEffect(()=>{      // the app's agents: only agents who exist in the app are shown
     Promise.all([
@@ -91,19 +91,59 @@ function A3cx({go}){
   useEffect(()=>{ loadApp(); },[loadApp]);
   useAutoRefresh(loadApp,30000);
 
+  // Live: the first read for a day gets everything; after that only rows newer than the last one seen (by id) are fetched, every 5 seconds,
+  // and a full re-read every 2 minutes in case anything was missed.
+  const dbKeyRef=useRef(''), dbLastIdRef=useRef(null), dbFullAtRef=useRef(0), dbBusyRef=useRef(false), dbAllRef=useRef([]);
   const reloadDb=useCallback(async()=>{
-    const lo=new Date(from-36*3600000).toISOString(), hi=new Date(to).toISOString();   // a day and a half before, so each agent's status at the start of the day is known
-    let all=[],i=0,last=false;
-    while(!last&&i<60){
-      const {data,error}=await run(cxDb().from(_cxCfg.dbTable||'status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',lo).lt('changed_at',hi).order('changed_at',{ascending:true}).range(i*1000,i*1000+999));
-      if(error){ setDbErr(error.message||String(error)); return; }
-      all=all.concat(data||[]); last=!data||data.length<1000; i++;
-    }
-    setDbErr(''); setDbRows(all); setDbAt(appNow()); bumpSync();
+    if(dbBusyRef.current) return; dbBusyRef.current=true;
+    try{
+      const lo=new Date(from-36*3600000).toISOString(), hi=new Date(to).toISOString();   // a day and a half before, so each agent's status at the start of the day is known
+      const key=lo+'|'+hi+'|'+(_cxCfg.dbUrl||'')+'|'+(_cxCfg.dbTable||'');
+      const full=key!==dbKeyRef.current||dbLastIdRef.current==null||Date.now()-dbFullAtRef.current>120000;
+      const cols='id,changed_at,extension,agent,old_status,new_status,detail', tbl=_cxCfg.dbTable||'status_log';
+      let got=[],i=0,last=false;
+      while(!last&&i<60){
+        let q=cxDb().from(tbl).select(cols).gte('changed_at',lo).lt('changed_at',hi);
+        q=full?q.order('changed_at',{ascending:true}):q.gt('id',dbLastIdRef.current).order('id',{ascending:true});
+        const {data,error}=await run(q.range(i*1000,i*1000+999));
+        if(error){ setDbErr(error.message||String(error)); return; }
+        got=got.concat(data||[]); last=!data||data.length<1000; i++;
+      }
+      let all;
+      if(full) all=got;
+      else if(got.length){ const seen=new Set(dbAllRef.current.map(r=>r.id)); all=dbAllRef.current.concat(got.filter(r=>!seen.has(r.id))).sort((a,b)=>Date.parse(a.changed_at)-Date.parse(b.changed_at)); }
+      else all=dbAllRef.current;
+      const ids=all.map(r=>Number(r.id)).filter(Number.isFinite);
+      dbKeyRef.current=key; dbAllRef.current=all; dbLastIdRef.current=ids.length&&ids.length===all.length?Math.max(...ids):null;   // rows without an id can't be read incrementally: always re-read everything
+      if(full) dbFullAtRef.current=Date.now();
+      setDbErr(''); if(full||got.length||!dbAt) setDbRows(all); setDbAt(appNow()); bumpSync();
+    } finally { dbBusyRef.current=false; }
   },[from,to]);
   useEffect(()=>{ if(source==='db') reloadDb(); },[source,reloadDb]);
+  // Instant updates: Supabase Realtime pushes every new status_log row the moment the logger inserts it. Polling stays as a slow safety net
+  // (and a faster one while the realtime socket is not connected).
+  const [rtOn,setRtOn]=useState(false);
+  const addLive=useCallback(row=>{
+    if(!row||!row.changed_at||Date.parse(row.changed_at)>=to) return;
+    const all=dbAllRef.current;
+    if(row.id!=null&&all.some(r=>r.id===row.id)) return;
+    const next=all.concat([row]).sort((a,b)=>Date.parse(a.changed_at)-Date.parse(b.changed_at));
+    dbAllRef.current=next; if(row.id!=null&&dbLastIdRef.current!=null&&Number(row.id)>dbLastIdRef.current) dbLastIdRef.current=Number(row.id);
+    setDbRows(next); setDbAt(appNow()); bumpSync();
+  },[to]);
+  useEffect(()=>{
+    if(source!=='db') return;
+    let ch=null;
+    try{
+      const c=cxDb(), tbl=_cxCfg.dbTable||'status_log';
+      ch=c.channel('cx-status-'+Math.random().toString(36).slice(2))
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:tbl},p=>addLive(p&&p.new))
+        .subscribe(st=>setRtOn(st==='SUBSCRIBED'));
+    }catch(e){ setRtOn(false); }
+    return()=>{ setRtOn(false); try{ ch&&cxDb().removeChannel(ch); }catch(e){} };
+  },[source,addLive]);
   const reloadIfLive=useCallback(()=>{ if(source==='db') return reloadDb(); },[source,reloadDb]);
-  useAutoRefresh(reloadIfLive,30000);                    // live: new rows every 30 seconds
+  useAutoRefresh(reloadIfLive,rtOn?60000:5000);          // safety net: every minute while realtime is connected, every 5 seconds if not
   const goLive=()=>{ setErr(''); setDbErr(''); setSel(null); setText(''); setFileMod(0); setFileName('Supabase · live'); setSource('db'); reloadDb(); };
 
   const load=(t,name,mod)=>{
@@ -210,7 +250,7 @@ function A3cx({go}){
   const statusOf=ext=>latest[ext]?latest[ext].status:'';
   const nowCount=cat=>agents.filter(a=>cxCat(statusOf(a.ext))===cat).length;
 
-  const sgn=d=>Math.abs(d)<1?'0s':`${d>0?'+':'−'}${CX.fmtDur(Math.abs(d))}`;   // the agent's log minus 3CX
+  const sgn=d=>Math.abs(d)<1?'0s':`+${CX.fmtDur(Math.abs(d))}`;   // how far the two totals are apart (both values are in the columns next to it)
   const kind=a=>a.type==='short_call'?{t:'Short call',cls:'b-bath',ic:'bth',d:`Lasted ${a.secs}s`}
     :a.type==='repeated_ignore'?{t:'Repeated',cls:'',ic:'brk',d:`${a.count} ignored calls within ${_cxCfg.repeatIgnoreWindowMin} min`,red:true}
     :{t:'Ignored',cls:'b-brk',ic:'brk',d:`Rang ${a.secs}s, not answered`};
@@ -242,9 +282,6 @@ function A3cx({go}){
     const mine=cmp.find(c=>c.user_id===a.uid);
     const ringLabel={answered:'Answered',ignored:'Not answered',taken_by_other:'Answered by a colleague',short_ring:'Caller hung up first'};
     const longest=myCalls.reduce((m,c)=>Math.max(m,c.secs),0);
-    const split={}; Object.entries(a.statusSecs).forEach(([st,v])=>{ const c=cxCat(st); split[c]=(split[c]||0)+v; });
-    const order=['call','admin','brk','avail','avail2','hol','ring','other','off'].filter(c=>split[c]>0);
-    const total=order.reduce((t,c)=>t+split[c],0)||1;
     const hmOf=ms=>wallHM(ms);
     const row=(key,left,mid,right,flag)=>(
       <div key={key} className="acc-row" style={{minHeight:54}}>
@@ -281,20 +318,21 @@ function A3cx({go}){
           <div style={{padding:'0 12px'}}>
             <div className="card-t" style={{fontSize:16,marginBottom:6}}>Timeline of the day</div>
             {(()=>{
-              const segs=R.intervals.filter(iv=>iv.ext===a.ext&&iv.start<to&&(iv.end==null?R.now:iv.end)>from).map(iv=>({st:iv.status,s:Math.max(iv.start,from),e:Math.min(iv.end==null?R.now:iv.end,to,R.now),part:iv.partialStart})).filter(x=>x.e>x.s).sort((p,q)=>p.s-q.s);
-              if(!segs.length) return null;
-              const t0=segs[0].s, t1=segs[segs.length-1].e, span=Math.max(t1-t0,1);
-              const h0=Math.ceil(wall(t0).getTime()/3600000), h1=Math.floor(wall(t1).getTime()/3600000);
-              const ticks=[]; for(let h=h0;h<=h1;h++) ticks.push(h);
+              const H0=_cxCfg.timelineStart, H1=_cxCfg.timelineEnd, ws=from+H0*3600000, we=from+H1*3600000, span=we-ws;   // only the working window (company clock)
+              const segs=R.intervals.filter(iv=>iv.ext===a.ext).map(iv=>({st:iv.status,s:Math.max(iv.start,ws),e:Math.min(iv.end==null?R.now:iv.end,we,R.now),part:iv.partialStart})).filter(x=>x.e>x.s).sort((p,q)=>p.s-q.s);
+              const split={}; segs.forEach(x=>{ const c=cxCat(x.st); split[c]=(split[c]||0)+(x.e-x.s)/1000; });
+              const order=['call','admin','brk','avail','avail2','hol','ring','other','off'].filter(c=>split[c]>0);
+              const total=order.reduce((t,c)=>t+split[c],0)||1;
+              const ticks=[]; for(let h=H0;h<=H1;h++) ticks.push(h);
               return(<div className="cx-tl pv">
-                <div className="cx-tl-track">{segs.map((x,i)=>{ const l=(x.s-t0)/span*100, w=(x.e-x.s)/span*100, mid=l+w/2; return(
-                  <div key={i} className={`cx-seg${mid<14?' l':mid>86?' r':''}`} style={{left:`${l}%`,width:`${w}%`,background:CXC[cxCat(x.st)]}}>
+                <div className="cx-tl-track">{segs.map((x,k)=>{ const l=(x.s-ws)/span*100, w=(x.e-x.s)/span*100, mid=l+w/2; return(
+                  <div key={k} className={`cx-seg${mid<14?' l':mid>86?' r':''}`} style={{left:`${l}%`,width:`${w}%`,background:CXC[cxCat(x.st)]}}>
                     <span className="cx-tip"><b>{x.st}</b>{CX.fmtDur((x.e-x.s)/1000)}<em>{wallHM(x.s)} – {wallHM(x.e)}{x.part?' · started before logging':''}</em></span>
                   </div>); })}</div>
-                <div className="cx-tl-axis">{ticks.map(h=>{ const p=(h*3600000-wall(0).getTime()-t0)/span*100; return <span key={h} style={{left:`${p}%`}}>{String(((h%24)+24)%24).padStart(2,'0')}:00</span>; })}</div>
+                <div className="cx-tl-axis">{ticks.map(h=><span key={h} style={{left:`${(h-H0)/(H1-H0)*100}%`}}>{String(h%24).padStart(2,'0')}:00</span>)}</div>
+                <div className="cx-split pv">{order.map(c=><div key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}<b>{CX.fmtDur(split[c])} · {Math.round(split[c]/total*100)}%</b></div>)}</div>
               </div>);
             })()}
-            <div className="cx-split pv">{order.map(c=><div key={c}><i style={{background:CXC[c]}}/>{CX_LABEL[c]}<b>{CX.fmtDur(split[c])} · {Math.round(split[c]/total*100)}%</b></div>)}</div>
           </div>
         </div>
         <div className="cx-two2">
