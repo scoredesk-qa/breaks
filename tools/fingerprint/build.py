@@ -6,7 +6,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); out = sys.argv[1]; os.makedir
 rd = lambda n: open(os.path.join(HERE, n), encoding='utf-8').read()
 rota = json.dumps(json.load(open(os.path.join(HERE, 'rota.json'), encoding='utf-8')), ensure_ascii=False)
 scripts = '\n'.join([rd('core.js'), 'const FP_ROTA = ' + rota + ';', rd('db.js'), rd('ui.js')])
-sql = rd('fp_setup.sql'); assert '`' not in sql and '${' not in sql and '</script' not in sql
+sql = rd('pt_setup.sql'); assert '`' not in sql and '${' not in sql and '</script' not in sql
 scripts += '\nconst FP_SETUP_SQL = `' + sql + '`;'
 assert '</script' not in scripts
 for name, dest in (('agent.html', 'FP_Agent_TEST.html'), ('admin.html', 'FP_Admin_TEST.html')):

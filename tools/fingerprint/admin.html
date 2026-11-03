@@ -18,7 +18,7 @@ const rangeFor = () => {
 };
 async function refresh() {
   if (!sess || !sess.isAdmin || busy) return; busy = true;
-  try { const [a, b] = rangeFor(); const r = await Promise.all([FPDB.listAgents(), FPDB.listPunches(a, b)]); agents = r[0]; punches = r[1]; err = ''; loaded = true; }
+  try { const [a, b] = rangeFor(); const r = await Promise.all([FPDB.listAgents(), FPDB.listPunches(a, b)]); agents = r[0]; punches = r[1]; err = ''; if (FPDB.live()) { const known = new Set(agents.map(a => a.name.toLowerCase())); const seen = [...new Set(punches.map(p => p.badge_id))].filter(n => !known.has(n.toLowerCase())); agents = agents.concat(seen.map(n => ({ badge_id: n, name: n, active: true, has_code: false, unregistered: true }))); } loaded = true; }
   catch (e) { err = String(e.message || e); }
   busy = false; compute(); render();
 }
@@ -85,7 +85,7 @@ function todayHtml() {
   const tile = (n, l) => `<div class="tile ${n ? '' : 'zero'}"><b>${n}</b><span>${l}</span></div>`;
   return `<div class="tiles">${tile(c('on'), 'On shift')}${tile(c('brk'), 'On a break')}${tile(c('late'), 'Should be in, not clocked in')}${tile(c('done'), 'Finished today')}${tile(c('soon') + c('off'), 'Not working yet / day off')}</div>
     ${noOut.length ? `<div class="err">Shifts with no clock-out: ${noOut.map(s => esc(m.nameOf(s.badge) || s.badge) + ' (' + esc(dayLabel(s.dayKey)) + ' from ' + FP.hm(s.inMs, m.off) + ')').join(', ')}</div>` : ''}
-    <div class="grid">${B.map(x => `<div class="ag"><div class="row"><span class="nm">${esc(x.a.name)}</span><span class="mut">badge ${esc(x.a.badge_id)}</span><span class="chip ${x.cls} sp">${esc(x.label)}</span></div>
+    <div class="grid">${B.map(x => `<div class="ag"><div class="row"><span class="nm">${esc(x.a.name)}</span><span class="chip ${x.cls} sp">${esc(x.label)}</span></div>
       ${x.s && (x.s.state === 'on' || x.s.state === 'brk') ? `<div class="t" data-since="${x.s.state === 'brk' ? x.s.breaks[x.s.breaks.length - 1].s : x.s.inMs}">${since((m.now - (x.s.state === 'brk' ? x.s.breaks[x.s.breaks.length - 1].s : x.s.inMs)) / 1000)}</div><div class="mut" style="margin-top:-8px;font-size:13px">${x.s.state === 'brk' ? 'on this break' : 'on shift'}</div>` : x.met && x.met.worked != null ? `<div class="t">${FP.dur(x.met.worked)}</div><div class="mut" style="margin-top:-8px;font-size:13px">worked today</div>` : ''}
       <div class="ln">${x.s ? `In ${FP.hm(x.s.inMs, m.off)}${x.s.out != null ? ' · out ' + FP.hm(x.s.out, m.off) : ''}` : 'No scans today'}${x.met ? ` · breaks ${x.met.breaks} (${FP.dur(x.met.breakSecs)})` : ''}</div>
       <div class="ln">${x.sc ? 'Rota ' + esc(x.sc.start + '–' + x.sc.end) : 'No rota today'} ${x.cmp && x.cmp.lateMin ? `<span class="chip bad">${x.cmp.lateMin} min late</span>` : ''}${x.cmp && x.cmp.earlyMin ? `<span class="chip bad">left ${x.cmp.earlyMin} min early</span>` : ''}</div></div>`).join('') || '<p class="mut">No agents yet. Add them under “Agents & setup”.</p>'}</div>`;
@@ -99,7 +99,7 @@ function weekHtml() {
       <button class="btn s" id="pw">‹ Previous</button><button class="btn s" id="tw" ${wk === nowWk ? 'disabled' : ''}>This week</button><button class="btn s" id="nw">Next ›</button>
       <button class="btn p" id="dl">Download weekly report (CSV)</button></div>
     <div class="scroll"><table class="tbl"><thead><tr><th>Agent</th>${m.weeks[0] ? m.weeks[0].days.map(d => `<th>${esc(dayLabel(d.key))}</th>`).join('') : ''}<th>Worked</th><th>Breaks</th><th>Late days</th><th></th></tr></thead><tbody>
-    ${m.weeks.map((w, i) => `<tr><td><b>${esc(w.agent.name)}</b><div class="mut" style="font-size:12.5px">badge ${esc(w.agent.badge_id)}</div></td>${w.days.map(d => `<td class="${d.key === m.today ? 'today' : ''}">${cell(d)}</td>`).join('')}<td class="n" style="white-space:nowrap">${w.totals.shifts ? `<b>${FP.dur(w.totals.worked)}</b>` : '<span class="mut">—</span>'}${w.totals.scheduledMin ? `<div class="mut" style="font-size:12.5px">of ${FP.dur(w.totals.scheduledMin * 60)} rota</div>` : ''}</td><td class="n" style="white-space:nowrap">${w.totals.shifts ? FP.dur(w.totals.break) : '—'}</td><td class="n">${w.totals.late}${w.totals.noOut ? ` <span class="chip bad">${w.totals.noOut} no out</span>` : ''}</td><td><button class="btn s" data-csv="${i}">CSV</button></td></tr>`).join('')}
+    ${m.weeks.map((w, i) => `<tr><td><b>${esc(w.agent.name)}</b></td>${w.days.map(d => `<td class="${d.key === m.today ? 'today' : ''}">${cell(d)}</td>`).join('')}<td class="n" style="white-space:nowrap">${w.totals.shifts ? `<b>${FP.dur(w.totals.worked)}</b>` : '<span class="mut">—</span>'}${w.totals.scheduledMin ? `<div class="mut" style="font-size:12.5px">of ${FP.dur(w.totals.scheduledMin * 60)} rota</div>` : ''}</td><td class="n" style="white-space:nowrap">${w.totals.shifts ? FP.dur(w.totals.break) : '—'}</td><td class="n">${w.totals.late}${w.totals.noOut ? ` <span class="chip bad">${w.totals.noOut} no out</span>` : ''}</td><td><button class="btn s" data-csv="${i}">CSV</button></td></tr>`).join('')}
     </tbody></table></div><p class="mut" style="margin:12px 0 0;font-size:13px">Late = more than 5 minutes after the rota start. “Worked” is time on shift minus breaks. The rota comes from the Fusion24 rota file embedded in this test page.</p></div>`;
 }
 
@@ -107,20 +107,19 @@ function logHtml() {
   const m = M, day = logDay || m.today, from = FP.dayStart(day, m.off), to = from + 86400000;
   const rows = m.built.log.filter(l => l.t >= from && l.t < to && (!logAgent || l.badge === logAgent));
   return `<div class="card"><div class="row" style="margin-bottom:12px"><h2 style="margin:0">Every scan on the day</h2><span class="sp"></span><input class="fi" type="date" id="ld" value="${day}" style="width:170px"><select class="fi" id="la" style="width:180px"><option value="">All agents</option>${agents.map(a => `<option value="${esc(a.badge_id)}" ${logAgent === a.badge_id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>
-    <div class="scroll"><table class="tbl"><thead><tr><th>Time</th><th>Agent</th><th>Recorded as</th></tr></thead><tbody>${rows.map(l => `<tr><td class="n">${clock(l.t, m.off)}</td><td>${esc(m.nameOf(l.badge) || 'badge ' + l.badge)}</td><td>${l.act ? esc(ACT[l.act]) + (l.inferred ? ' <span class="mut">(worked out from the order)</span>' : '') : `<span class="red">Ignored: ${esc(l.ignored)}</span>`}</td></tr>`).join('') || '<tr><td colspan="3" class="mut">No scans on this day.</td></tr>'}</tbody></table></div></div>`;
+    <div class="scroll"><table class="tbl"><thead><tr><th>Time</th><th>Agent</th><th>Recorded as</th></tr></thead><tbody>${rows.map(l => `<tr><td class="n">${clock(l.t, m.off)}</td><td>${esc(m.nameOf(l.badge) || l.badge)}</td><td>${l.act ? esc(ACT[l.act]) + (l.inferred ? ' <span class="mut">(worked out from the order)</span>' : '') : `<span class="red">Ignored: ${esc(l.ignored)}</span>`}</td></tr>`).join('') || '<tr><td colspan="3" class="mut">No scans on this day.</td></tr>'}</tbody></table></div></div>`;
 }
 
 function agentsHtml() {
-  const e = editing || { badge_id: '', name: '', code: '', active: true, isNew: true };
+  const e = editing || { name: '', code: '', active: true, isNew: true };
   return `<div class="card"><h2>${e.isNew ? 'Add an agent' : 'Edit ' + esc(e.name)}</h2><div class="row" style="align-items:flex-end">
-      <label class="f" style="flex:1 1 140px">Badge number (scanner user ID)<input class="fi" id="ab" value="${esc(e.badge_id)}" ${e.isNew ? '' : 'disabled'}></label>
-      <label class="f" style="flex:2 1 200px">Name (as on the rota)<input class="fi" id="an" value="${esc(e.name)}"></label>
+            <label class="f" style="flex:2 1 200px">Name (as enrolled on the scanner without “(PT)”, and as on the rota)<input class="fi" id="an" value="${esc(e.name)}" ${e.isNew ? '' : 'disabled'}></label>
       <label class="f" style="flex:1 1 170px">Agent's personal code (4–8 digits)<input class="fi" id="ac" inputmode="numeric" placeholder="${e.isNew ? '' : 'leave empty to keep'}"></label>
       <label class="f" style="flex:0 1 110px">Active<select class="fi" id="aa"><option value="1" ${e.active ? 'selected' : ''}>Yes</option><option value="0" ${e.active ? '' : 'selected'}>No</option></select></label>
       <button class="btn p" id="asave">Save</button>${e.isNew ? '' : '<button class="btn" id="acancel">Cancel</button>'}</div>
-      <p class="mut" style="margin:10px 0 0;font-size:13px">Agents sign in on the agent page with their badge number and this code. Give them the code in person. A code can be changed at any time.</p></div>
-    <div class="card"><h2>Agents</h2><div class="scroll"><table class="tbl"><thead><tr><th>Name</th><th>Badge</th><th>Code</th><th>Active</th><th></th></tr></thead><tbody>${agents.map(a => `<tr><td>${esc(a.name)}</td><td class="n">${esc(a.badge_id)}</td><td>${a.has_code ? '<span class="ok">set</span>' : '<span class="red">not set — agent cannot sign in</span>'}</td><td>${a.active ? 'Yes' : 'No'}</td><td><button class="btn s" data-edit="${esc(a.badge_id)}">Edit</button></td></tr>`).join('')}</tbody></table></div></div>
-    <div class="card"><h2>Database setup (Supabase SQL Editor, once)</h2><p class="mut" style="margin-top:0">Creates the tables for punches and agents, lets the scanner app add punches with the public key, lets the one admin account read everything, and gives agents a locked-down lookup by badge + code. Safe to run again. The last comment shows how to mark your admin account.</p>
+      <p class="mut" style="margin:10px 0 0;font-size:13px">Agents sign in on the agent page with their name and this code. Give them the code in person. A code can be changed at any time.</p></div>
+    <div class="card"><h2>Agents</h2><div class="scroll"><table class="tbl"><thead><tr><th>Name</th><th>Code</th><th>Active</th><th></th></tr></thead><tbody>${agents.map(a => `<tr><td>${esc(a.name)}${a.unregistered ? ' <span class="chip bad">has scans, not added yet</span>' : ''}</td><td>${a.has_code ? '<span class="ok">set</span>' : '<span class="red">not set — agent cannot sign in</span>'}</td><td>${a.active ? 'Yes' : 'No'}</td><td><button class="btn s" data-edit="${esc(a.badge_id)}">Edit</button></td></tr>`).join('')}</tbody></table></div></div>
+    <div class="card"><h2>Database setup (Supabase SQL Editor, once)</h2><p class="mut" style="margin-top:0">Keeps your existing pt_punches table and admin rule (the clock server keeps writing it with its service_role key) and adds a code for each agent, a lookup that shows an agent only their own punches, and live updates. Safe to run again. The last comment shows how to mark your one admin account.</p>
       <div class="row" style="margin-bottom:10px"><button class="btn p" id="csql">Copy the setup SQL</button></div><div class="sql">${esc(FP_SETUP_SQL)}</div></div>`;
 }
 
@@ -138,10 +137,10 @@ function wireBody() {
     $$('[data-edit]').forEach(b => b.onclick = () => { const a = agents.find(x => x.badge_id === b.dataset.edit); editing = { ...a, code: '' }; render(); window.scrollTo(0, 0); });
     const c = $('#acancel'); if (c) c.onclick = () => { editing = null; render(); };
     $('#asave').onclick = async () => {
-      const a = { badge_id: $('#ab').value.trim(), name: $('#an').value.trim(), code: $('#ac').value.trim(), active: $('#aa').value === '1' };
-      if (!/^[0-9A-Za-z_-]{1,20}$/.test(a.badge_id) || !a.name) { err = 'Enter a badge number (letters, digits, - or _) and a name.'; render(); return; }
+      const a = { name: $('#an').value.trim(), code: $('#ac').value.trim(), active: $('#aa').value === '1' }; a.badge_id = a.name;
+      if (!a.name) { err = 'Enter the agent\'s name.'; render(); return; }
       if (a.code && !/^[0-9]{4,8}$/.test(a.code)) { err = 'The code must be 4 to 8 digits.'; render(); return; }
-      if (!a.code && !agents.some(x => x.badge_id === a.badge_id)) { err = 'Set a code so the agent can sign in.'; render(); return; }
+      if (!a.code && !agents.some(x => x.badge_id.toLowerCase() === a.badge_id.toLowerCase() && x.has_code)) { err = 'Set a code so the agent can sign in.'; render(); return; }
       try { await FPDB.upsertAgent(a); info = `Saved ${a.name}.`; err = ''; editing = null; await refresh(); } catch (e) { err = String(e.message || e); render(); }
     };
   }

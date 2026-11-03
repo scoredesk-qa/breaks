@@ -1,6 +1,6 @@
 /* Data layer for the test pages. Two modes behind one interface:
      demo  — made-up agents and punches kept in this browser (shared by the agent and admin pages), with a clock you can move forward
-     live  — your Supabase project (tables and functions from fp_setup.sql)
+     live  — your Supabase project (your pt_punches table, plus pt_agents and the functions from pt_setup.sql)
    Needs core.js (FP) and rota.json (FP_ROTA) to be loaded first. */
 (function () {
   const H = 3600000, MIN = 60000, CONN_KEY = 'fp_conn', DEMO_KEY = 'fp_demo_v1', COMPANY_OFF = 1;   // the demo story is told on the company clock, UTC+1
@@ -16,10 +16,10 @@
 
   /* ── demo data ─────────────────────────────────────────────────── */
   const DEMO_AGENTS = [
-    { badge_id: '101', name: 'Youness', code: '482913', active: true },
-    { badge_id: '102', name: 'Yousra', code: '735018', active: true },
-    { badge_id: '103', name: 'Ziad', code: '194627', active: true },
-    { badge_id: '104', name: 'Khalil', code: '607351', active: true },
+    { badge_id: 'Youness', name: 'Youness', code: '482913', active: true },     // an agent is identified by the name on the scanner without "(PT)"
+    { badge_id: 'Yousra', name: 'Yousra', code: '735018', active: true },
+    { badge_id: 'Ziad', name: 'Ziad', code: '194627', active: true },
+    { badge_id: 'Khalil', name: 'Khalil', code: '607351', active: true },
   ];
   const rnd = seed => { let a = 0; for (const c of seed) a = (a * 31 + c.charCodeAt(0)) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
   const DEMO_NOW_KEY = '2026-11-03', DEMO_NOW_HM = '17:15';
@@ -75,6 +75,8 @@
     if (!window.supabase) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.52.1/dist/umd/supabase.min.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load the Supabase library (are you online?)')); document.head.appendChild(s); });
     sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'fp-admin-auth' } }); sbKey = k; return sb;
   }
+  // pt_punches row (what the clock server writes) <-> the pages' punch: shift IN/OUT = clock in/out, break IN/OUT = break start/end
+  const typeOf = (kind, dir) => kind === 'break' ? (dir === 'IN' ? 'break_start' : 'break_end') : (dir === 'IN' ? 'in' : 'out');
   const errMsg = e => (e && (e.message || e.error_description)) || String(e);
 
   /* ── the interface both pages use ──────────────────────────────── */
@@ -90,15 +92,16 @@
         if (!a || a.code !== String(code).trim()) return { ok: false, error: 'bad_code' };
         return { ok: true, name: a.name, punches: d.punches.filter(p => { const t = Date.parse(p.punched_at); return p.badge_id === a.badge_id && t >= fromMs && t < toMs; }).map(p => ({ punched_at: p.punched_at, punch_type: p.punch_type })) };
       }
-      const c = await client(); const { data, error } = await c.rpc('fp_agent_view', { p_badge: String(badge).trim(), p_code: String(code).trim(), p_from: new Date(fromMs).toISOString(), p_to: new Date(toMs).toISOString() });
+      const c = await client(); const { data, error } = await c.rpc('pt_agent_view', { p_name: String(badge).trim(), p_code: String(code).trim(), p_from: new Date(fromMs).toISOString(), p_to: new Date(toMs).toISOString() });
       if (error) return { ok: false, error: 'error', message: errMsg(error) };
-      return data;
+      if (!data || !data.ok) return data || { ok: false, error: 'bad_code' };
+      return { ok: true, name: data.name, punches: (data.punches || []).map(p => ({ punched_at: p.ts, punch_type: typeOf(p.kind, p.dir) })) };
     },
 
     async adminSession() {
       if (!live()) { const e = store.get('fp_admin_demo'); return e ? { email: e, isAdmin: true } : null; }
       const c = await client(); const { data } = await c.auth.getSession(); const u = data && data.session && data.session.user;
-      return u ? { email: u.email, isAdmin: !!(u.app_metadata && u.app_metadata.fp_admin === true) } : null;
+      return u ? { email: u.email, isAdmin: !!(u.app_metadata && u.app_metadata.pt_admin === true) } : null;
     },
     async adminSignIn(email, pw) {
       if (!live()) { if (String(email).trim().toLowerCase() === 'admin@demo.test' && pw === 'admin123') { store.set('fp_admin_demo', 'admin@demo.test'); return { ok: true }; } return { ok: false, message: 'Wrong email or password.' }; }
@@ -109,17 +112,17 @@
 
     async listAgents() {
       if (!live()) return demoLoad().agents.map(a => ({ badge_id: a.badge_id, name: a.name, active: a.active, has_code: !!a.code }));
-      const c = await client(); const { data, error } = await c.from('fp_agents').select('badge_id,name,active,code_hash').order('name');
-      if (error) throw new Error(errMsg(error)); return (data || []).map(a => ({ badge_id: a.badge_id, name: a.name, active: a.active, has_code: !!a.code_hash }));
+      const c = await client(); const { data, error } = await c.from('pt_agents').select('name,active,code_hash').order('name');
+      if (error) throw new Error(errMsg(error)); return (data || []).map(a => ({ badge_id: a.name, name: a.name, active: a.active, has_code: !!a.code_hash }));
     },
     async listPunches(fromMs, toMs) {
       if (!live()) return demoLoad().punches.filter(p => { const t = Date.parse(p.punched_at); return t >= fromMs && t < toMs; }).map(p => ({ ...p }));
       const c = await client(); let all = [], i = 0, last = false;
       while (!last && i < 60) {
-        const { data, error } = await c.from('fp_punches').select('id,badge_id,punched_at,punch_type').gte('punched_at', new Date(fromMs).toISOString()).lt('punched_at', new Date(toMs).toISOString()).order('punched_at', { ascending: true }).range(i * 1000, i * 1000 + 999);
+        const { data, error } = await c.from('pt_punches').select('emp,ts,name,kind,dir').gte('ts', new Date(fromMs).toISOString()).lt('ts', new Date(toMs).toISOString()).order('ts', { ascending: true }).range(i * 1000, i * 1000 + 999);
         if (error) throw new Error(errMsg(error)); all = all.concat(data || []); last = !data || data.length < 1000; i++;
       }
-      return all;
+      return all.map(r => ({ id: r.emp + '|' + r.ts, badge_id: r.name, punched_at: r.ts, punch_type: typeOf(r.kind, r.dir) }));
     },
     async upsertAgent(a) {
       if (!live()) {
@@ -128,7 +131,7 @@
         const row = { badge_id: a.badge_id, name: a.name, active: a.active !== false, code: (a.code || (i >= 0 ? d.agents[i].code : '')) };
         if (i >= 0) d.agents[i] = row; else d.agents.push(row); demoSave(); emit(); return;
       }
-      const c = await client(); const { error } = await c.rpc('fp_upsert_agent', { p_badge: a.badge_id, p_name: a.name, p_code: a.code ? a.code : null, p_active: a.active !== false });
+      const c = await client(); const { error } = await c.rpc('pt_upsert_agent', { p_name: a.name, p_code: a.code ? a.code : null, p_active: a.active !== false });
       if (error) throw new Error(errMsg(error));
     },
 
@@ -136,16 +139,16 @@
     onPunch(cb) {
       if (!live()) { listeners.add(cb); return () => listeners.delete(cb); }
       let ch = null, dead = false, timer = setInterval(cb, 15000);
-      client().then(c => { if (dead) return; ch = c.channel('fp-' + Math.random().toString(36).slice(2)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'fp_punches' }, () => cb()).subscribe(); }).catch(() => {});
+      client().then(c => { if (dead) return; ch = c.channel('fp-' + Math.random().toString(36).slice(2)).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pt_punches' }, () => cb()).subscribe(); }).catch(() => {});
       return () => { dead = true; clearInterval(timer); if (ch && sb) try { sb.removeChannel(ch); } catch (e) {} };
     },
 
     /* demo only */
-    scan(badge, type) { const d = demoLoad(), t = DB.now(); d.punches.push({ id: d.punches.length + 1, badge_id: String(badge), punched_at: new Date(t).toISOString(), punch_type: type || null, device: 'demo' }); demoSave(); emit(); },
+    scan(badge, type) { const d = demoLoad(), t = DB.now(), ag = d.agents.find(x => x.badge_id.toLowerCase() === String(badge).toLowerCase()); d.punches.push({ id: d.punches.length + 1, badge_id: ag ? ag.badge_id : String(badge), punched_at: new Date(t).toISOString(), punch_type: type || null, device: 'demo' }); demoSave(); emit(); },
     skip(minutes) { const d = demoLoad(); d.skew += minutes * MIN; demoSave(); emit(); },
     reset() { demoReset(); },
-    // the scanner app writes punches to fp_punches itself; this is only for trying the live board from the admin page
-    async livePing() { const c = await client(); const { error } = await c.from('fp_punches').select('id').limit(1); return error ? errMsg(error) : ''; },
+    // the scanner app writes punches to pt_punches itself; this is only for trying the live board from the admin page
+    async livePing() { const c = await client(); const { error } = await c.from('pt_punches').select('emp').limit(1); return error ? errMsg(error) : ''; },
   };
   window.FPDB = DB;
 })();

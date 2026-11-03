@@ -16,8 +16,8 @@ async function load() {
   try {
     const off = FPDB.getOff(), now = FPDB.now(), wk = weekSel || FP.mondayOf(FP.dayKey(now, off));
     const r = await FPDB.agentView(sess.badge, sess.code, FP.dayStart(FP.addDays(wk, -1), off), FP.dayStart(FP.addDays(wk, 8), off));
-    if (!r || !r.ok) { err = r && r.error === 'locked' ? 'Too many wrong codes. Try again in 15 minutes, or ask your admin.' : r && r.message ? r.message : 'Badge number or code not recognised.'; if (!view) { sess = null; sessionStorage.removeItem(SKEY); } }
-    else { err = ''; view = { name: r.name, punches: (r.punches || []).map(p => ({ badge_id: sess.badge, punched_at: p.punched_at, punch_type: p.punch_type })) }; }
+    if (!r || !r.ok) { err = r && r.error === 'locked' ? 'Too many wrong codes. Try again in 15 minutes, or ask your admin.' : r && r.message ? r.message : 'Name or code not recognised.'; if (!view) { sess = null; sessionStorage.removeItem(SKEY); } }
+    else { err = ''; view = { name: r.name, punches: (r.punches || []).map(p => ({ badge_id: r.name, punched_at: p.punched_at, punch_type: p.punch_type })) }; }
   } catch (e) { err = String(e.message || e); }
   busy = false; compute(); render();
 }
@@ -27,7 +27,7 @@ function compute() {
   const off = FPDB.getOff(), now = FPDB.now(), today = FP.dayKey(now, off), wk = weekSel || FP.mondayOf(today);
   const sched = (b, k) => rotaFn(view.name, k);
   const built = FP.buildShifts(view.punches, { off, sched });
-  const week = FP.weekFor({ badge_id: sess.badge, name: view.name }, built.shifts, wk, now, sched, { off });
+  const week = FP.weekFor({ badge_id: view.name, name: view.name }, built.shifts, wk, now, sched, { off });
   const open = built.shifts.filter(s => s.state === 'on' || s.state === 'brk').pop() || null;
   const todays = built.shifts.filter(s => s.dayKey === today).pop() || null;
   model = { off, now, today, wk, week, built, open, cur: open || todays, sched: sched(null, today) };
@@ -46,8 +46,8 @@ function render() {
   const app = $('#app'); $('#modeTag').textContent = FPDB.live() ? 'your Supabase' : 'demo data';
   const head = `<h1>My shift</h1><p class="sub">Clock in and out, and take your breaks, with your fingerprint. This page only shows what the scanner recorded.</p>` + connPanel();
   if (!sess || !model) {
-    const hint = FPDB.live() ? '' : `<p class="mut" style="font-size:13px;margin:14px 0 0">Demo logins (badge · code): ${FPDB.demoAgents().map(a => `<a href="#" data-fill="${esc(a.badge_id)}|${esc(a.code)}" style="color:var(--acc)">${esc(a.name)} ${esc(a.badge_id)} · ${esc(a.code)}</a>`).join(' &nbsp; ')}</p>`;
-    app.innerHTML = head + `<div class="card login"><h2>Sign in</h2><label class="f">Badge number (your ID on the scanner)<input class="fi" id="badge" inputmode="numeric" autocomplete="off"></label>
+    const hint = FPDB.live() ? '' : `<p class="mut" style="font-size:13px;margin:14px 0 0">Demo logins (name · code): ${FPDB.demoAgents().map(a => `<a href="#" data-fill="${esc(a.badge_id)}|${esc(a.code)}" style="color:var(--acc)">${esc(a.name)} · ${esc(a.code)}</a>`).join(' &nbsp; ')}</p>`;
+    app.innerHTML = head + `<div class="card login"><h2>Sign in</h2><label class="f">Your name (as enrolled on the scanner, e.g. Sara)<input class="fi" id="badge" autocomplete="off"></label>
       <label class="f">Your code<input class="fi" id="code" type="password" inputmode="numeric" autocomplete="off"></label>
       ${err ? `<div class="err">${esc(err)}</div>` : ''}<button class="btn p" id="go" style="width:100%;margin-top:6px">Show my shift</button>${hint}</div>`;
     connWire(() => { view = null; sess = null; sessionStorage.removeItem(SKEY); err = ''; subscribe(); render(); });
@@ -89,9 +89,9 @@ function render() {
   const go = n => { weekSel = FP.addDays(m.wk, n); load(); };
   $('#pw').onclick = () => go(-7); $('#nw').onclick = () => go(7); $('#tw').onclick = () => { weekSel = null; load(); };
   if (!FPDB.live()) {
-    const hypo = () => { const t = m.now + 1000, r = FP.buildShifts(view.punches.concat([{ badge_id: sess.badge, punched_at: t, punch_type: null }]), { off, sched: (b, k) => rotaFn(view.name, k) }); const l = r.log[r.log.length - 1]; return l && l.act ? ACT[l.act] : 'ignored (same finger again within a minute)'; };
+    const hypo = () => { const t = m.now + 1000, r = FP.buildShifts(view.punches.concat([{ badge_id: view.name, punched_at: t, punch_type: null }]), { off, sched: (b, k) => rotaFn(view.name, k) }); const l = r.log[r.log.length - 1]; return l && l.act ? ACT[l.act] : 'ignored (same finger again within a minute)'; };
     $('#scanHint').textContent = 'would be recorded as: ' + hypo();
-    $('#scan').onclick = () => { FPDB.scan(sess.badge); load(); };
+    $('#scan').onclick = () => { FPDB.scan(view.name); load(); };
     $('#s15').onclick = () => { FPDB.skip(15); load(); }; $('#s60').onclick = () => { FPDB.skip(60); load(); };
     $('#rst').onclick = () => { FPDB.reset(); weekSel = null; load(); };
   }

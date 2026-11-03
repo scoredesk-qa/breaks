@@ -69,7 +69,7 @@ const later = at('2026-11-06', '12:00');
 check('W4 once the day has passed the same row is marked absent', FP.weekFor(agents[0], r.shifts, '2026-11-02', later, sched, { off }).days[3].absent === true);
 check('W5 week totals add up (Youness 6h49m worked)', Math.round(wk[0].totals.worked / 60) === 409 && wk[1].totals.shifts === 1);
 const csv = FP.weeklyCsv(wk, '2026-11-02', off);
-check('C1 CSV starts with a BOM, has the header and one line per working day', csv.startsWith('﻿Weekly report') && /Agent,Badge,Date,Day,Scheduled,Clock in,Clock out/.test(csv) && /Youness,101,2026-11-02,Mon,06:00-13:00,05:58,13:02,1,00:15,07:04,06:49/.test(csv), csv.split('\r\n').slice(3, 5).join(' | '));
+check('C1 CSV starts with a BOM, has the header and one line per working day', csv.startsWith('﻿Weekly report') && /Agent,Date,Day,Scheduled,Clock in,Clock out/.test(csv) && /Youness,2026-11-02,Mon,06:00-13:00,05:58,13:02,1,00:15,07:04,06:49/.test(csv), csv.split('\r\n').slice(3, 5).join(' | '));
 check('C2 CSV quotes commas and quotes in names', FP.weeklyCsv([{ agent: { name: 'O"Neil, Pat', badge_id: '9' }, days: [{ key: '2026-11-02', sched: null, shifts: [{}], in: at('2026-11-02', '06:00'), out: null, breaks: 0, breakSecs: 0, onShift: 0, worked: 0, noOut: false, open: true }], totals: { scheduledMin: 0, break: 0, onShift: 0, worked: 0, late: 0, noOut: 0 } }], '2026-11-02', off).includes('"O""Neil, Pat"'));
 check('F1 formatting: dur and durHM and mondayOf', FP.dur(3725) === '1h 02m' && FP.dur(75) === '1m 15s' && FP.durHM(3725) === '01:02' && FP.mondayOf('2026-11-08') === '2026-11-02' && FP.mondayOf('2026-11-02') === '2026-11-02');
 console.log(fails ? 'FAILED ' + fails : 'ALL PASSED'); process.exit(fails ? 1 : 0);

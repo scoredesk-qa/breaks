@@ -143,15 +143,15 @@
   const csvCell = v => { v = v == null ? '' : String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   function weeklyCsv(weeks, weekStart, off) {
-    const rows = [['Agent', 'Badge', 'Date', 'Day', 'Scheduled', 'Clock in', 'Clock out', 'Breaks', 'Break time (hh:mm)', 'On shift (hh:mm)', 'Worked (hh:mm)', 'Late (min)', 'Left early (min)', 'Notes']];
+    const rows = [['Agent', 'Date', 'Day', 'Scheduled', 'Clock in', 'Clock out', 'Breaks', 'Break time (hh:mm)', 'On shift (hh:mm)', 'Worked (hh:mm)', 'Late (min)', 'Left early (min)', 'Notes']];
     for (const w of weeks) {
       w.days.forEach((d, i) => {
         if (!d.shifts.length && !d.sched) return;
         const notes = [d.noOut ? 'No clock-out recorded' : '', d.open ? 'Still on shift' : '', d.absent ? 'Scheduled but never clocked in' : '', d.overtimeMin ? `Stayed ${d.overtimeMin} min after the rota end` : ''].filter(Boolean).join('; ');
-        rows.push([w.agent.name, w.agent.badge_id, d.key, DOW[i], d.sched ? d.sched.start + '-' + d.sched.end : '', d.in != null ? hm(d.in, off) : '', d.out != null ? hm(d.out, off) : '', d.shifts.length ? d.breaks : '', d.shifts.length ? durHM(d.breakSecs) : '', d.shifts.length && !d.noOut ? durHM(d.onShift) : '', d.shifts.length && !d.noOut ? durHM(d.worked) : '', d.lateMin || '', d.earlyMin || '', notes]);
+        rows.push([w.agent.name, d.key, DOW[i], d.sched ? d.sched.start + '-' + d.sched.end : '', d.in != null ? hm(d.in, off) : '', d.out != null ? hm(d.out, off) : '', d.shifts.length ? d.breaks : '', d.shifts.length ? durHM(d.breakSecs) : '', d.shifts.length && !d.noOut ? durHM(d.onShift) : '', d.shifts.length && !d.noOut ? durHM(d.worked) : '', d.lateMin || '', d.earlyMin || '', notes]);
       });
       const t = w.totals;
-      rows.push([w.agent.name + ' — week total', w.agent.badge_id, '', '', durHM(t.scheduledMin * 60), '', '', '', durHM(t.break), durHM(t.onShift), durHM(t.worked), t.late ? t.late + ' late day(s)' : '', '', t.noOut ? t.noOut + ' shift(s) without clock-out' : '']);
+      rows.push([w.agent.name + ' — week total', '', '', durHM(t.scheduledMin * 60), '', '', '', durHM(t.break), durHM(t.onShift), durHM(t.worked), t.late ? t.late + ' late day(s)' : '', '', t.noOut ? t.noOut + ' shift(s) without clock-out' : '']);
       rows.push([]);
     }
     return '﻿' + [['Weekly report', 'week of ' + weekStart + ' to ' + addDays(weekStart, 6)], []].concat(rows).map(r => r.map(csvCell).join(',')).join('\r\n');
