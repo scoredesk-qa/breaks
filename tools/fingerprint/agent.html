@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TEST · My shift</title>
+<style><!--CSS--></style></head>
+<body>
+<div class="ribbon">TEST PAGE · agent view · <span id="modeTag">demo data</span></div>
+<div class="wrap" id="app"></div>
+<script><!--SCRIPTS--></script>
+<script>
+const SKEY = 'fp_agent_sess';
+let sess = null, view = null, err = '', weekSel = null, rotaFn = (n, k) => FPDB.rota()(n, k), unsub = null, busy = false, model = null;
+try { sess = JSON.parse(sessionStorage.getItem(SKEY) || 'null'); } catch (e) {}
+
+async function load() {
+  if (!sess || busy) return; busy = true;
+  try {
+    const off = FPDB.getOff(), now = FPDB.now(), wk = weekSel || FP.mondayOf(FP.dayKey(now, off));
+    const r = await FPDB.agentView(sess.badge, sess.code, FP.dayStart(FP.addDays(wk, -1), off), FP.dayStart(FP.addDays(wk, 8), off));
+    if (!r || !r.ok) { err = r && r.error === 'locked' ? 'Too many wrong codes. Try again in 15 minutes, or ask your admin.' : r && r.message ? r.message : 'Badge number or code not recognised.'; if (!view) { sess = null; sessionStorage.removeItem(SKEY); } }
+    else { err = ''; view = { name: r.name, punches: (r.punches || []).map(p => ({ badge_id: sess.badge, punched_at: p.punched_at, punch_type: p.punch_type })) }; }
+  } catch (e) { err = String(e.message || e); }
+  busy = false; compute(); render();
+}
+
+function compute() {
+  if (!view) { model = null; return; }
+  const off = FPDB.getOff(), now = FPDB.now(), today = FP.dayKey(now, off), wk = weekSel || FP.mondayOf(today);
+  const sched = (b, k) => rotaFn(view.name, k);
+  const built = FP.buildShifts(view.punches, { off, sched });
+  const week = FP.weekFor({ badge_id: sess.badge, name: view.name }, built.shifts, wk, now, sched, { off });
+  const open = built.shifts.filter(s => s.state === 'on' || s.state === 'brk').pop() || null;
+  const todays = built.shifts.filter(s => s.dayKey === today).pop() || null;
+  model = { off, now, today, wk, week, built, open, cur: open || todays, sched: sched(null, today) };
+}
+
+function status() {
+  const m = model; if (!m.cur) return { cls: '', label: 'Not clocked in', big: null };
+  const s = m.cur;
+  if (s.state === 'brk') return { cls: 'brk', label: 'On a break', big: { since: s.breaks[s.breaks.length - 1].s, cap: 'break so far' } };
+  if (s.state === 'on') return { cls: 'on', label: 'On shift', big: { since: s.inMs, cap: 'on shift' } };
+  if (s.state === 'no_out') return { cls: 'bad', label: 'No clock-out recorded', big: null };
+  return { cls: 'done', label: 'Shift finished', big: null };
+}
+
+function render() {
+  const app = $('#app'); $('#modeTag').textContent = FPDB.live() ? 'your Supabase' : 'demo data';
+  const head = `<h1>My shift</h1><p class="sub">Clock in and out, and take your breaks, with your fingerprint. This page only shows what the scanner recorded.</p>` + connPanel();
+  if (!sess || !model) {
+    const hint = FPDB.live() ? '' : `<p class="mut" style="font-size:13px;margin:14px 0 0">Demo logins (badge · code): ${FPDB.demoAgents().map(a => `<a href="#" data-fill="${esc(a.badge_id)}|${esc(a.code)}" style="color:var(--acc)">${esc(a.name)} ${esc(a.badge_id)} · ${esc(a.code)}</a>`).join(' &nbsp; ')}</p>`;
+    app.innerHTML = head + `<div class="card login"><h2>Sign in</h2><label class="f">Badge number (your ID on the scanner)<input class="fi" id="badge" inputmode="numeric" autocomplete="off"></label>
+      <label class="f">Your code<input class="fi" id="code" type="password" inputmode="numeric" autocomplete="off"></label>
+      ${err ? `<div class="err">${esc(err)}</div>` : ''}<button class="btn p" id="go" style="width:100%;margin-top:6px">Show my shift</button>${hint}</div>`;
+    connWire(() => { view = null; sess = null; sessionStorage.removeItem(SKEY); err = ''; subscribe(); render(); });
+    $('#go').onclick = () => { sess = { badge: $('#badge').value.trim(), code: $('#code').value.trim() }; sessionStorage.setItem(SKEY, JSON.stringify(sess)); view = null; err = ''; load(); };
+    $('#code').onkeydown = e => { if (e.key === 'Enter') $('#go').click(); };
+    $$('[data-fill]').forEach(a => a.onclick = e => { e.preventDefault(); const [b, c] = a.dataset.fill.split('|'); $('#badge').value = b; $('#code').value = c; });
+    return;
+  }
+  const m = model, st = status(), s = m.cur, off = m.off, met = s ? FP.metrics(s, m.now) : null;
+  const sc = m.sched;
+  const brkList = s && s.breaks.length ? s.breaks.map(b => `${FP.hm(b.s, off)}–${b.e ? FP.hm(b.e, off) : 'now'}`).join(' · ') : '—';
+  const wkNow = FP.mondayOf(m.today);
+  app.innerHTML = head + `
+    <div class="row" style="margin-bottom:14px"><h2 style="margin:0;font-size:22px">Hi ${esc(view.name)}</h2><span class="chip ${st.cls}">${esc(st.label)}</span><button class="btn s sp" id="out">Sign out</button></div>
+    ${err ? `<div class="err">${esc(err)}</div>` : ''}
+    <div class="card"><div class="mut" style="margin-bottom:6px">${st.big ? esc(st.big.cap) : (s && s.state === 'done' ? 'Worked today' : 'Today')}</div>
+      <div class="big" ${st.big ? `data-since="${st.big.since}"` : ''} id="big">${st.big ? since((m.now - st.big.since) / 1000) : (s && s.state === 'done' ? FP.dur(met.worked) : '—')}</div>
+      <div class="kv">
+        <div><span>Clocked in</span><b id="k-in">${s ? FP.hm(s.inMs, off) : '—'}</b></div>
+        <div><span>Clocked out</span><b id="k-out">${s && s.out != null ? FP.hm(s.out, off) : (s && s.state === 'no_out' ? 'not recorded' : '—')}</b></div>
+        <div><span>On shift</span><b id="k-shift" ${s && (s.state === 'on' || s.state === 'brk') ? `data-since="${s.inMs}"` : ''}>${met && met.onShift != null ? since(met.onShift) : '—'}</b></div>
+        <div><span>Break time${s && s.breaks.length ? ` (${s.breaks.length})` : ''}</span><b id="k-brk">${met ? FP.dur(met.breakSecs) : '—'}</b></div>
+        <div><span>Worked</span><b id="k-work">${met && met.worked != null ? FP.dur(met.worked) : '—'}</b></div>
+        <div><span>Your rota today</span><b>${sc ? esc(sc.start + '–' + sc.end) : 'day off'}</b></div>
+      </div>
+      <p class="mut" style="margin:14px 0 0;font-size:13.5px">Breaks today: ${esc(brkList)}${s && s.inferred ? ' · The scanner did not label some scans, so clock-in, breaks and clock-out are worked out from the order of your scans.' : ''}</p></div>
+    <div class="card"><div class="row" style="margin-bottom:10px"><h2 style="margin:0">Week of ${esc(dayLabel(m.wk))}</h2><span class="sp"></span>
+      <button class="btn s" id="pw">‹ Previous</button><button class="btn s" id="tw" ${m.wk === wkNow ? 'disabled' : ''}>This week</button><button class="btn s" id="nw">Next ›</button></div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Day</th><th>Rota</th><th>Clock in</th><th>Clock out</th><th>Breaks</th><th>Worked</th><th></th></tr></thead><tbody>
+      ${m.week.days.map((d, i) => { const cls = d.key === m.today ? 'today' : d.key < m.today ? 'past' : 'fut'; const notes = [d.lateMin ? `<span class="chip bad">${d.lateMin} min late</span>` : '', d.earlyMin ? `<span class="chip bad">left ${d.earlyMin} min early</span>` : '', d.noOut ? '<span class="chip bad">no clock-out</span>' : '', d.open ? '<span class="chip on">on shift</span>' : '', d.absent ? '<span class="chip bad">no clock-in</span>' : ''].join(' ');
+        return `<tr class="${cls}"><td>${esc(dayLabel(d.key))}</td><td class="n">${d.sched ? esc(d.sched.start + '–' + d.sched.end) : '<span class="mut">off</span>'}</td><td class="n">${d.in != null ? FP.hm(d.in, off) : '—'}</td><td class="n">${d.out != null ? FP.hm(d.out, off) : '—'}</td><td class="n">${d.shifts.length ? d.breaks + ' · ' + FP.dur(d.breakSecs) : '—'}</td><td class="n">${d.shifts.length && !d.noOut ? FP.dur(d.worked) : '—'}</td><td>${notes}</td></tr>`; }).join('')}
+      </tbody><tfoot><tr><td colspan="4" class="mut" style="padding-top:12px">Week total</td><td class="n" style="padding-top:12px">${FP.dur(m.week.totals.break)} breaks</td><td class="n" style="padding-top:12px"><b>${FP.dur(m.week.totals.worked)}</b></td><td></td></tr></tfoot></table></div></div>
+    ${FPDB.live() ? '' : `<div class="demo"><h2>Test tools (demo data only)</h2><p class="mut" style="margin-top:0">The real scanner app writes these punches. Here you can press the scanner for ${esc(view.name)} and watch this page, and the admin page, react.</p>
+      <div class="row"><button class="btn p" id="scan">Fingerprint scan for ${esc(view.name)}</button><span class="mut" id="scanHint"></span><span class="sp"></span>
+      <button class="btn s" id="s15">+15 min</button><button class="btn s" id="s60">+1 hour</button><button class="btn s" id="rst">Reset demo data</button></div>
+      <p class="mut" style="margin:10px 0 0;font-size:13px">Demo time now: ${esc(dayLabel(m.today))} ${FP.hm(m.now, off)}</p></div>`}`;
+  connWire(() => { view = null; sess = null; sessionStorage.removeItem(SKEY); err = ''; subscribe(); render(); });
+  $('#out').onclick = () => { sess = null; view = null; model = null; sessionStorage.removeItem(SKEY); render(); };
+  const go = n => { weekSel = FP.addDays(m.wk, n); load(); };
+  $('#pw').onclick = () => go(-7); $('#nw').onclick = () => go(7); $('#tw').onclick = () => { weekSel = null; load(); };
+  if (!FPDB.live()) {
+    const hypo = () => { const t = m.now + 1000, r = FP.buildShifts(view.punches.concat([{ badge_id: sess.badge, punched_at: t, punch_type: null }]), { off, sched: (b, k) => rotaFn(view.name, k) }); const l = r.log[r.log.length - 1]; return l && l.act ? ACT[l.act] : 'ignored (same finger again within a minute)'; };
+    $('#scanHint').textContent = 'would be recorded as: ' + hypo();
+    $('#scan').onclick = () => { FPDB.scan(sess.badge); load(); };
+    $('#s15').onclick = () => { FPDB.skip(15); load(); }; $('#s60').onclick = () => { FPDB.skip(60); load(); };
+    $('#rst').onclick = () => { FPDB.reset(); weekSel = null; load(); };
+  }
+}
+
+function tick() {   // the big timers count up every second without redrawing the page
+  if (!model) return; const now = FPDB.now();
+  $$('[data-since]').forEach(e => { e.textContent = since((now - Number(e.dataset.since)) / 1000); });
+}
+function subscribe() { if (unsub) unsub(); unsub = FPDB.onPunch(() => load()); }
+subscribe(); setInterval(tick, 1000); setInterval(() => { if (sess) load(); }, FPDB.live() ? 5000 : 20000);
+if (sess) load(); else render();
+</script></body></html>
