@@ -54,11 +54,11 @@ const mkdb = (extra = {}) => Object.assign({
 
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
-  const open = async ({ user, db, rpc, noCols, w = 1500 } = {}) => {
+  const open = async ({ user, db, rpc, noCols, now = NOW, w = 1500 } = {}) => {
     const c = await b.newContext({ timezoneId: 'UTC', viewport: { width: w, height: 1100 } });
     const q = await c.newPage(); q.on('pageerror', e => errs.push(e.message));
     await q.addInitScript(([u, d, r, nc]) => { window.__USER = u; window.__DB = d; if (nc) window.__NO_COLS = nc; if (r !== undefined) window.__RPC_FN = { cx_team_day: () => r }; }, [user, db || mkdb(), rpc === undefined ? { data: cxPayload, error: null } : rpc, noCols || null]);
-    await q.clock.setFixedTime(new Date(NOW));
+    await q.clock.setFixedTime(new Date(now));
     await q.goto('file://' + page);
     return q;
   };
@@ -113,6 +113,38 @@ const mkdb = (extra = {}) => Object.assign({
   p = await open({ user: agent, db: cfgdb });
   await p.waitForSelector('#break-left'); await p.waitForSelector('#agent-calls'); t = await flat(p);
   check('S1 the admin\'s allowance (90 min per 7.5 h = 12 min per hour) and 3CX limits (short call = 20 s, hours 08-12) reach the agent page', /1h 30m for a full 7\.5-hour shift/.test(t) && /12 min for every hour you work/.test(t) && !/Warning: 1 short call/.test(t) && await p.locator('#agent-calls .hb').count() === 4, String(await p.locator('#agent-calls .hb').count()));
+  await p.context().close();
+
+  // lunch group: visible without scrolling
+  const lunch = grp => mkdb({ bt_lunch_schedule: [{ id: 1, date: TODAY, group_a: grp === 'A' ? ['Jane Doe'] : [], group_b: grp === 'B' ? ['Jane Doe'] : [] }] });
+  p = await open({ user: agent, db: lunch('A') });
+  await p.waitForSelector('#lunch-strip .lunch-pill b'); await p.waitForTimeout(300);
+  let strip = (await p.locator('#lunch-strip').innerText()).replace(/\s+/g, ' ');
+  const ly = (await p.locator('#lunch-strip').boundingBox()).y, vh = 1100;
+  check('L1 the lunch group is right under the greeting: Group A 13:00-14:00, now, ends in 50m', /Lunch · Group A · 13:00–14:00 · now · ends in 50m/.test(strip), strip);
+  check('L2 ...and it is inside the first screen (no scrolling)', ly < 400 && ly + 40 < vh, String(Math.round(ly)));
+  check('L3 the existing Swap lunch button is still there, once (not duplicated by the strip)', await p.locator('button:has-text("Swap lunch")').count() === 1);
+  await p.screenshot({ path: path.join(mods, 'app_lunch.png'), clip: { x: 0, y: 0, width: 1500, height: 520 } });
+  const gy = (await p.locator('.grid3').boundingBox()).y, cy = (await p.locator('#agent-calls').boundingBox()).y;
+  check('L4 the Shift / Lunch / Team cards come before the call stats (calls are lower down)', gy < cy, Math.round(gy) + ' < ' + Math.round(cy));
+  await p.context().close();
+  p = await open({ user: agent, db: lunch('B'), now: TODAY + 'T11:30:00.000Z' });
+  await p.waitForSelector('#lunch-strip .lunch-pill b'); await p.waitForTimeout(300);
+  strip = (await p.locator('#lunch-strip').innerText()).replace(/\s+/g, ' ');
+  check('L5 before lunch it says when it starts: Group B 12:00-13:00, starts in 30m', /Lunch · Group B · 12:00–13:00 · starts in 30m/.test(strip), strip);
+  await p.context().close();
+  p = await open({ user: agent, db: lunch('B') });
+  await p.waitForSelector('#lunch-strip .lunch-pill b'); await p.waitForTimeout(300);
+  check('L6 after lunch it says finished', /Group B · 12:00–13:00 · finished/.test((await p.locator('#lunch-strip').innerText()).replace(/\s+/g, ' ')));
+  await p.context().close();
+  p = await open({ user: agent, db: mkdb({ bt_settings: [settingsRow({ break_allowance_min: 105, full_shift_hours: 8, cx_config: {}, trainees: ['Jane Doe'], trainee_lunch: '12:30' })] }) });
+  await p.waitForSelector('#lunch-strip .lunch-pill b'); await p.waitForTimeout(500);
+  strip = (await p.locator('#lunch-strip').innerText()).replace(/\s+/g, ' ');
+  check('L7 a trainee sees Trainee 12:30-13:30, with no swap button', /Lunch · Trainee · 12:30–13:30 · now · ends in 20m/.test(strip) && await p.locator('#lunch-strip button').count() === 0, strip);
+  await p.context().close();
+  p = await open({ user: agent, db: mkdb() });
+  await p.waitForSelector('#lunch-strip .lunch-pill'); await p.waitForTimeout(300);
+  check('L8 no lunch group assigned: it says Unassigned', /Lunch · Unassigned/.test((await p.locator('#lunch-strip').innerText()).replace(/\s+/g, ' ')));
   await p.context().close();
 
   // not set up yet / nothing to show: the break card still works, the call stats stay out of the way

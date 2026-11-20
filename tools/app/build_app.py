@@ -329,13 +329,44 @@ rep("""        <div className="grid3">
           {aheadSec>60&&<div className="al-note amber">You have used {durStr(aheadSec)} more than you have earned so far. It evens out as the shift goes on (about {perHour} min for every hour you work).</div>}
         </div>
 
-        <AgentCallStats st={cxs}/>
-
         <div className="grid3">
           <div className="card sm">
             <div className="card-hd">
               <div>
                 <div className="card-t">Shift</div>""")
+
+
+# the lunch group is shown right under the greeting, so nobody has to scroll for it
+rep("""        <div className="acts">
+          {!clockRow&&<button className="bp" onClick={clockIn}>""", r"""        <div className="lunch-strip" id="lunch-strip">
+          {(()=>{
+            const mins=x=>{ const [h,m]=x.split(':').map(Number); return h*60+m; };
+            const slot=trainee?{from:team.lunch,to:addMin(team.lunch,60)}:li?.group?li.slot:null;
+            if(!slot) return <span className="lunch-pill"><Ic n="utensils" size={15}/> Lunch · <b>Unassigned</b></span>;
+            const nowM=mins(hhmm(nowA)), a=mins(slot.from), z=mins(slot.to);
+            const lm=x=>x>=60?`${Math.floor(x/60)}h ${x%60}m`:`${x}m`;
+            const when=nowM<a?`starts in ${lm(a-nowM)}`:nowM<z?`now · ends in ${lm(z-nowM)}`:'finished';
+            return(<>
+              <span className={`lunch-pill${nowM>=a&&nowM<z?' now':''}`}><Ic n="utensils" size={15}/> Lunch · <b>{trainee?'Trainee':`Group ${li.group}`}</b> · <b>{slot.from}–{slot.to}</b> · {when}</span>
+            </>);
+          })()}
+        </div>
+
+        <div className="acts">
+          {!clockRow&&<button className="bp" onClick={clockIn}>""")
+rep("""            </div>
+          </div>
+        </div>
+      </div>
+
+      {confirmOut&&(""", """            </div>
+          </div>
+        </div>
+
+        <AgentCallStats st={cxs}/>
+      </div>
+
+      {confirmOut&&(""")
 
 css = """
 /* agent view: break time left, call stats */
@@ -347,6 +378,8 @@ css = """
 .al-note{font-size:13.5px;margin-top:14px}.al-note.amber{color:#ffb86b}
 .al-warn{font-size:14px;line-height:1.5;margin:4px 12px 14px;padding:10px 14px;border-radius:12px}
 .al-warn.amber{background:rgba(245,165,36,.12);color:#ffc966}.al-warn.red{background:rgba(220,38,38,.14);color:#fca5a5}
+.lunch-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-6px 0 18px}
+.lunch-pill{display:inline-flex;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--bdr);border-radius:999px;padding:8px 16px;font-size:14.5px;color:var(--txt2)}.lunch-pill b{font-weight:500;color:var(--txt)}.lunch-pill.now{border-color:#b3812a;color:#ffc966}.lunch-pill.now b{color:#ffd98c}
 """
 i = s.rindex('</style>')
 s = s[:i] + css + s[i:]
