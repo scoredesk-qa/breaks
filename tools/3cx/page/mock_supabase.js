@@ -28,6 +28,10 @@
     then(res, rej) { return Promise.resolve(this.exec()).then(res, rej); }
     exec() {
       if (window.__ERRORS && window.__ERRORS[this.t]) return { data: null, error: { message: window.__ERRORS[this.t] } };
+      if (window.__NO_COLS && window.__NO_COLS[this.t] && this.pl && ['insert', 'update', 'upsert'].includes(this.op)) {     // columns the database does not have yet
+        const bad = Object.keys(Array.isArray(this.pl) ? this.pl[0] : this.pl).find(k => window.__NO_COLS[this.t].includes(k));
+        if (bad) return { data: null, error: { message: `Could not find the '${bad}' column of '${this.t}' in the schema cache` } };
+      }
       const db = window.__DB; const tbl = db[this.t] || (db[this.t] = []);
       const match = r => this.f.every(fn => fn(r));
       let rows;
@@ -55,7 +59,7 @@
   const chan = () => { const c = { on: (t, f, cb) => { (window.__RT = window.__RT || []).push({ f, cb }); return c; }, subscribe: cb => { if (cb) setTimeout(() => cb('SUBSCRIBED'), 0); return c; }, send: async () => 'ok', unsubscribe: () => {} }; return c; };
   const client = {
     from: t => new Q(t),
-    rpc: async n => ({ data: n === 'bt_slot_sync' ? (typeof window.__SYNC === 'function' ? window.__SYNC() : (window.__SYNC || { v: 4, ok: true, cron: true })) : null, error: null }),
+    rpc: async (n, args) => (window.__RPC_FN && window.__RPC_FN[n]) ? window.__RPC_FN[n](args) : ({ data: n === 'bt_slot_sync' ? (typeof window.__SYNC === 'function' ? window.__SYNC() : (window.__SYNC || { v: 4, ok: true, cron: true })) : null, error: null }),
     channel: () => chan(),
     removeChannel: () => {},
     realtime: { connectionState: () => 'connecting' },
