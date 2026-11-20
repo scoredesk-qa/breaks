@@ -70,18 +70,18 @@ const mkdb = (extra = {}) => Object.assign({
   let p = await open({ user: agent });
   await p.waitForSelector('#break-left'); await p.waitForSelector('#agent-calls');
   let t = await flat(p), left = await p.locator('#break-left').innerText();
-  check('B1 "Break time left" says how the allowance works: 1h 45m for a full 8-hour shift, 13.1 min per hour', /Break time left/.test(left) && /1h 45m for a full 8-hour shift/.test(left) && /13\.1 min for every hour you work/.test(left), left.replace(/\s+/g, ' ').slice(0, 160));
-  check('B2 on shift 08:10-13:10 (5h) with 25 min of breaks used: 1h 20m left of the full day', /1h 20m/.test(left) && /Used today\s*25m 0s/.test(left.replace(/\n/g, ' ').replace(/\s+/g, ' ')) && /Full-day allowance\s*1h 45m/.test(left.replace(/\n/g, ' ').replace(/\s+/g, ' ')), left.replace(/\s+/g, ' '));
-  check('B3 earned so far after 5 hours = 5/8 of 1h 45m = 1h 5m', /Earned so far\s*1h 5m/.test(left.replace(/\n/g, ' ').replace(/\s+/g, ' ')));
+  check('B1 "Break time left" has no explanation lines under it', /Break time left/.test(left) && !/for every hour you work/.test(left) && !/for a full 8-hour shift/.test(left), left.replace(/\s+/g, ' ').slice(0, 160));
+  check('B2 on shift 08:10-13:10 (5h) with 25 min of breaks used: 1h 20m left of the full day, shown in whole minutes', /1h 20m/.test(left) && /Used today 25m(?! \d)/.test(left.replace(/\s+/g, ' ')) && /Full-day allowance 1h 45m/.test(left.replace(/\s+/g, ' ')), left.replace(/\s+/g, ' '));
+  check('B3 earned so far after 5 hours = 5/8 of 1h 45m = 1h 5m', /Earned so far 1h 5m/.test(left.replace(/\s+/g, ' ')));
   check('B4 no "ahead of what you earned" warning (25m used, 65m earned)', !/more than you have earned/.test(left));
   const bar = await p.locator('#break-left .al-bar i').evaluate(e => e.style.width), mark = await p.locator('#break-left .al-bar b').evaluate(e => e.style.left);
   check('B5 the bar shows 25/105 used (23.8%) and a marker at the 62.5% earned', Math.abs(parseFloat(bar) - 23.81) < 0.2 && /62\.5/.test(mark), bar + ' / ' + mark);
 
   const calls = await p.locator('#agent-calls').innerText(), cf = calls.replace(/\s+/g, ' ');
   check('C1 call stats: 3 calls, talk time 15m 30s, average 5m 10s', /Calls taken 3/.test(cf) && /Talk time 15m 30s/.test(cf) && /Average call 5m 10s/.test(cf), cf.slice(0, 200));
-  check('C2 admin time 10m (Do Not Disturb - ADMIN counts as admin), 1 ignored ring, 1 short call', /Admin time 10m 00s/.test(cf) && /Ignored rings 1/.test(cf) && /Short calls 1/.test(cf));
-  check('C3 the short-call warning is shown, with the limit from Settings', /Warning: 1 short call under 60 seconds/.test(cf));
-  check('C4 the ignored-ring note is shown', /1 ignored ring: the phone rang for 10 seconds or more/.test(cf));
+  check('C2 admin time 10m (Do Not Disturb - ADMIN counts as admin), 1 ignored ring, 1 short call', /Admin time 10m 00s/.test(cf) && /Ignored rings 1/.test(cf) && /Short calls\s*(warning )?1/i.test(cf));
+  check('C3 the short-call tile is marked with a Warning flag (no long explanation box)', await p.locator('#agent-calls .cx-tiles > div.warn').count() === 1 && /Short calls\s*Warning/i.test(calls) && !/can look like dropped calls/.test(cf));
+  check('C4 the ignored-rings tile is marked, with no explanation box either', await p.locator('#agent-calls .cx-tiles > div.bad').count() === 1 && !/the phone rang for/.test(cf));
   check('C5 per-hour chart: 7 hours (07:00-13:00), one bar group each', await p.locator('#agent-calls .hb').count() === 7, String(await p.locator('#agent-calls .hb').count()));
   const titles = await p.locator('#agent-calls .hb title').allTextContents();
   check('C6 09:00 hour: you 2 calls, team average 1.5 per agent', titles[2] === '09:00–10:00: you 2 calls · team average 1.5 per agent', titles[2]);
@@ -97,22 +97,27 @@ const mkdb = (extra = {}) => Object.assign({
   const early = mkdb({ bt_clocklogs: [{ id: 1, user_id: 'u1', agent_name: 'Jane Doe', clock_in: at('11:10:00'), clock_out: null, date: TODAY }] });
   p = await open({ user: agent, db: early });
   await p.waitForSelector('#break-left'); left = (await p.locator('#break-left').innerText()).replace(/\s+/g, ' ');
-  check('B6 only 2h on shift (earned 26m 15s) but 25 min of breaks used: still 1h 20m left of the day, with no warning (within 60 s)', /1h 20m/.test(left) && !/more than you have earned/.test(left) && /Earned so far 26m 15s/.test(left), left);
+  check('B6 only 2h on shift (earned 26m) but 25 min used: still 1h 20m left of the day', /1h 20m/.test(left) && /Earned so far 26m(?! \d)/.test(left), left);
   await p.context().close();
   const ahead = mkdb({ bt_clocklogs: [{ id: 1, user_id: 'u1', agent_name: 'Jane Doe', clock_in: at('12:10:00'), clock_out: null, date: TODAY }] });
   p = await open({ user: agent, db: ahead });
   await p.waitForSelector('#break-left'); left = (await p.locator('#break-left').innerText()).replace(/\s+/g, ' ');
-  check('B7 1h on shift (earned 13m 7s) with 25 min used: told they are ahead of what they have earned', /You have used 11m 53s more than you have earned so far/.test(left) && /1h 20m/.test(left), left.slice(0, 300));
+  check('B7 1h on shift, 25 min used (more than earned): still 1h 20m left, and no explanation note', /1h 20m/.test(left) && !/more than you have earned/.test(left), left.slice(0, 300));
   await p.context().close();
   const out = mkdb({ bt_clocklogs: [{ id: 1, user_id: 'u1', agent_name: 'Jane Doe', clock_in: at('08:10:00'), clock_out: at('10:10:00'), date: TODAY }], bt_logs: [{ id: 11, user_id: 'u1', agent_name: 'Jane Doe', start_time: at('09:00:00'), end_time: at('09:30:00'), duration_secs: 1800, break_type: 'Break' }] });
   p = await open({ user: agent, db: out });
   await p.waitForSelector('#break-left'); left = (await p.locator('#break-left').innerText()).replace(/\s+/g, ' ');
-  check('B8 clocked out after 2h: the allowance is what was earned (26m 15s), 30 min used = over by 3m 45s', /Allowance today 26m 15s/.test(left) && /Over by 3m 45s/.test(left), left.slice(0, 260));
+  check('B8 clocked out after 2h: the allowance is what was earned (26m), 30 min used = over by 3m, in whole minutes', /Allowance today 26m(?! \d)/.test(left) && /Over by 3m(?! \d)/.test(left), left.slice(0, 260));
+  await p.context().close();
+  const near = mkdb({ bt_clocklogs: [{ id: 1, user_id: 'u1', agent_name: 'Jane Doe', clock_in: at('08:00:00'), clock_out: at('13:00:00'), date: TODAY }], bt_logs: [{ id: 11, user_id: 'u1', agent_name: 'Jane Doe', start_time: at('09:00:00'), end_time: at('10:06:00'), duration_secs: 3960, break_type: 'Break' }] });
+  p = await open({ user: agent, db: near });
+  await p.waitForSelector('#break-left'); left = (await p.locator('#break-left').innerText()).replace(/\s+/g, ' ');
+  check('B9 over the allowance by only 22 seconds: it says nothing about it (0m left, no "Over by", bar not red)', !/Over by/.test(left) && /^Break time left 0m/.test(left) && await p.locator('#break-left .al-bar i.over').count() === 0, left.slice(0, 120));
   await p.context().close();
   const cfgdb = mkdb({ bt_settings: [settingsRow({ break_allowance_min: 90, full_shift_hours: 7.5, cx_config: { shortCallSec: 20, timelineStart: 8, timelineEnd: 12 } })] });
   p = await open({ user: agent, db: cfgdb });
   await p.waitForSelector('#break-left'); await p.waitForSelector('#agent-calls'); t = await flat(p);
-  check('S1 the admin\'s allowance (90 min per 7.5 h = 12 min per hour) and 3CX limits (short call = 20 s, hours 08-12) reach the agent page', /1h 30m for a full 7\.5-hour shift/.test(t) && /12 min for every hour you work/.test(t) && !/Warning: 1 short call/.test(t) && await p.locator('#agent-calls .hb').count() === 4, String(await p.locator('#agent-calls .hb').count()));
+  check('S1 the admin\'s allowance (90 min per 7.5 h) and 3CX limits (short call = 20 s, hours 08-12) reach the agent page: earned 1h after 5 h, full day 1h 30m, no short-call warning, 4 hour bars', /Earned so far 1h(?! \d)/.test((await p.locator('#break-left').innerText()).replace(/\s+/g, ' ')) && /Full-day allowance 1h 30m/.test((await p.locator('#break-left').innerText()).replace(/\s+/g, ' ')) && await p.locator('#agent-calls .cx-tiles > div.warn').count() === 0 && await p.locator('#agent-calls .hb').count() === 4, String(await p.locator('#agent-calls .hb').count()));
   await p.context().close();
 
   // lunch group: visible without scrolling
@@ -126,6 +131,8 @@ const mkdb = (extra = {}) => Object.assign({
   check('L3 the existing Swap lunch button is still there, once (not duplicated by the strip)', await p.locator('button:has-text("Swap lunch")').count() === 1);
   await p.screenshot({ path: path.join(mods, 'app_lunch.png'), clip: { x: 0, y: 0, width: 1500, height: 520 } });
   const gy = (await p.locator('.grid3').boundingBox()).y, cy = (await p.locator('#agent-calls').boundingBox()).y;
+  const gb = await p.locator('.grid3').boundingBox(), cb = await p.locator('#agent-calls').boundingBox();
+  check('L4b room between the Shift/Lunch/Team cards and the call stats (at least 20px)', cb.y - (gb.y + gb.height) >= 20, String(Math.round(cb.y - (gb.y + gb.height))));
   check('L4 the Shift / Lunch / Team cards come before the call stats (calls are lower down)', gy < cy, Math.round(gy) + ' < ' + Math.round(cy));
   await p.context().close();
   p = await open({ user: agent, db: lunch('B'), now: TODAY + 'T11:30:00.000Z' });
@@ -158,7 +165,7 @@ const mkdb = (extra = {}) => Object.assign({
   await p.context().close();
   p = await open({ user: { id: 'u1', email: 'jane@x.com', user_metadata: { role: 'agent', display_name: 'Jane Doe' } }, db: mkdb({ bt_settings: [settingsRow({})] }) });
   await p.waitForSelector('#break-left');
-  check('N3 settings without the new columns: the defaults (1h 45m, 8 h) are used', /1h 45m for a full 8-hour shift/.test(await flat(p)));
+  check('N3 settings without the new columns: the defaults (1h 45m, 8 h) are used', /Full-day allowance 1h 45m/.test(await flat(p)));
   await p.context().close();
 
   /* ───────────── Settings page (admin) ───────────── */

@@ -209,18 +209,16 @@ function AgentCallStats({st}){
   const m=st.me, hrs=st.hours, avgOk=hrs.filter(r=>r.avg!=null);
   const above=avgOk.filter(r=>r.mine>r.avg).length, below=avgOk.filter(r=>r.mine<r.avg).length;
   return(
-    <div className="card acc" style={{marginBottom:34}} id="agent-calls">
-      <div className="card-hd"><div><div className="card-t">Your calls today</div><div className="al-sub">From the phone system · updates live</div></div></div>
+    <div className="card acc" style={{marginTop:34,marginBottom:34}} id="agent-calls">
+      <div className="card-hd"><div><div className="card-t">Your calls today</div></div></div>
       <div className="cx-tiles pv">
         <div><span>Calls taken</span><b>{m.calls}</b></div>
         <div><span>Talk time</span><b>{CX.fmtDur(m.callSecs)}</b></div>
         <div><span>Average call</span><b>{CX.fmtDur(m.avgCallSecs)}</b></div>
         <div><span>Admin time</span><b>{CX.fmtDur(m.adminSecs)}</b></div>
-        <div><span>Ignored rings</span><b style={m.ignored?{color:'#ff8fa3'}:null}>{m.ignored}</b></div>
-        <div><span>Short calls</span><b style={m.shortCalls?{color:'#ffb86b'}:null}>{m.shortCalls}</b></div>
+        <div className={m.ignored?'bad':''}><span>Ignored rings</span><b style={m.ignored?{color:'#ff8fa3'}:null}>{m.ignored}</b></div>
+        <div className={m.shortCalls?'warn':''}><span>Short calls{m.shortCalls>0&&<em className="al-flag">Warning</em>}</span><b style={m.shortCalls?{color:'#ffb86b'}:null}>{m.shortCalls}</b></div>
       </div>
-      {m.shortCalls>0&&<div className="al-warn amber">Warning: {m.shortCalls} short call{m.shortCalls===1?'':'s'} under {_cxCfg.shortCallSec} seconds today. Calls this short can look like dropped calls, so your admin may ask about them.</div>}
-      {m.ignored>0&&<div className="al-warn red">{m.ignored} ignored ring{m.ignored===1?'':'s'}: the phone rang for {_cxCfg.ignoreRingSec} seconds or more and the call was not answered by you or a colleague.</div>}
       {hrs.length>0&&<>
         <div className="card-t" style={{fontSize:16,margin:'6px 12px 4px'}}>Calls per hour, compared with the team</div>
         <div className="cx-chart"><CxHourBars rows={hrs}/></div>
@@ -300,9 +298,9 @@ rep("  const pct=maxB>0?Math.min(100,teamCount/maxB*100):100;",
   const earnedSec=Math.min(allowSec,allowSec*(shiftSec/3600)/team.fullShiftH);
   const totalAllow=isClockedOut?earnedSec:allowSec;
   const leftSec=Math.round(totalAllow-todaySec);
-  const aheadSec=isClockedOut?0:Math.round(todaySec-earnedSec);
+  const overMin=leftSec<=-60?Math.floor(-leftSec/60):0;     // going over by less than a minute is not worth mentioning
+  const mFmt=x=>{ const h=Math.floor(x/60), m=x%60; return h?`${h}h${m?` ${m}m`:''}`:`${m}m`; };
   const usedPct=totalAllow>0?Math.min(100,todaySec/totalAllow*100):100, earnedPct=totalAllow>0?Math.min(100,earnedSec/totalAllow*100):0;
-  const perHour=Math.round(team.allowanceMin/team.fullShiftH*10)/10;
   const pct=maxB>0?Math.min(100,teamCount/maxB*100):100;""")
 rep("""        <div className="grid3">
           <div className="card sm">
@@ -311,22 +309,18 @@ rep("""        <div className="grid3">
                 <div className="card-t">Shift</div>""",
     r"""        <div className="card acc" style={{marginBottom:34}} id="break-left">
           <div className="card-hd">
-            <div>
-              <div className="card-t">Break time left</div>
-              <div className="al-sub">{durStr(team.allowanceMin*60)} for a full {team.fullShiftH}-hour shift · {perHour} min for every hour you work</div>
-            </div>
-            <div className="card-ctl">{leftSec>=0?<span className="al-big">{durStr(leftSec)}</span>:<span className="al-big over">Over by {durStr(-leftSec)}</span>}</div>
+            <div className="card-t">Break time left</div>
+            <div className="card-ctl">{overMin?<span className="al-big over">Over by {mFmt(overMin)}</span>:<span className="al-big">{mFmt(Math.max(0,Math.floor(leftSec/60)))}</span>}</div>
           </div>
-          <div className="al-bar" role="img" aria-label={`Used ${durStr(todaySec)} of ${durStr(Math.round(totalAllow))}`}>
-            <i className={leftSec<0?'over':''} style={{width:`${usedPct}%`}}/>
+          <div className="al-bar" role="img" aria-label={`Used ${mFmt(Math.floor(todaySec/60))} of ${mFmt(Math.floor(totalAllow/60))}`}>
+            <i className={overMin?'over':''} style={{width:`${usedPct}%`}}/>
             {!isClockedOut&&<b style={{left:`calc(${earnedPct}% - 1px)`}} title="Earned so far"/>}
           </div>
           <div className="sm-cols" style={{marginTop:16}}>
-            <div><div className="sm-l">Used today</div><div className="sm-v">{durStr(todaySec)}</div></div>
-            <div><div className="sm-l">Earned so far</div><div className="sm-v">{durStr(Math.round(earnedSec))}</div></div>
-            <div><div className="sm-l">{isClockedOut?'Allowance today':'Full-day allowance'}</div><div className="sm-v">{durStr(Math.round(totalAllow))}</div></div>
+            <div><div className="sm-l">Used today</div><div className="sm-v">{mFmt(Math.floor(todaySec/60))}</div></div>
+            <div><div className="sm-l">Earned so far</div><div className="sm-v">{mFmt(Math.floor(earnedSec/60))}</div></div>
+            <div><div className="sm-l">{isClockedOut?'Allowance today':'Full-day allowance'}</div><div className="sm-v">{mFmt(Math.floor(totalAllow/60))}</div></div>
           </div>
-          {aheadSec>60&&<div className="al-note amber">You have used {durStr(aheadSec)} more than you have earned so far. It evens out as the shift goes on (about {perHour} min for every hour you work).</div>}
         </div>
 
         <div className="grid3">
@@ -375,9 +369,8 @@ css = """
 .al-bar{position:relative;height:12px;border-radius:99px;background:#23252f;margin:10px 0 4px}
 .al-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:#8e9cff}.al-bar i.over{background:#ef6b5b}
 .al-bar b{position:absolute;top:-4px;bottom:-4px;width:2px;background:#f5f5fa;border-radius:2px}
-.al-note{font-size:13.5px;margin-top:14px}.al-note.amber{color:#ffb86b}
-.al-warn{font-size:14px;line-height:1.5;margin:4px 12px 14px;padding:10px 14px;border-radius:12px}
-.al-warn.amber{background:rgba(245,165,36,.12);color:#ffc966}.al-warn.red{background:rgba(220,38,38,.14);color:#fca5a5}
+.cx-tiles>div.warn{box-shadow:inset 0 0 0 1px rgba(245,165,36,.55)}.cx-tiles>div.bad{box-shadow:inset 0 0 0 1px rgba(239,107,91,.55)}
+.al-flag{font-style:normal;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:#14131c;background:#f5a524;border-radius:99px;padding:1px 8px;margin-left:8px}
 .lunch-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-6px 0 18px}
 .lunch-pill{display:inline-flex;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--bdr);border-radius:999px;padding:8px 16px;font-size:14.5px;color:var(--txt2)}.lunch-pill b{font-weight:500;color:var(--txt)}.lunch-pill.now{border-color:#b3812a;color:#ffc966}.lunch-pill.now b{color:#ffd98c}
 """
