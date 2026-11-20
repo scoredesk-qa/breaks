@@ -68,7 +68,7 @@ const mkdb = (extra = {}) => Object.assign({
 
   /* ───────────── agent view ───────────── */
   let p = await open({ user: agent });
-  await p.waitForSelector('#break-left'); await p.waitForSelector('#agent-calls');
+  await p.waitForSelector('#break-left');
   let t = await flat(p), left = await p.locator('#break-left').innerText();
   check('B1 "Break time left" has no explanation lines under it', /Break time left/.test(left) && !/for every hour you work/.test(left) && !/for a full 8-hour shift/.test(left), left.replace(/\s+/g, ' ').slice(0, 160));
   check('B2 on shift 08:10-13:10 (5h) with 25 min of breaks used: 1h 20m left of the full day, shown in whole minutes', /1h 20m/.test(left) && /Used today 25m(?! \d)/.test(left.replace(/\s+/g, ' ')) && /Full-day allowance 1h 45m/.test(left.replace(/\s+/g, ' ')), left.replace(/\s+/g, ' '));
@@ -77,6 +77,7 @@ const mkdb = (extra = {}) => Object.assign({
   const bar = await p.locator('#break-left .al-bar i').evaluate(e => e.style.width), mark = await p.locator('#break-left .al-bar b').evaluate(e => e.style.left);
   check('B5 the bar shows 25/105 used (23.8%) and a marker at the 62.5% earned', Math.abs(parseFloat(bar) - 23.81) < 0.2 && /62\.5/.test(mark), bar + ' / ' + mark);
 
+  await p.click('[data-nav=calls]'); await p.waitForSelector('#agent-calls');
   const calls = await p.locator('#agent-calls').innerText(), cf = calls.replace(/\s+/g, ' ');
   check('C1 call stats: 3 calls, talk time 15m 30s, average 5m 10s', /Calls taken 3/.test(cf) && /Talk time 15m 30s/.test(cf) && /Average call 5m 10s/.test(cf), cf.slice(0, 200));
   check('C2 admin time 10m (Do Not Disturb - ADMIN counts as admin), 1 ignored ring, 1 short call', /Admin time 10m 00s/.test(cf) && /Ignored rings 1/.test(cf) && /Short calls\s*(warning )?1/i.test(cf));
@@ -116,8 +117,8 @@ const mkdb = (extra = {}) => Object.assign({
   await p.context().close();
   const cfgdb = mkdb({ bt_settings: [settingsRow({ break_allowance_min: 90, full_shift_hours: 7.5, cx_config: { shortCallSec: 20, timelineStart: 8, timelineEnd: 12 } })] });
   p = await open({ user: agent, db: cfgdb });
-  await p.waitForSelector('#break-left'); await p.waitForSelector('#agent-calls'); t = await flat(p);
-  check('S1 the admin\'s allowance (90 min per 7.5 h) and 3CX limits (short call = 20 s, hours 08-12) reach the agent page: earned 1h after 5 h, full day 1h 30m, no short-call warning, 4 hour bars', /Earned so far 1h(?! \d)/.test((await p.locator('#break-left').innerText()).replace(/\s+/g, ' ')) && /Full-day allowance 1h 30m/.test((await p.locator('#break-left').innerText()).replace(/\s+/g, ' ')) && await p.locator('#agent-calls .cx-tiles > div.warn').count() === 0 && await p.locator('#agent-calls .hb').count() === 4, String(await p.locator('#agent-calls .hb').count()));
+  await p.waitForSelector('#break-left'); const s1 = (await p.locator('#break-left').innerText()).replace(/\s+/g, ' '); await p.click('[data-nav=calls]'); await p.waitForSelector('#agent-calls'); t = await flat(p);
+  check('S1 the admin\'s allowance (90 min per 7.5 h) and 3CX limits (short call = 20 s, hours 08-12) reach the agent page: earned 1h after 5 h, full day 1h 30m, no short-call warning, 4 hour bars', /Earned so far 1h(?! \d)/.test(s1) && /Full-day allowance 1h 30m/.test(s1) && await p.locator('#agent-calls .cx-tiles > div.warn').count() === 0 && await p.locator('#agent-calls .hb').count() === 4, String(await p.locator('#agent-calls .hb').count()));
   await p.context().close();
 
   // lunch group: visible without scrolling
@@ -130,10 +131,7 @@ const mkdb = (extra = {}) => Object.assign({
   check('L2 ...and it is inside the first screen (no scrolling)', ly < 400 && ly + 40 < vh, String(Math.round(ly)));
   check('L3 the existing Swap lunch button is still there, once (not duplicated by the strip)', await p.locator('button:has-text("Swap lunch")').count() === 1);
   await p.screenshot({ path: path.join(mods, 'app_lunch.png'), clip: { x: 0, y: 0, width: 1500, height: 520 } });
-  const gy = (await p.locator('.grid3').boundingBox()).y, cy = (await p.locator('#agent-calls').boundingBox()).y;
-  const gb = await p.locator('.grid3').boundingBox(), cb = await p.locator('#agent-calls').boundingBox();
-  check('L4b room between the Shift/Lunch/Team cards and the call stats (at least 20px)', cb.y - (gb.y + gb.height) >= 20, String(Math.round(cb.y - (gb.y + gb.height))));
-  check('L4 the Shift / Lunch / Team cards come before the call stats (calls are lower down)', gy < cy, Math.round(gy) + ' < ' + Math.round(cy));
+  check('L4 the call stats are not on Home any more (they have their own Calls tab)', await p.locator('#agent-calls').count() === 0 && await p.locator('.grid3').count() === 1);
   await p.context().close();
   p = await open({ user: agent, db: lunch('B'), now: TODAY + 'T11:30:00.000Z' });
   await p.waitForSelector('#lunch-strip .lunch-pill b'); await p.waitForTimeout(300);
@@ -156,11 +154,11 @@ const mkdb = (extra = {}) => Object.assign({
 
   // not set up yet / nothing to show: the break card still works, the call stats stay out of the way
   p = await open({ user: agent, rpc: { data: null, error: { message: 'Could not find the function public.cx_team_day' } } });
-  await p.waitForSelector('#break-left'); await p.waitForTimeout(400);
-  check('N1 before the setup SQL is run: no call-stats card and no error message for the agent; the break card still shows', await p.locator('#agent-calls').count() === 0 && !/cx_team_day/.test(await flat(p)) && /Break time left/.test(await flat(p)));
+  await p.waitForSelector('#break-left'); await p.click('[data-nav=calls]'); await p.waitForTimeout(500);
+  check('N1 before the setup SQL is run: no call-stats card and no error message for the agent; the break card still shows', await p.locator('#agent-calls').count() === 0 && !/cx_team_day/.test(await flat(p)) && /No call activity recorded for you today/.test(await flat(p)));
   await p.context().close();
   p = await open({ user: agent, rpc: { data: { mine: [], team: TEAM }, error: null } });
-  await p.waitForSelector('#break-left'); await p.waitForTimeout(400);
+  await p.waitForSelector('#break-left'); await p.click('[data-nav=calls]'); await p.waitForTimeout(500);
   check('N2 an agent with no 3CX activity today (not matched in 3CX) gets no call-stats card', await p.locator('#agent-calls').count() === 0);
   await p.context().close();
   p = await open({ user: { id: 'u1', email: 'jane@x.com', user_metadata: { role: 'agent', display_name: 'Jane Doe' } }, db: mkdb({ bt_settings: [settingsRow({})] }) });

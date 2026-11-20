@@ -172,7 +172,7 @@ function useAgentCx(name){
   const [raw,setRaw]=useState(null);       // null while loading; {off:true} if the setup SQL has not been run yet
   const load=useCallback(async()=>{
     const [from,to]=CX.dayRange(todayISO(),clockOff());
-    const {data,error}=await run(SB.rpc('cx_team_day',{p_from:new Date(from-36*3600000).toISOString(),p_to:new Date(to).toISOString(),p_name:name}));
+    const {data,error}=(await run(SB.rpc('cx_team_day',{p_from:new Date(from-36*3600000).toISOString(),p_to:new Date(to).toISOString(),p_name:name})))||{};
     setRaw(error||!data||Array.isArray(data)?{off:true}:data);
   },[name]);
   useEffect(()=>{ load(); },[load]);
