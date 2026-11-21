@@ -198,7 +198,7 @@ NEW_CSS = r"""
 @keyframes rqIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .rq-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .rq-ico{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex-shrink:0;background:var(--amber-d);color:var(--acc-txt)}
-.rq-ico.sick{background:var(--red-d);color:var(--red)}.rq-ico.shift{background:var(--blue-d);color:var(--blue)}.rq-ico.other{background:var(--indigo-d);color:var(--indigo)}
+.rq-ico.document{background:var(--green-d);color:var(--green)}.cal-c.document{background:var(--green-d);color:var(--green)}.rq-ico.sick{background:var(--red-d);color:var(--red)}.rq-ico.shift{background:var(--blue-d);color:var(--blue)}.rq-ico.other{background:var(--indigo-d);color:var(--indigo)}
 .rq-t{font-size:16.5px;font-weight:500}.rq-s{font-size:13.5px;color:var(--mut);margin-top:2px}
 .rq-sp{margin-left:auto}
 .rq-note{font-size:14.5px;color:var(--txt2);line-height:1.5;white-space:pre-wrap}
@@ -257,6 +257,7 @@ rep("const PATHS = {", """const PATHS = {
   calendar: ["M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","M16 2v4","M8 2v4","M3 10h18"],
   message:  "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   inbox:    ["M22 12h-6l-2 3h-4l-2-3H2","M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"],
+  file:     ["M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z","M14 2v6h6","M8 13h8","M8 17h5"],
   palm:     ["M12 22V10","M12 10c-1-4-4-6-8-5 3 0 5 2 5.5 4","M12 10c1-4 4-6 8-5-3 0-5 2-5.5 4","M12 10c-3-3-6-3-8-1 3-.5 5 .5 6.5 2","M12 10c3-3 6-3 8-1-3-.5-5 .5-6.5 2"],""")
 
 # ═════════════════════════════ 3. components ═════════════════════════════
@@ -279,6 +280,17 @@ function ThemeFab(){
   return <button className="theme-fab" onClick={toggle} title={t==='light'?'Switch to dark mode':'Switch to light mode'} aria-label="Toggle theme"><ThemeIcon/></button>;
 }
 
+/* The BreakTrack mark: the company's folded-shard logo, recoloured to the page palette */
+function BrandMark({size=32}){
+  return(
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className="bm">
+      <defs><linearGradient id="bmg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#a3aeff"/><stop offset="1" stopColor="#5266eb"/></linearGradient></defs>
+      <path d="M4.3 14.8L4.3 24.6L10.4 24.6Z" fill="#3b47a8" stroke="#3b47a8" strokeWidth=".8" strokeLinejoin="round"/>
+      <path className="bm-w" d="M4.6 14.5L16.6 14.6L19.1 18.2L13.2 27.8Z" stroke="#f4f5ff" strokeWidth=".8" strokeLinejoin="round"/>
+      <path d="M27.7 4.3L26.1 27.8L13.4 27.8Z" fill="url(#bmg)" stroke="#6b7cf0" strokeWidth=".8" strokeLinejoin="round"/>
+    </svg>);
+}
+
 /* One sidebar for admin and agent: slides a highlight to the active item, collapses to icons, remembers its state. */
 function Sidebar({items,active,onGo,open,onClose,role,onLogout}){
   const [theme,toggleTheme]=useTheme();
@@ -287,15 +299,16 @@ function Sidebar({items,active,onGo,open,onClose,role,onLogout}){
   const [ind,setInd]=useState({y:0,h:0,on:false});
   const measure=useCallback(()=>{ const el=refs.current[active]; setInd(el?{y:el.offsetTop,h:el.offsetHeight,on:true}:{y:0,h:0,on:false}); },[active]);
   useLayoutEffect(()=>{ measure(); },[measure,items.length,col]);
+  useEffect(()=>{ const id=setTimeout(measure,460); return()=>clearTimeout(id); },[col,measure]);
   useEffect(()=>{ window.addEventListener('resize',measure); return()=>window.removeEventListener('resize',measure); },[measure]);
   const toggleCol=()=>setCol(c=>{ try{ localStorage.setItem(SIDE_KEY,c?'0':'1'); }catch(e){} return !c; });
   return(<>
     <div className={`scrim${open?' open':''}`} onClick={onClose}/>
     <aside className={`sb${col?' col':''}${open?' open':''}`} aria-label="Main navigation">
-      <div className="sb-hd"><div className="sb-logo"><Ic n="brand" size={24} sw={2}/></div><span className="sb-name">BreakTrack</span></div>
+      <div className="sb-hd"><div className="sb-logo"><BrandMark size={42}/></div><span className="sb-name">BreakTrack</span></div>
       <nav className="sb-nav">
         <i className="sb-ind" style={{transform:`translateY(${ind.y}px)`,height:ind.h,opacity:ind.on?1:0}}/>
-        {items.map((it,i)=>it.section
+        {items.filter(it=>!(col&&it.more)).map((it,i)=>it.section
           ?<div key={'s'+i} className="sb-sec">{it.section}</div>
           :<button key={it.id} ref={el=>{ refs.current[it.id]=el; }} className={`sb-i${active===it.id?' on':''}`} style={{'--i':i}} onClick={()=>onGo(it.id)}
              title={col?it.label:undefined} aria-current={active===it.id?'page':undefined} data-nav={it.id}>
@@ -320,9 +333,10 @@ function Sidebar({items,active,onGo,open,onClose,role,onLogout}){
 }
 
 /* ── requests: shared bits ── */
-const REQ_KINDS={pto:'Time off',sick:'Sick leave',shift:'Shift change',other:'Other'};
+const REQ_KINDS={pto:'Time off',document:'Document',other:'Other',sick:'Sick leave',shift:'Shift change'};
+const REQ_NEW=['pto','document','other'];   // what an agent can ask for (older sick/shift requests still show)
 const REQ_STATUS={pending:'Pending',approved:'Approved',denied:'Denied',cancelled:'Cancelled'};
-const REQ_ICON={pto:'palm',sick:'drop',shift:'swap',other:'message'};
+const REQ_ICON={pto:'palm',document:'file',sick:'drop',shift:'swap',other:'message'};
 const isoAdd=(iso,n)=>new Date(Date.parse(iso+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
 const dShort=iso=>new Date(iso+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'});
 const reqRange=r=>{ if(!r.start_date) return 'No dates'; const a=dShort(r.start_date), b=dShort(r.end_date||r.start_date); return a===b?a:`${a} – ${b}`; };
@@ -434,8 +448,8 @@ function AgentRequests({user,name}){
   useEffect(()=>{ load(); },[load]);
   useAutoRefresh(load,10000);
   useReqChanged(load);
-  const needsDates=f.kind!=='other';
-  const valid=(!needsDates||(f.start&&f.end&&f.end>=f.start))&&(f.kind!=='other'||f.note.trim().length>0);
+  const needsDates=f.kind==='pto';
+  const valid=(!needsDates||(f.start&&f.end&&f.end>=f.start))&&(f.kind==='pto'||f.note.trim().length>0);
   const submit=async()=>{
     if(!valid||busy) return;
     setBusy(true); setErr('');
@@ -470,15 +484,15 @@ function AgentRequests({user,name}){
             <h2>New request</h2>
             <label>Type
               <select className="fi" value={f.kind} onChange={e=>setF({...f,kind:e.target.value})} aria-label="Request type">
-                {Object.entries(REQ_KINDS).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+                {REQ_NEW.map(k=><option key={k} value={k}>{k==='document'?'Document request':REQ_KINDS[k]}</option>)}
               </select>
             </label>
             {needsDates&&<div className="rq-two">
               <label>From<input className="fi" type="date" min={today} value={f.start} onChange={e=>setF({...f,start:e.target.value,end:f.end<e.target.value?e.target.value:f.end})} aria-label="From date"/></label>
               <label>To<input className="fi" type="date" min={f.start||today} value={f.end} onChange={e=>setF({...f,end:e.target.value})} aria-label="To date"/></label>
             </div>}
-            <label>{f.kind==='other'?'What do you need?':'Note (optional)'}
-              <textarea className="fi" value={f.note} maxLength={2000} onChange={e=>setF({...f,note:e.target.value})} placeholder={f.kind==='pto'?'e.g. family trip':''} aria-label="Note"/>
+            <label>{f.kind==='document'?'Which document do you need?':f.kind==='other'?'What do you need?':'Note (optional)'}
+              <textarea className="fi" value={f.note} maxLength={2000} onChange={e=>setF({...f,note:e.target.value})} placeholder={f.kind==='pto'?'e.g. family trip':f.kind==='document'?'e.g. employment letter, payslip, reference':''} aria-label="Note"/>
             </label>
             <button className="bp" onClick={submit} disabled={!valid||busy}>{busy?<span className="spin-sm"/>:<><Ic n="send" size={15}/> Send request</>}</button>
           </div>
@@ -717,6 +731,131 @@ function AAccounts(){
   );
 }
 
+/* ── agent: Performance tab (a month at a glance) ── */
+const _cxDayCache=new Map();
+function cxAgentDay(data,name,day){
+  const tz=clockOff(), cfg=_cxCfg, now=appNow();
+  const rows=CX.rowsFromStatusLog([...(data.mine||[]),...(data.team||[])]);
+  if(!rows.length) return null;
+  const [from,to]=CX.dayRange(day,tz);
+  const R=CX.analyze(rows,{day,now:Math.min(now,to),...cfg,tzOffsetHours:0,dayOffsetHours:tz});
+  const key=CX.nameKey(name);
+  const me=Object.values(R.agents).find(a=>CX.nameKey(a.agent)===key);
+  if(!me) return null;
+  const working=a=>Object.keys(a.statusSecs).some(st=>!['off','hol'].includes(cxCat(st)));
+  const others=Object.values(R.agents).filter(a=>a.ext!==me.ext&&working(a));
+  return {calls:me.calls,talk:me.callSecs,ignored:me.ignored,short:me.shortCalls,admin:me.adminSecs,team:others.length?others.reduce((t,a)=>t+a.calls,0)/others.length:null};
+}
+async function cxFetchDay(name,day){
+  const k=name+'|'+day, isToday=day===todayISO();
+  if(!isToday&&_cxDayCache.has(k)) return _cxDayCache.get(k);
+  const [from,to]=CX.dayRange(day,clockOff());
+  const {data,error}=(await run(SB.rpc('cx_team_day',{p_from:new Date(from-36*3600000).toISOString(),p_to:new Date(to).toISOString(),p_name:name})))||{};
+  if(error||!data||Array.isArray(data)) return {off:true};
+  let r=null; try{ r=cxAgentDay(data,name,day); }catch(e){ r=null; }
+  if(!isToday) _cxDayCache.set(k,r);
+  return r;
+}
+function AgentPerformance({user,name,team}){
+  const cur=todayISO().slice(0,7);
+  const [ym,setYm]=useState(cur);
+  const [clocks,setClocks]=useState(null);
+  const [logs,setLogs]=useState([]);
+  const [cx,setCx]=useState({});
+  const [prog,setProg]=useState(null);
+  const [cxOff,setCxOff]=useState(false);
+  const [now,setNow]=useState(appNow());
+  useEffect(()=>{ const id=setInterval(()=>setNow(appNow()),30000); return()=>clearInterval(id); },[]);
+  const first=ym+'-01', nextFirst=monthAdd(first,1);
+  useEffect(()=>{
+    let dead=false;
+    (async()=>{
+      setClocks(null); setCx({}); setCxOff(false); setProg(null);
+      const {data:c}=await run(SB.from('bt_clocklogs').select('*').eq('user_id',user.id).gte('date',first).lt('date',nextFirst).order('date'));
+      const off=clockOff()*3600000, s0=new Date(Date.parse(first+'T00:00:00Z')-off).toISOString(), s1=new Date(Date.parse(nextFirst+'T00:00:00Z')-off).toISOString();
+      const {data:l}=await run(SB.from('bt_logs').select('*').eq('user_id',user.id).gte('start_time',s0).lt('start_time',s1));
+      if(dead) return;
+      setClocks(c||[]); setLogs(l||[]);
+      const days=[...new Set((c||[]).map(x=>x.date))].filter(d=>d<=todayISO());
+      let i=0,done=0; setProg({done:0,total:days.length});
+      const worker=async()=>{
+        while(i<days.length&&!dead){
+          const d=days[i++], r=await cxFetchDay(name,d);
+          if(dead) return;
+          if(r&&r.off) setCxOff(true); else setCx(p=>({...p,[d]:r}));
+          setProg({done:++done,total:days.length});
+        }
+      };
+      await Promise.all([worker(),worker(),worker()]);
+    })();
+    return()=>{ dead=true; };
+  },[ym,user.id,name]);
+  const mm=x=>{ const m=Math.round(x/60), h=Math.floor(m/60); return h?`${h}h${m%60?` ${m%60}m`:''}`:`${m}m`; };
+  const byDay={};
+  (clocks||[]).forEach(c=>{
+    const end=c.clock_out?new Date(c.clock_out).getTime():(c.date===todayISO()?now:null);
+    const sec=c.clock_in&&end?Math.max(0,Math.round((end-new Date(c.clock_in).getTime())/1000)):0;
+    const d=byDay[c.date]=byDay[c.date]||{day:c.date,shift:0,brk:0,n:0,open:!c.clock_out&&c.date===todayISO()};
+    d.shift+=sec;
+  });
+  logs.forEach(l=>{ const w=wall(l.start_time), k=`${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; if(!byDay[k]) return; byDay[k].brk+=secOf(l,now); byDay[k].n++; });
+  const days=Object.values(byDay).sort((a,b)=>b.day.localeCompare(a.day));
+  const allow=team.allowanceMin*60;
+  days.forEach(d=>{ d.earned=d.open?allow:Math.min(allow,allow*(d.shift/3600)/team.fullShiftH); d.over=d.brk>d.earned+59; });
+  const sum=f=>days.reduce((t,d)=>t+f(d),0);
+  const cxDays=days.map(d=>cx[d.day]).filter(Boolean);
+  const cs=f=>cxDays.reduce((t,r)=>t+f(r),0);
+  const teamDays=cxDays.filter(r=>r.team!=null);
+  const myPerDay=cxDays.length?cs(r=>r.calls)/cxDays.length:0;
+  const teamPerDay=teamDays.length?teamDays.reduce((t,r)=>t+r.team,0)/teamDays.length:null;
+  const monthName=new Date(first+'T00:00:00Z').toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});
+  const r1=x=>Math.round(x*10)/10;
+  return(
+    <div id="tab-perf">
+      <div className="tab-h"><h1>Performance</h1><p>Your month at a glance.</p></div>
+      <div className="pf-nav">
+        <button className="icb" onClick={()=>setYm(monthAdd(first,-1).slice(0,7))} aria-label="Previous month"><Ic n="chevleft" size={18}/></button>
+        <b>{monthName}</b>
+        <button className="icb" onClick={()=>setYm(monthAdd(first,1).slice(0,7))} disabled={ym>=cur} aria-label="Next month"><span style={{display:'inline-flex',transform:'rotate(180deg)'}}><Ic n="chevleft" size={18}/></span></button>
+        {prog&&prog.done<prog.total&&!cxOff&&<span className="rq-s" style={{marginLeft:8}}>Loading calls {prog.done}/{prog.total}…</span>}
+      </div>
+      {clocks===null?<div className="es"><div className="spin"/></div>
+       :days.length===0?<div className="card rq-empty">No shifts recorded in {monthName}.</div>
+       :(<>
+        <div className="kpis">
+          <div className="kpi"><div className="kpi-ic"><Ic n="calendar" size={20}/></div><b>{days.length}</b><span>Days worked</span></div>
+          <div className="kpi"><div className="kpi-ic p"><Ic n="clock" size={20}/></div><b>{mm(sum(d=>d.shift))}</b><span>Time on shift</span></div>
+          <div className="kpi"><div className="kpi-ic b"><Ic n="coffee" size={20}/></div><b>{mm(sum(d=>d.brk)/days.length)}</b><span>Break time per day</span></div>
+          <div className="kpi"><div className={`kpi-ic ${days.some(d=>d.over)?'r':'g'}`}><Ic n="timer" size={20}/></div><b>{days.filter(d=>d.over).length}</b><span>Days over the break allowance</span></div>
+        </div>
+        {!cxOff&&cxDays.length>0&&(
+          <div className="card acc" style={{marginBottom:22}} id="perf-calls">
+            <div className="card-hd"><div className="card-t">Calls this month</div></div>
+            <div className="cx-tiles pv">
+              <div><span>Calls taken</span><b>{cs(r=>r.calls)}</b></div>
+              <div><span>Talk time</span><b>{CX.fmtDur(cs(r=>r.talk))}</b></div>
+              <div><span>Average call</span><b>{CX.fmtDur(cs(r=>r.calls)?cs(r=>r.talk)/cs(r=>r.calls):0)}</b></div>
+              <div><span>Admin time</span><b>{CX.fmtDur(cs(r=>r.admin))}</b></div>
+              <div className={cs(r=>r.ignored)?'bad':''}><span>Ignored rings</span><b style={cs(r=>r.ignored)?{color:'var(--bad-txt)'}:null}>{cs(r=>r.ignored)}</b></div>
+              <div className={cs(r=>r.short)?'warn':''}><span>Short calls</span><b style={cs(r=>r.short)?{color:'var(--warn-txt)'}:null}>{cs(r=>r.short)}</b></div>
+            </div>
+            <p className="al-sub" style={{margin:'10px 12px 0'}}>You averaged {r1(myPerDay)} calls a day{teamPerDay==null?'.':`; the team averaged ${r1(teamPerDay)} per agent.`}</p>
+          </div>)}
+        <div className="card" style={{padding:'10px 22px 14px'}}>
+          <table className="tbl"><thead><tr><th>Day</th><th>Shift</th><th>Breaks</th><th>Break time</th>{!cxOff&&<><th>Calls</th><th>Talk</th><th>Ignored</th><th>Short</th></>}</tr></thead><tbody>
+            {days.map(d=>{ const r=cx[d.day]; return(
+              <tr key={d.day} data-day={d.day}>
+                <td>{fmtD(d.day+'T12:00:00Z')}{d.day===todayISO()?' · today':''}</td><td className="n">{mm(d.shift)}</td><td className="n">{d.n}</td>
+                <td className="n" style={d.over?{color:'var(--bad-txt)'}:null}>{mm(d.brk)}</td>
+                {!cxOff&&<><td className="n">{r?r.calls:'–'}</td><td className="n">{r?CX.fmtDur(r.talk):'–'}</td><td className="n">{r?r.ignored:'–'}</td><td className="n">{r?r.short:'–'}</td></>}
+              </tr>); })}
+          </tbody></table>
+        </div>
+       </>)}
+    </div>
+  );
+}
+
 /* ── agent: Calls tab ── */
 function AgentCalls({st}){
   return(
@@ -736,14 +875,32 @@ rep("function App() {", SHELL_JS + "function App() {")
 rep("const { useState, useEffect, useRef, useCallback } = React;", "const { useState, useEffect, useRef, useCallback, useLayoutEffect } = React;")
 cut_start = s.index("  const NavItem=({id,n,label,badge})=>(")
 cut_end = s.index("      <div className=\"main\">", cut_start)
-s = s[:cut_start] + """  const sideItems=[...main, {section:'Workflows'}, ...flows];
+s = s[:cut_start] + """  const sideItems=[...main, {section:'More',more:true}, ...flows];
 
   return (
     <div className="shell">
       <Sidebar items={sideItems} active={tab} onGo={go} open={navOpen} onClose={()=>setNavOpen(false)} role="Admin" onLogout={onLogout}/>
 
 """ + s[cut_end:]
-rep("    {id:'clocks',    n:'clock',    label:'Clock In/Out'},\n", "    {id:'clocks',    n:'clock',    label:'Clock In/Out'},\n    {id:'requests',  n:'inbox',    label:'Requests', badge:reqN},\n    {id:'accounts',  n:'users',    label:'Accounts'},\n")
+_a=s.index("  const main=["); _b=s.index("  const exportToday", _a)
+s = s[:_a] + """  const main=[
+    {id:'home',      n:'home',     label:'Home'},
+    {id:'cx',        n:'phone',    label:'3CX'},
+    {id:'live',      n:'activity', label:'Live Rack', badge:counts.live},
+    {id:'clocks',    n:'clock',    label:'Clock In/Out'},
+    {id:'requests',  n:'inbox',    label:'Requests', badge:reqN},
+    {id:'lunch',     n:'utensils', label:'Lunch Schedule'},
+    {id:'settings',  n:'settings', label:'Settings'},
+  ];
+  const flows=[
+    {id:'accounts',  n:'users',    label:'Accounts', more:true},
+    {id:'analytics', n:'bars',     label:'Analytics', more:true},
+    {id:'logs',      n:'list',     label:'All Logs', more:true},
+    {id:'trainees',  n:'users',    label:'Trainees', more:true},
+    {id:'swaps',     n:'swap',     label:'Lunch Swaps', badge:counts.swaps, more:true},
+    {id:'notifs',    n:'bell',     label:'Notifications', more:true},
+  ];
+""" + s[_b:]
 rep("  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n", "  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n  const [reqN]=useReqBadge(user,true,false);\n  useRequestToasts(user,true);\n")
 rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'    &&<AClocks/>}\n          {tab==='requests'  &&<ARequests user={user} name={name}/>}\n          {tab==='accounts'  &&<AAccounts/>}\n")
 
@@ -751,7 +908,7 @@ rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'  
 rep("  const cxs = useAgentCx(name);\n", "  const cxs = useAgentCx(name);\n  const [tab,setTab]=useState('home');\n  const [navOpen,setNavOpen]=useState(false);\n  const [reqN]=useReqBadge(user,false,tab==='requests');\n  useRequestToasts(user,false);\n")
 rep("  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n",
     "  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n"
-    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'calls',n:'phone',label:'Calls'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
+    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'calls',n:'phone',label:'Calls'},{id:'lunch',n:'utensils',label:'Lunch'},{id:'perf',n:'bars',label:'Performance'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
     "  const goTab=id=>{ setTab(id); setNavOpen(false); window.scrollTo({top:0}); };\n")
 rep('''    <div className="main solo" style={{minHeight:'100vh'}}>
       <header className="top">
@@ -774,6 +931,39 @@ rep('''        <AgentCallStats st={cxs}/>
       {confirmOut&&(''', '''        </>)}
         {tab==='calls'    &&<AgentCalls st={cxs}/>}
         {tab==='requests' &&<AgentRequests user={user} name={name}/>}
+        {tab==='lunch'&&(()=>{
+          const mins=x=>{ const [h,m]=x.split(':').map(Number); return h*60+m; };
+          const slot=trainee?{from:team.lunch,to:addMin(team.lunch,60)}:li?.group?li.slot:null;
+          const nowM=mins(hhmm(nowA)), a=slot?mins(slot.from):0, z=slot?mins(slot.to):0;
+          const lm=x=>x>=60?`${Math.floor(x/60)}h ${x%60}m`:`${x}m`;
+          const when=!slot?'':nowM<a?`Starts in ${lm(a-nowM)}`:nowM<z?`Now, ends in ${lm(z-nowM)}`:'Finished for today';
+          const Grp=({g,names})=>(
+            <div className={`lg${li?.group===g?' mine':''}`}>
+              <div className="lg-h"><b>Group {g}</b><span>{li?.slots?.[g]?`${li.slots[g].from}–${li.slots[g].to}`:''}</span></div>
+              {(names||[]).length===0?<div className="rq-s">Nobody yet</div>:(names||[]).map(n=><div key={n} className={`lg-n${n===name?' me':''}`}>{n}{n===name?' · you':''}</div>)}
+            </div>);
+          return(
+            <div id="tab-lunch">
+              <div className="tab-h"><h1>Lunch</h1><p>Your lunch group today, and swapping with a colleague.</p></div>
+              {!slot?<div className="card rq-empty">You are not in a lunch group today.</div>:(
+                <div className="grid2">
+                  <div className="card" id="lunch-main" style={{padding:"24px 28px"}}>
+                    <div className="card-hd"><div className="card-t">Your lunch</div></div>
+                    <div className="timer-big idle" style={{fontSize:56}}>{slot.from}–{slot.to}</div>
+                    <div className="timer-sub">{trainee?'Trainee lunch':`Group ${li.group}`} · {when}</div>
+                    {!trainee&&<div className="acts" style={{marginTop:22}}>
+                      {!outgoingSwap&&<button className="bp" onClick={()=>setShowSwapModal(true)} disabled={!isClockedIn} title={isClockedIn?'':'Clock in first'}><Ic n="swap" size={16}/> Swap lunch</button>}
+                      {outgoingSwap&&<><span className="lunch-pill"><Ic n="timer" size={15}/> Waiting for {outgoingSwap.to_name} to answer</span><button className="bs" onClick={cancelSwapRequest}>Cancel request</button></>}
+                    </div>}
+                  </div>
+                  {!trainee&&<div className="card" id="lunch-groups" style={{padding:"24px 28px"}}>
+                    <div className="card-hd"><div className="card-t">Today's groups</div></div>
+                    <div className="lg-wrap"><Grp g="A" names={li.allA}/><Grp g="B" names={li.allB}/></div>
+                  </div>}
+                </div>)}
+            </div>);
+        })()}
+        {tab==='perf'     &&<AgentPerformance user={user} name={name} team={team}/>}
       </div>
       </div>
 
@@ -784,10 +974,14 @@ rep('''    <div className="auth-bg">
       <div className="auth-card">''')
 
 i = s.rindex('</style>')
-s = s[:i] + "#tab-calls #agent-calls{margin-top:0!important}\n.top-title{font-size:15px;color:var(--mut)}\n.acc-pw{display:flex;gap:8px}.acc-pw .fi{flex:1;min-width:0}.sb-out:hover{color:#ff8a9a}\n" + s[i:]
+s = s[:i] + "#tab-calls #agent-calls{margin-top:0!important}\n.top-title{font-size:15px;color:var(--mut)}\n.top-ic{margin-left:auto}.bm-w{fill:#f4f5ff}[data-theme='light'] .wm-icon .bm-w{fill:#aab4ff;stroke:#aab4ff}\n.lg-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}.lg{background:var(--tile);border-radius:16px;padding:14px 16px}.lg.mine{outline:2px solid var(--sb-acc)}.lg-h{display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px}.lg-h span{color:var(--mut)}.lg-n{padding:4px 0;font-size:14.5px}.lg-n.me{font-weight:600}\n.pf-nav{display:flex;align-items:center;gap:12px;margin-bottom:20px;font-size:17px}.pf-nav b{min-width:150px;text-align:center;font-weight:500}\n.sb-logo{background:none!important;box-shadow:none!important;width:46px;height:46px}\n.acc-pw{display:flex;gap:8px}.acc-pw .fi{flex:1;min-width:0}.sb-out:hover{color:#ff8a9a}\n" + s[i:]
 
-s = s.replace('<div className="wm-icon"><Ic n="tower" size={16} col="#c9c9d2" sw={2}/></div>', '<div className="wm-icon"><Ic n="brand" size={17} col="#c9c9d2" sw={2}/></div>')
-FAV = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235266eb'/%3E%3Cstop offset='1' stop-color='%238e9cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='white' stroke-width='2.4'/%3E%3Cline x1='13.3' y1='12.5' x2='13.3' y2='19.5' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3Cline x1='18.7' y1='12.5' x2='18.7' y2='19.5' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"
+rep("  const [hide,setHide]=useState(false);\n", "  const hide=false;\n")
+rep("  useEffect(()=>{ document.body.classList.toggle('privacy',hide); return()=>document.body.classList.remove('privacy'); },[hide]);\n", "")
+s = re.sub(r"[ ]*<button className=\{`icb hide-s[^\n]*setHide[^\n]*\n", "", s)
+assert 'setHide' not in s
+s = s.replace('<div className="wm-icon"><Ic n="tower" size={16} col="#c9c9d2" sw={2}/></div>', '<div className="wm-icon"><BrandMark size={20}/></div>')
+FAV = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a3aeff'/%3E%3Cstop offset='1' stop-color='%235266eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='%231c1d26'/%3E%3Cpath d='M4.3 14.8L4.3 24.6L10.4 24.6Z' fill='%233b47a8' stroke='%233b47a8' stroke-width='.8' stroke-linejoin='round'/%3E%3Cpath d='M4.6 14.5L16.6 14.6L19.1 18.2L13.2 27.8Z' fill='%23f4f5ff' stroke='%23f4f5ff' stroke-width='.8' stroke-linejoin='round'/%3E%3Cpath d='M27.7 4.3L26.1 27.8L13.4 27.8Z' fill='url(%23g)' stroke='%236b7cf0' stroke-width='.8' stroke-linejoin='round'/%3E%3C/svg%3E"
 s, _n = re.subn(r'<link rel="icon"[^>]*/>', lambda m: '<link rel="icon" type="image/svg+xml" href="' + FAV + '"/>', s)
 assert _n == 1, _n
 

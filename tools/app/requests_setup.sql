@@ -9,7 +9,7 @@ create table if not exists public.bt_requests (
   id          bigint generated always as identity primary key,
   user_id     uuid        not null default auth.uid(),
   agent_name  text        not null,
-  kind        text        not null default 'pto' check (kind in ('pto', 'sick', 'shift', 'other')),
+  kind        text        not null default 'pto' check (kind in ('pto', 'document', 'other', 'sick', 'shift')),
   start_date  date,
   end_date    date,
   note        text        check (note is null or length(note) <= 2000),
@@ -20,6 +20,10 @@ create table if not exists public.bt_requests (
   created_at  timestamptz not null default now(),
   check (end_date is null or start_date is null or end_date >= start_date)
 );
+-- already ran an earlier version? this lets the table accept document requests
+alter table public.bt_requests drop constraint if exists bt_requests_kind_check;
+alter table public.bt_requests add constraint bt_requests_kind_check check (kind in ('pto', 'document', 'other', 'sick', 'shift'));
+
 create index if not exists bt_requests_user   on public.bt_requests (user_id, created_at desc);
 create index if not exists bt_requests_status on public.bt_requests (status, start_date);
 

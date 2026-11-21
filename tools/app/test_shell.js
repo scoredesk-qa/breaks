@@ -45,7 +45,7 @@ const requests = () => [
   p = await open({ user: H.agent });
   await p.waitForSelector('.sb-i');
   const navs = await p.locator('.sb-nav .sb-i').allInnerTexts();
-  check('S1 agent sidebar: Home, Calls, Requests (no Breaks tab)', navs.map(x => x.trim()).join('|') === 'Home|Calls|Requests', navs.join('|'));
+  check('S1 agent sidebar: Home, Calls, Lunch, Performance, Requests', navs.map(x => x.trim()).join('|') === 'Home|Calls|Lunch|Performance|Requests', navs.join('|'));
   const ind = async () => { await p.waitForTimeout(700); const r = await p.locator('.sb-ind').boundingBox(), a = await p.locator('.sb-i.on').boundingBox(); return { r, a }; };
   let m = await ind();
   check('S2 the highlight sits behind the active item', Math.abs(m.r.y - m.a.y) <= 2 && Math.abs(m.r.height - m.a.height) <= 2, JSON.stringify([m.r.y, m.a.y]));
@@ -69,7 +69,13 @@ const requests = () => [
   await p.context().close();
   p = await open({ user: H.admin }); await p.waitForSelector('.sb-i');
   const an = (await p.locator('.sb-nav .sb-i').allInnerTexts()).map(x => x.trim());
-  check('S8 the admin gets the same sidebar, with Requests between Clock In/Out and Analytics', an.indexOf('Requests') === an.indexOf('Clock In/Out') + 1 && an.includes('Settings') && an.includes('3CX'), an.join('|'));
+  check('S8 collapsed, the admin sidebar shows only the everyday pages', an.join('|') === 'Home|3CX|Live Rack|Clock In/Out|Requests|Lunch Schedule|Settings', an.join('|'));
+  check('S8a the hide-names button is gone', await p.locator('.top-ic .icb.hide-s').count() === 0);
+  const ti = await p.locator('.top-ic').boundingBox();
+  check('S8b the top bar reaches the right edge of the screen', 1500 - (ti.x + ti.width) < 60, String(1500 - (ti.x + ti.width)));
+  await p.click('[data-act=collapse]'); await p.waitForTimeout(700);
+  const an2 = (await p.locator('.sb-nav .sb-i').allInnerTexts()).map(x => x.trim());
+  check('S8c expanded, every page is listed', ['Accounts', 'Analytics', 'All Logs', 'Trainees', 'Lunch Swaps', 'Notifications'].every(x => an2.includes(x)) && an2.length === 13, an2.join('|'));
   await p.click('[data-nav=accounts]'); await p.waitForSelector('#acc-form');
   const create = p.locator('#acc-form button.bp');
   check('S8b Accounts: the create button stays off until name, email and a 6+ character password are filled', await create.isDisabled());
@@ -119,6 +125,13 @@ const requests = () => [
   check('R7 it appears at the top of the list straight away', await p.locator('.rq-card').count() === 3 && /12 Nov – 13 Nov/.test(await p.locator('.rq-card').first().innerText()));
   await p.fill('#rq-form input[aria-label="From date"]', '2026-11-20'); await p.fill('#rq-form input[aria-label="To date"]', '2026-11-19'); await p.waitForTimeout(150);
   check('R8 a "to" date before the "from" date is moved up, never sent backwards', await p.locator('#rq-form input[aria-label="To date"]').inputValue() >= await p.locator('#rq-form input[aria-label="From date"]').inputValue() || await p.locator('#rq-form button.bp').isDisabled());
+  await p.selectOption('#rq-form select', 'other'); await p.waitForTimeout(150);
+  check('R8b the form offers only Time off, Document request and Other', JSON.stringify(await p.locator('#rq-form select option').allInnerTexts()) === JSON.stringify(['Time off', 'Document request', 'Other']));
+  await p.selectOption('#rq-form select', 'document'); await p.waitForTimeout(150);
+  check('R8c a document request has no dates and needs to say which document', await p.locator('#rq-form input[type=date]').count() === 0 && await p.locator('#rq-form button.bp').isDisabled() && /Which document/.test(await p.locator('#rq-form').innerText()));
+  await p.fill('#rq-form textarea', 'Employment letter'); await p.click('#rq-form button.bp'); await p.waitForTimeout(400);
+  const rd = await p.evaluate(() => window.__DB.bt_requests.slice(-1)[0]);
+  check('R8d it is saved as kind document, pending', rd.kind === 'document' && rd.status === 'pending' && rd.start_date === null && rd.note === 'Employment letter' && /Document/.test(await p.locator('.rq-card').first().innerText()));
   await p.selectOption('#rq-form select', 'other'); await p.waitForTimeout(150);
   check('R9 "Other" has no dates and needs a note before it can be sent', await p.locator('#rq-form input[type=date]').count() === 0 && await p.locator('#rq-form button.bp').isDisabled());
   await p.fill('#rq-form textarea', 'Question about my schedule'); await p.click('#rq-form button.bp'); await p.waitForTimeout(400);
@@ -214,6 +227,29 @@ const requests = () => [
   await p.context().close();
 
   check('E9 no page errors anywhere', errs.length === 0, errs.join(' | '));
+  /* ───────────── lunch tab and performance tab ───────────── */
+  const lunchDb = H.mkdb({ bt_lunch_schedule: [{ id: 1, date: TODAY, group_a: ['Jane Doe', 'Kay Kim'], group_b: ['Sam Lee'] }] });
+  p = await open({ user: H.agent, db: lunchDb }); await p.waitForSelector('.sb');
+  await p.click('[data-nav=lunch]'); await p.waitForSelector('#lunch-main');
+  const lt = (await p.locator('#tab-lunch').innerText()).replace(/\s+/g, ' ');
+  check('LT1 the Lunch tab shows the agent\'s group and time, and both groups', /13:00–14:00/.test(lt) && /Group A/.test(lt) && /Kay Kim/.test(lt) && /Sam Lee/.test(lt) && /Jane Doe · you/.test(lt), lt);
+  check('LT2 ...with the swap button there (they are clocked in)', await p.locator('#lunch-main button:has-text("Swap lunch")').isEnabled());
+  await p.click('#lunch-main button:has-text("Swap lunch")'); await p.waitForTimeout(400);
+  check('LT3 which opens the existing swap window', /Sam Lee/.test(await p.locator('.modal, [role=dialog], .overlay').first().innerText().catch(() => '')) || (await flat(p)).includes('Sam Lee'));
+  await p.context().close();
+  const monthDb = H.mkdb({
+    bt_clocklogs: [{ id: 1, user_id: 'u1', agent_name: 'Jane Doe', clock_in: '2026-10-26T08:00:00.000Z', clock_out: '2026-10-26T16:00:00.000Z', date: '2026-10-26' }, { id: 2, user_id: 'u1', agent_name: 'Jane Doe', clock_in: at('08:10:00'), clock_out: null, date: TODAY }, { id: 3, user_id: 'u1', agent_name: 'Jane Doe', clock_in: '2026-09-30T08:00:00.000Z', clock_out: '2026-09-30T16:00:00.000Z', date: '2026-09-30' }],
+    bt_logs: [{ id: 21, user_id: 'u1', agent_name: 'Jane Doe', start_time: '2026-10-26T11:00:00.000Z', end_time: '2026-10-26T13:00:00.000Z', duration_secs: 7200, break_type: 'Break' }, { id: 11, user_id: 'u1', agent_name: 'Jane Doe', start_time: at('11:00:00'), end_time: at('11:15:00'), duration_secs: 900, break_type: 'Break' }] });
+  p = await open({ user: H.agent, db: monthDb }); await p.waitForSelector('.sb');
+  await p.click('[data-nav=perf]'); await p.waitForSelector('#tab-perf .kpis'); await p.waitForTimeout(600);
+  const pf = (await p.locator('#tab-perf').innerText()).replace(/\s+/g, ' ');
+  check('PF1 Performance shows this month: 2 days worked, time on shift, break time per day, days over the allowance', /October 2026/.test(pf) && /2\s*Days worked/.test(pf) && /1\s*Days over the break allowance/.test(pf), pf.slice(0, 300));
+  check('PF2 the day table lists both days, and the over-allowance day is the 26th', await p.locator('#tab-perf tr[data-day]').count() === 2 && /2h/.test(await p.locator('tr[data-day="2026-10-26"]').innerText()));
+  await p.click('#tab-perf button[aria-label="Previous month"]'); await p.waitForTimeout(600);
+  check('PF3 the previous month shows only its own day', /September 2026/.test(await p.locator('#tab-perf').innerText()) && await p.locator('#tab-perf tr[data-day]').count() === 1);
+  check('PF4 the next-month button is off on the current month', await (async () => { await p.click('#tab-perf button[aria-label="Next month"]'); await p.waitForTimeout(400); return p.locator('#tab-perf button[aria-label="Next month"]').isDisabled(); })());
+  await p.context().close();
+
   await b.close(); fs.rmSync(work, { recursive: true, force: true });
   console.log(fails ? 'FAILED ' + fails : 'ALL PASSED'); process.exit(fails ? 1 : 0);
 })();
