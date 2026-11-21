@@ -856,17 +856,6 @@ function AgentPerformance({user,name,team}){
   );
 }
 
-/* ── agent: Calls tab ── */
-function AgentCalls({st}){
-  return(
-    <div id="tab-calls">
-      <div className="tab-h"><h1>Calls</h1><p>Your calls today, from the phone system.</p></div>
-      {st&&st.me&&!st.off&&!st.empty?<AgentCallStats st={st}/>
-        :<div className="card rq-empty">{st===null?'Loading your calls…':'No call activity recorded for you today yet.'}</div>}
-    </div>
-  );
-}
-
 """.replace('__REQ_SQL__', req_sql)
 rep("function App() {", SHELL_JS + "function App() {")
 
@@ -905,10 +894,10 @@ rep("  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lu
 rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'    &&<AClocks/>}\n          {tab==='requests'  &&<ARequests user={user} name={name}/>}\n          {tab==='accounts'  &&<AAccounts/>}\n")
 
 # ═════════════════════════════ 5. agent shell: tabs ═════════════════════════════
-rep("  const cxs = useAgentCx(name);\n", "  const cxs = useAgentCx(name);\n  const [tab,setTab]=useState('home');\n  const [navOpen,setNavOpen]=useState(false);\n  const [reqN]=useReqBadge(user,false,tab==='requests');\n  useRequestToasts(user,false);\n")
+rep("  const cxs = useAgentCx(name);\n", "  const [tab,setTab]=useState('home');\n  const [navOpen,setNavOpen]=useState(false);\n  const [reqN]=useReqBadge(user,false,tab==='requests');\n  useRequestToasts(user,false);\n")
 rep("  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n",
     "  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n"
-    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'calls',n:'phone',label:'Calls'},{id:'lunch',n:'utensils',label:'Lunch'},{id:'perf',n:'bars',label:'Performance'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
+    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'lunch',n:'utensils',label:'Lunch'},{id:'perf',n:'bars',label:'Performance'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
     "  const goTab=id=>{ setTab(id); setNavOpen(false); window.scrollTo({top:0}); };\n")
 rep('''    <div className="main solo" style={{minHeight:'100vh'}}>
       <header className="top">
@@ -929,7 +918,6 @@ rep('''        <AgentCallStats st={cxs}/>
       </div>
 
       {confirmOut&&(''', '''        </>)}
-        {tab==='calls'    &&<AgentCalls st={cxs}/>}
         {tab==='requests' &&<AgentRequests user={user} name={name}/>}
         {tab==='lunch'&&(()=>{
           const mins=x=>{ const [h,m]=x.split(':').map(Number); return h*60+m; };
