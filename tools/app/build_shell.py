@@ -731,131 +731,6 @@ function AAccounts(){
   );
 }
 
-/* ── agent: Performance tab (a month at a glance) ── */
-const _cxDayCache=new Map();
-function cxAgentDay(data,name,day){
-  const tz=clockOff(), cfg=_cxCfg, now=appNow();
-  const rows=CX.rowsFromStatusLog([...(data.mine||[]),...(data.team||[])]);
-  if(!rows.length) return null;
-  const [from,to]=CX.dayRange(day,tz);
-  const R=CX.analyze(rows,{day,now:Math.min(now,to),...cfg,tzOffsetHours:0,dayOffsetHours:tz});
-  const key=CX.nameKey(name);
-  const me=Object.values(R.agents).find(a=>CX.nameKey(a.agent)===key);
-  if(!me) return null;
-  const working=a=>Object.keys(a.statusSecs).some(st=>!['off','hol'].includes(cxCat(st)));
-  const others=Object.values(R.agents).filter(a=>a.ext!==me.ext&&working(a));
-  return {calls:me.calls,talk:me.callSecs,ignored:me.ignored,short:me.shortCalls,admin:me.adminSecs,team:others.length?others.reduce((t,a)=>t+a.calls,0)/others.length:null};
-}
-async function cxFetchDay(name,day){
-  const k=name+'|'+day, isToday=day===todayISO();
-  if(!isToday&&_cxDayCache.has(k)) return _cxDayCache.get(k);
-  const [from,to]=CX.dayRange(day,clockOff());
-  const {data,error}=(await run(SB.rpc('cx_team_day',{p_from:new Date(from-36*3600000).toISOString(),p_to:new Date(to).toISOString(),p_name:name})))||{};
-  if(error||!data||Array.isArray(data)) return {off:true};
-  let r=null; try{ r=cxAgentDay(data,name,day); }catch(e){ r=null; }
-  if(!isToday) _cxDayCache.set(k,r);
-  return r;
-}
-function AgentPerformance({user,name,team}){
-  const cur=todayISO().slice(0,7);
-  const [ym,setYm]=useState(cur);
-  const [clocks,setClocks]=useState(null);
-  const [logs,setLogs]=useState([]);
-  const [cx,setCx]=useState({});
-  const [prog,setProg]=useState(null);
-  const [cxOff,setCxOff]=useState(false);
-  const [now,setNow]=useState(appNow());
-  useEffect(()=>{ const id=setInterval(()=>setNow(appNow()),30000); return()=>clearInterval(id); },[]);
-  const first=ym+'-01', nextFirst=monthAdd(first,1);
-  useEffect(()=>{
-    let dead=false;
-    (async()=>{
-      setClocks(null); setCx({}); setCxOff(false); setProg(null);
-      const {data:c}=await run(SB.from('bt_clocklogs').select('*').eq('user_id',user.id).gte('date',first).lt('date',nextFirst).order('date'));
-      const off=clockOff()*3600000, s0=new Date(Date.parse(first+'T00:00:00Z')-off).toISOString(), s1=new Date(Date.parse(nextFirst+'T00:00:00Z')-off).toISOString();
-      const {data:l}=await run(SB.from('bt_logs').select('*').eq('user_id',user.id).gte('start_time',s0).lt('start_time',s1));
-      if(dead) return;
-      setClocks(c||[]); setLogs(l||[]);
-      const days=[...new Set((c||[]).map(x=>x.date))].filter(d=>d<=todayISO());
-      let i=0,done=0; setProg({done:0,total:days.length});
-      const worker=async()=>{
-        while(i<days.length&&!dead){
-          const d=days[i++], r=await cxFetchDay(name,d);
-          if(dead) return;
-          if(r&&r.off) setCxOff(true); else setCx(p=>({...p,[d]:r}));
-          setProg({done:++done,total:days.length});
-        }
-      };
-      await Promise.all([worker(),worker(),worker()]);
-    })();
-    return()=>{ dead=true; };
-  },[ym,user.id,name]);
-  const mm=x=>{ const m=Math.round(x/60), h=Math.floor(m/60); return h?`${h}h${m%60?` ${m%60}m`:''}`:`${m}m`; };
-  const byDay={};
-  (clocks||[]).forEach(c=>{
-    const end=c.clock_out?new Date(c.clock_out).getTime():(c.date===todayISO()?now:null);
-    const sec=c.clock_in&&end?Math.max(0,Math.round((end-new Date(c.clock_in).getTime())/1000)):0;
-    const d=byDay[c.date]=byDay[c.date]||{day:c.date,shift:0,brk:0,n:0,open:!c.clock_out&&c.date===todayISO()};
-    d.shift+=sec;
-  });
-  logs.forEach(l=>{ const w=wall(l.start_time), k=`${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; if(!byDay[k]) return; byDay[k].brk+=secOf(l,now); byDay[k].n++; });
-  const days=Object.values(byDay).sort((a,b)=>b.day.localeCompare(a.day));
-  const allow=team.allowanceMin*60;
-  days.forEach(d=>{ d.earned=d.open?allow:Math.min(allow,allow*(d.shift/3600)/team.fullShiftH); d.over=d.brk>d.earned+59; });
-  const sum=f=>days.reduce((t,d)=>t+f(d),0);
-  const cxDays=days.map(d=>cx[d.day]).filter(Boolean);
-  const cs=f=>cxDays.reduce((t,r)=>t+f(r),0);
-  const teamDays=cxDays.filter(r=>r.team!=null);
-  const myPerDay=cxDays.length?cs(r=>r.calls)/cxDays.length:0;
-  const teamPerDay=teamDays.length?teamDays.reduce((t,r)=>t+r.team,0)/teamDays.length:null;
-  const monthName=new Date(first+'T00:00:00Z').toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'});
-  const r1=x=>Math.round(x*10)/10;
-  return(
-    <div id="tab-perf">
-      <div className="tab-h"><h1>Performance</h1><p>Your month at a glance.</p></div>
-      <div className="pf-nav">
-        <button className="icb" onClick={()=>setYm(monthAdd(first,-1).slice(0,7))} aria-label="Previous month"><Ic n="chevleft" size={18}/></button>
-        <b>{monthName}</b>
-        <button className="icb" onClick={()=>setYm(monthAdd(first,1).slice(0,7))} disabled={ym>=cur} aria-label="Next month"><span style={{display:'inline-flex',transform:'rotate(180deg)'}}><Ic n="chevleft" size={18}/></span></button>
-        {prog&&prog.done<prog.total&&!cxOff&&<span className="rq-s" style={{marginLeft:8}}>Loading calls {prog.done}/{prog.total}…</span>}
-      </div>
-      {clocks===null?<div className="es"><div className="spin"/></div>
-       :days.length===0?<div className="card rq-empty">No shifts recorded in {monthName}.</div>
-       :(<>
-        <div className="kpis">
-          <div className="kpi"><div className="kpi-ic"><Ic n="calendar" size={20}/></div><b>{days.length}</b><span>Days worked</span></div>
-          <div className="kpi"><div className="kpi-ic p"><Ic n="clock" size={20}/></div><b>{mm(sum(d=>d.shift))}</b><span>Time on shift</span></div>
-          <div className="kpi"><div className="kpi-ic b"><Ic n="coffee" size={20}/></div><b>{mm(sum(d=>d.brk)/days.length)}</b><span>Break time per day</span></div>
-          <div className="kpi"><div className={`kpi-ic ${days.some(d=>d.over)?'r':'g'}`}><Ic n="timer" size={20}/></div><b>{days.filter(d=>d.over).length}</b><span>Days over the break allowance</span></div>
-        </div>
-        {!cxOff&&cxDays.length>0&&(
-          <div className="card acc" style={{marginBottom:22}} id="perf-calls">
-            <div className="card-hd"><div className="card-t">Calls this month</div></div>
-            <div className="cx-tiles pv">
-              <div><span>Calls taken</span><b>{cs(r=>r.calls)}</b></div>
-              <div><span>Talk time</span><b>{CX.fmtDur(cs(r=>r.talk))}</b></div>
-              <div><span>Average call</span><b>{CX.fmtDur(cs(r=>r.calls)?cs(r=>r.talk)/cs(r=>r.calls):0)}</b></div>
-              <div><span>Admin time</span><b>{CX.fmtDur(cs(r=>r.admin))}</b></div>
-              <div className={cs(r=>r.ignored)?'bad':''}><span>Ignored rings</span><b style={cs(r=>r.ignored)?{color:'var(--bad-txt)'}:null}>{cs(r=>r.ignored)}</b></div>
-              <div className={cs(r=>r.short)?'warn':''}><span>Short calls</span><b style={cs(r=>r.short)?{color:'var(--warn-txt)'}:null}>{cs(r=>r.short)}</b></div>
-            </div>
-            <p className="al-sub" style={{margin:'10px 12px 0'}}>You averaged {r1(myPerDay)} calls a day{teamPerDay==null?'.':`; the team averaged ${r1(teamPerDay)} per agent.`}</p>
-          </div>)}
-        <div className="card" style={{padding:'10px 22px 14px'}}>
-          <table className="tbl"><thead><tr><th>Day</th><th>Shift</th><th>Breaks</th><th>Break time</th>{!cxOff&&<><th>Calls</th><th>Talk</th><th>Ignored</th><th>Short</th></>}</tr></thead><tbody>
-            {days.map(d=>{ const r=cx[d.day]; return(
-              <tr key={d.day} data-day={d.day}>
-                <td>{fmtD(d.day+'T12:00:00Z')}{d.day===todayISO()?' · today':''}</td><td className="n">{mm(d.shift)}</td><td className="n">{d.n}</td>
-                <td className="n" style={d.over?{color:'var(--bad-txt)'}:null}>{mm(d.brk)}</td>
-                {!cxOff&&<><td className="n">{r?r.calls:'–'}</td><td className="n">{r?CX.fmtDur(r.talk):'–'}</td><td className="n">{r?r.ignored:'–'}</td><td className="n">{r?r.short:'–'}</td></>}
-              </tr>); })}
-          </tbody></table>
-        </div>
-       </>)}
-    </div>
-  );
-}
-
 /* ── agent: Calls tab ── */
 function AgentCalls({st}){
   return(
@@ -908,7 +783,7 @@ rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'  
 rep("  const cxs = useAgentCx(name);\n", "  const cxs = useAgentCx(name);\n  const [tab,setTab]=useState('home');\n  const [navOpen,setNavOpen]=useState(false);\n  const [reqN]=useReqBadge(user,false,tab==='requests');\n  useRequestToasts(user,false);\n")
 rep("  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n",
     "  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n"
-    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'calls',n:'phone',label:'Calls'},{id:'lunch',n:'utensils',label:'Lunch'},{id:'perf',n:'bars',label:'Performance'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
+    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'calls',n:'phone',label:'Calls'},{id:'lunch',n:'utensils',label:'Lunch'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
     "  const goTab=id=>{ setTab(id); setNavOpen(false); window.scrollTo({top:0}); };\n")
 rep('''    <div className="main solo" style={{minHeight:'100vh'}}>
       <header className="top">
@@ -963,7 +838,6 @@ rep('''        <AgentCallStats st={cxs}/>
                 </div>)}
             </div>);
         })()}
-        {tab==='perf'     &&<AgentPerformance user={user} name={name} team={team}/>}
       </div>
       </div>
 
