@@ -45,14 +45,14 @@ const requests = () => [
   p = await open({ user: H.agent });
   await p.waitForSelector('.sb-i');
   const navs = await p.locator('.sb-nav .sb-i').allInnerTexts();
-  check('S1 agent sidebar: Home, Lunch, Performance, Requests', navs.map(x => x.trim()).join('|') === 'Home|Lunch|Performance|Requests', navs.join('|'));
+  check('S1 agent sidebar: Home, Calls, Lunch, Performance, Requests', navs.map(x => x.trim()).join('|') === 'Home|Calls|Lunch|Performance|Requests', navs.join('|'));
   const ind = async () => { await p.waitForTimeout(700); const r = await p.locator('.sb-ind').boundingBox(), a = await p.locator('.sb-i.on').boundingBox(); return { r, a }; };
   let m = await ind();
   check('S2 the highlight sits behind the active item', Math.abs(m.r.y - m.a.y) <= 2 && Math.abs(m.r.height - m.a.height) <= 2, JSON.stringify([m.r.y, m.a.y]));
   const y0 = m.r.y;
-  await p.click('[data-nav=lunch]'); m = await ind();
+  await p.click('[data-nav=calls]'); m = await ind();
   check('S3 clicking another item slides the highlight to it (animated move)', m.r.y > y0 + 40 && Math.abs(m.r.y - m.a.y) <= 2, y0 + ' -> ' + m.r.y);
-  check('S4 the page changes with the tab: Lunch opens the lunch page', await p.locator('#tab-lunch').count() === 1 && await p.locator('#break-left').count() === 0);
+  check('S4 the page changes with the tab: Calls opens the calls page', await p.locator('#tab-calls').count() === 1 && await p.locator('#break-left').count() === 0);
   const w0 = (await p.locator('.sb').boundingBox()).width;
   check('S5 the sidebar starts minimised (icons only) until the user changes it', w0 < 100 && (await p.locator('.sb.col').count()) === 1, String(w0));
   await p.click('[data-act=collapse]'); await p.waitForTimeout(700);
@@ -101,6 +101,8 @@ const requests = () => [
   /* ───────────── agent: home / calls ───────────── */
   p = await open({ user: H.agent }); await p.waitForSelector('#break-left');
   check('A1 Home keeps the basics: greeting, break timer, break time left, shift / lunch / team cards', /Welcome, Jane/.test(await flat(p)) && await p.locator('.timer').count() === 1 && await p.locator('.grid3').count() === 1 && await p.locator('#agent-calls').count() === 0);
+  await p.click('[data-nav=calls]'); await p.waitForTimeout(400);
+  check('A2 the Calls tab says when there is nothing to show yet', /No call activity recorded for you today/.test(await flat(p)));
   await p.context().close();
 
   /* ───────────── agent: requests ───────────── */

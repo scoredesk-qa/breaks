@@ -77,6 +77,18 @@ const mkdb = (extra = {}) => Object.assign({
   const bar = await p.locator('#break-left .al-bar i').evaluate(e => e.style.width), mark = await p.locator('#break-left .al-bar b').evaluate(e => e.style.left);
   check('B5 the bar shows 25/105 used (23.8%) and a marker at the 62.5% earned', Math.abs(parseFloat(bar) - 23.81) < 0.2 && /62\.5/.test(mark), bar + ' / ' + mark);
 
+  await p.click('[data-nav=calls]'); await p.waitForSelector('#agent-calls');
+  const calls = await p.locator('#agent-calls').innerText(), cf = calls.replace(/\s+/g, ' ');
+  check('C1 call stats: 3 calls, talk time 15m 30s, average 5m 10s', /Calls taken 3/.test(cf) && /Talk time 15m 30s/.test(cf) && /Average call 5m 10s/.test(cf), cf.slice(0, 200));
+  check('C2 admin time 10m (Do Not Disturb - ADMIN counts as admin), 1 ignored ring, 1 short call', /Admin time 10m 00s/.test(cf) && /Ignored rings 1/.test(cf) && /Short calls\s*(warning )?1/i.test(cf));
+  check('C3 the short-call tile is marked with a Warning flag (no long explanation box)', await p.locator('#agent-calls .cx-tiles > div.warn').count() === 1 && /Short calls\s*Warning/i.test(calls) && !/can look like dropped calls/.test(cf));
+  check('C4 the ignored-rings tile is marked, with no explanation box either', await p.locator('#agent-calls .cx-tiles > div.bad').count() === 1 && !/the phone rang for/.test(cf));
+  check('C5 per-hour chart: 7 hours (07:00-13:00), one bar group each', await p.locator('#agent-calls .hb').count() === 7, String(await p.locator('#agent-calls .hb').count()));
+  const titles = await p.locator('#agent-calls .hb title').allTextContents();
+  check('C6 09:00 hour: you 2 calls, team average 1.5 per agent', titles[2] === '09:00–10:00: you 2 calls · team average 1.5 per agent', titles[2]);
+  check('C7 10:00 hour: you 1 call, team average 1 per agent', titles[3] === '10:00–11:00: you 1 call · team average 1 per agent', titles[3]);
+  check('C8 an hour with nobody else logged in has no average ("–"), and the current hour says "so far"', /team average – per agent/.test(titles[0]) && /\(so far\)/.test(titles[6]), titles[0] + ' | ' + titles[6]);
+  check('C9 the summary compares you with the team: team average 2.5 calls per agent, above in 1 of 4 hours', /the team average is 2\.5 per agent/.test(cf) && /above the average in 1 of 4 hours and below it in 0/.test(cf), cf.slice(-220));
   check('C10 the agent only ever got other people\'s rows without names ("Colleague N"), and none of those names appear on the page', !/Colleague/.test(t));
   check('C11 no page errors', errs.length === 0, errs.join(' | '));
   await p.screenshot({ path: path.join(mods, 'app_agent.png'), fullPage: true });
@@ -105,8 +117,8 @@ const mkdb = (extra = {}) => Object.assign({
   await p.context().close();
   const cfgdb = mkdb({ bt_settings: [settingsRow({ break_allowance_min: 90, full_shift_hours: 7.5, cx_config: { shortCallSec: 20, timelineStart: 8, timelineEnd: 12 } })] });
   p = await open({ user: agent, db: cfgdb });
-  await p.waitForSelector('#break-left'); const s1 = (await p.locator('#break-left').innerText()).replace(/\s+/g, ' '); t = await flat(p);
-  check('S1 the admin\'s allowance (90 min per 7.5 h) and 3CX limits (short call = 20 s, hours 08-12) reach the agent page: earned 1h after 5 h, full day 1h 30m, no short-call warning, 4 hour bars', /Earned so far 1h(?! \d)/.test(s1) && /Full-day allowance 1h 30m/.test(s1));
+  await p.waitForSelector('#break-left'); const s1 = (await p.locator('#break-left').innerText()).replace(/\s+/g, ' '); await p.click('[data-nav=calls]'); await p.waitForSelector('#agent-calls'); t = await flat(p);
+  check('S1 the admin\'s allowance (90 min per 7.5 h) and 3CX limits (short call = 20 s, hours 08-12) reach the agent page: earned 1h after 5 h, full day 1h 30m, no short-call warning, 4 hour bars', /Earned so far 1h(?! \d)/.test(s1) && /Full-day allowance 1h 30m/.test(s1) && await p.locator('#agent-calls .cx-tiles > div.warn').count() === 0 && await p.locator('#agent-calls .hb').count() === 4, String(await p.locator('#agent-calls .hb').count()));
   await p.context().close();
 
   // lunch group: visible without scrolling
@@ -119,7 +131,7 @@ const mkdb = (extra = {}) => Object.assign({
   check('L2 ...and it is inside the first screen (no scrolling)', ly < 400 && ly + 40 < vh, String(Math.round(ly)));
   check('L3 the existing Swap lunch button is still there, once (not duplicated by the strip)', await p.locator('button:has-text("Swap lunch")').count() === 1);
   await p.screenshot({ path: path.join(mods, 'app_lunch.png'), clip: { x: 0, y: 0, width: 1500, height: 520 } });
-  check('L4 the call stats are not on Home', await p.locator('#agent-calls').count() === 0 && await p.locator('.grid3').count() === 1);
+  check('L4 the call stats are not on Home any more (they have their own Calls tab)', await p.locator('#agent-calls').count() === 0 && await p.locator('.grid3').count() === 1);
   await p.context().close();
   p = await open({ user: agent, db: lunch('B'), now: TODAY + 'T11:30:00.000Z' });
   await p.waitForSelector('#lunch-strip .lunch-pill b'); await p.waitForTimeout(300);
@@ -142,11 +154,11 @@ const mkdb = (extra = {}) => Object.assign({
 
   // not set up yet / nothing to show: the break card still works, the call stats stay out of the way
   p = await open({ user: agent, rpc: { data: null, error: { message: 'Could not find the function public.cx_team_day' } } });
-  await p.waitForSelector('#break-left'); await p.waitForTimeout(500);
-  check('N1 before the setup SQL is run: no call-stats card and no error message for the agent; the break card still shows', await p.locator('#agent-calls').count() === 0 && !/cx_team_day/.test(await flat(p)));
+  await p.waitForSelector('#break-left'); await p.click('[data-nav=calls]'); await p.waitForTimeout(500);
+  check('N1 before the setup SQL is run: no call-stats card and no error message for the agent; the break card still shows', await p.locator('#agent-calls').count() === 0 && !/cx_team_day/.test(await flat(p)) && /No call activity recorded for you today/.test(await flat(p)));
   await p.context().close();
   p = await open({ user: agent, rpc: { data: { mine: [], team: TEAM }, error: null } });
-  await p.waitForSelector('#break-left'); await p.waitForTimeout(500);
+  await p.waitForSelector('#break-left'); await p.click('[data-nav=calls]'); await p.waitForTimeout(500);
   check('N2 an agent with no 3CX activity today (not matched in 3CX) gets no call-stats card', await p.locator('#agent-calls').count() === 0);
   await p.context().close();
   p = await open({ user: { id: 'u1', email: 'jane@x.com', user_metadata: { role: 'agent', display_name: 'Jane Doe' } }, db: mkdb({ bt_settings: [settingsRow({})] }) });
