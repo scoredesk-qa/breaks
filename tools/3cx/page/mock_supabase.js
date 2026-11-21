@@ -67,7 +67,8 @@
       getSession: async () => ({ data: { session: window.__USER ? { user: window.__USER } : null } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
       signInWithPassword: async () => ({ data: { user: window.__USER }, error: null }),
-      signOut: async () => ({ error: null }),
+      signOut: async () => { window.__SIGNED_OUT = true; return { error: null }; },
+      signUp: async a => { (window.__SIGNUPS = window.__SIGNUPS || []).push(a); if (window.__SIGNUP_ERR) return { data: {}, error: { message: window.__SIGNUP_ERR } }; const dup = a.email === 'dup@x.com'; return { data: { user: { id: 'n1', email: a.email, identities: dup ? [] : [{}], email_confirmed_at: window.__CONFIRM ? null : 'now' }, session: null }, error: null }; },
     },
   };
   window.supabase = { createClient: (url, key) => { (window.__CLIENTS = window.__CLIENTS || []).push({ url, key }); return client; } };

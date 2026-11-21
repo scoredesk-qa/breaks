@@ -58,8 +58,8 @@ drop_lines(['.side{width:340px', '.side-org{', '.side-org .chev', '.side-nav{', 
             '.side-ft{', '.side-ft .muted', '.scrim{display:none}', '.side{width:280px}', '.side{position:fixed', '.side.open{', '.scrim.open{'])
 rep(".top{height:94px;padding:0 120px 0 120px;display:flex;align-items:center;gap:24px;position:sticky;top:0;z-index:20;background:rgba(23,23,28,.86);",
     ".top{height:84px;padding:0 44px;display:flex;align-items:center;gap:24px;position:sticky;top:0;z-index:20;background:var(--top-bg);")
-rep(".page{padding:44px 120px 90px;max-width:1660px;width:100%}", ".page{padding:30px 44px 90px;max-width:1560px;width:100%}")
-rep(".panel{padding:44px 120px 90px;max-width:1660px}", ".panel{padding:30px 44px 90px;max-width:1560px}")
+rep(".page{padding:44px 120px 90px;max-width:1660px;width:100%}", ".page{padding:30px 44px 90px;max-width:none;width:100%}")
+rep(".panel{padding:44px 120px 90px;max-width:1660px}", ".panel{padding:30px 44px 90px;max-width:none}")
 rep("  .top,.page,.panel{padding-left:56px;padding-right:56px}\n", "  .top,.page,.panel{padding-left:36px;padding-right:36px}\n")
 
 NEW_CSS = r"""
@@ -253,6 +253,7 @@ s = s[:i] + NEW_CSS + s[i:]
 # ═════════════════════════════ 2. icons ═════════════════════════════
 rep("const PATHS = {", """const PATHS = {
   chevleft: "M15 18l-6-6 6-6",
+  brand:    ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z","M10 9v6","M14 9v6"],
   calendar: ["M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","M16 2v4","M8 2v4","M3 10h18"],
   message:  "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   inbox:    ["M22 12h-6l-2 3h-4l-2-3H2","M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"],
@@ -279,9 +280,9 @@ function ThemeFab(){
 }
 
 /* One sidebar for admin and agent: slides a highlight to the active item, collapses to icons, remembers its state. */
-function Sidebar({items,active,onGo,open,onClose,role}){
+function Sidebar({items,active,onGo,open,onClose,role,onLogout}){
   const [theme,toggleTheme]=useTheme();
-  const [col,setCol]=useState(()=>{ try{ return localStorage.getItem(SIDE_KEY)==='1'; }catch(e){ return false; } });
+  const [col,setCol]=useState(()=>{ try{ return localStorage.getItem(SIDE_KEY)!=='0'; }catch(e){ return true; } });
   const refs=useRef({});
   const [ind,setInd]=useState({y:0,h:0,on:false});
   const measure=useCallback(()=>{ const el=refs.current[active]; setInd(el?{y:el.offsetTop,h:el.offsetHeight,on:true}:{y:0,h:0,on:false}); },[active]);
@@ -291,7 +292,7 @@ function Sidebar({items,active,onGo,open,onClose,role}){
   return(<>
     <div className={`scrim${open?' open':''}`} onClick={onClose}/>
     <aside className={`sb${col?' col':''}${open?' open':''}`} aria-label="Main navigation">
-      <div className="sb-hd"><div className="sb-logo"><Ic n="tower" size={22} sw={1.8}/></div><span className="sb-name">BreakTrack</span></div>
+      <div className="sb-hd"><div className="sb-logo"><Ic n="brand" size={24} sw={2}/></div><span className="sb-name">BreakTrack</span></div>
       <nav className="sb-nav">
         <i className="sb-ind" style={{transform:`translateY(${ind.y}px)`,height:ind.h,opacity:ind.on?1:0}}/>
         {items.map((it,i)=>it.section
@@ -309,6 +310,9 @@ function Sidebar({items,active,onGo,open,onClose,role}){
         </button>
         <button className="sb-i sb-sm sb-col-btn" onClick={toggleCol} data-act="collapse" title={col?'Expand menu':'Collapse menu'}>
           <span className="sb-ic sb-col-ic"><Ic n="chevleft" size={20}/></span><span className="sb-lb">Collapse</span>
+        </button>
+        <button className="sb-i sb-sm sb-out" onClick={onLogout} data-act="logout" title="Sign out">
+          <span className="sb-ic"><Ic n="logout" size={20}/></span><span className="sb-lb">Sign out</span>
         </button>
       </div>
     </aside>
@@ -648,48 +652,66 @@ function ARequests({user,name}){
   );
 }
 
-/* ── agent: Breaks tab (the last two weeks) ── */
-function AgentBreaks({user,team}){
-  const [logs,setLogs]=useState(null);
-  const [open,setOpen]=useState(null);
-  const [now,setNow]=useState(appNow());
-  useEffect(()=>{ const id=setInterval(()=>setNow(appNow()),1000); return()=>clearInterval(id); },[]);
-  const load=useCallback(async()=>{
-    const since=new Date(localMidnight()-13*86400000).toISOString();
-    const {data}=await run(SB.from('bt_logs').select('*').eq('user_id',user.id).gte('start_time',since).order('start_time',{ascending:false}));
-    setLogs(data||[]);
-  },[user.id]);
-  useEffect(()=>{ load(); },[load]);
-  useAutoRefresh(load,15000);
-  const days={};
-  (logs||[]).forEach(l=>{ const w=wall(l.start_time), k=`${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; (days[k]=days[k]||[]).push(l); });
-  const keys=Object.keys(days).sort().reverse();
-  const allowSec=team.allowanceMin*60;
-  const sum=a=>a.reduce((t,l)=>t+secOf(l,now),0);
-  const week=keys.filter(k=>k>isoAdd(todayISO(),-7)).flatMap(k=>days[k]);
-  const longest=(logs||[]).reduce((m,l)=>Math.max(m,secOf(l,now)),0);
-  const mm=x=>{ const m=Math.floor(x/60), h=Math.floor(m/60); return h?`${h}h${m%60?` ${m%60}m`:''}`:`${m}m`; };
+/* ── admin: add accounts from the page ── */
+let _addClient=null;
+function addClient(){
+  if(!_addClient) _addClient=supabase.createClient(window.BT_URL,window.BT_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'bt_add_user'}});
+  return _addClient;
+}
+function AAccounts(){
+  const blank={name:'',email:'',pw:'',role:'agent'};
+  const [f,setF]=useState(blank);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState('');
+  const [made,setMade]=useState([]);
+  const [show,setShow]=useState(false);
+  const valid=f.name.trim()&&/^\S+@\S+\.\S+$/.test(f.email.trim())&&f.pw.length>=6;
+  const gen=()=>{ const c='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const a=new Uint32Array(10); crypto.getRandomValues(a); setF(x=>({...x,pw:Array.from(a,n=>c[n%c.length]).join('')})); setShow(true); };
+  const submit=async()=>{
+    if(!valid||busy) return;
+    setBusy(true); setErr('');
+    const email=f.email.trim().toLowerCase(), nm=f.name.trim();
+    try{
+      const {data,error}=await addClient().auth.signUp({email,password:f.pw,options:{data:{display_name:nm,role:f.role}}});
+      if(error) throw error;
+      if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0) throw new Error('That email already has an account.');
+      const confirmed=!!data.session||!!(data.user&&data.user.email_confirmed_at);
+      setMade(m=>[{name:nm,email,role:f.role,pw:f.pw,confirmed},...m]);
+      setF(blank); setShow(false);
+      fireNotification({title:'Account created',body:nm,type:'info',duration:5000});
+    }catch(e){ setErr(e.message||'Could not create the account.'); }
+    setBusy(false);
+  };
+  const copy=m=>{ try{ navigator.clipboard.writeText(`BreakTrack login\nEmail: ${m.email}\nPassword: ${m.pw}`); fireNotification({title:'Login details copied',body:m.email,type:'info',duration:3000}); }catch(e){} };
   return(
-    <div className="panel" style={{padding:0}} id="tab-breaks">
-      <div className="tab-h"><h1>Breaks</h1><p>Your last two weeks.</p></div>
-      <div className="kpis">
-        <div className="kpi"><div className="kpi-ic"><Ic n="coffee" size={20}/></div><b>{week.length}</b><span>Breaks in the last 7 days</span></div>
-        <div className="kpi"><div className="kpi-ic p"><Ic n="timer" size={20}/></div><b>{mm(sum(week))}</b><span>Break time in the last 7 days</span></div>
-        <div className="kpi"><div className="kpi-ic b"><Ic n="clock" size={20}/></div><b>{keys.length?mm(Math.round(sum(logs)/keys.length)):'0m'}</b><span>Average per day</span></div>
-        <div className="kpi"><div className="kpi-ic g"><Ic n="utensils" size={20}/></div><b>{mm(longest)}</b><span>Longest break</span></div>
-      </div>
-      <div className="card" style={{padding:'10px 22px 14px'}}>
-        {logs===null?<div className="es"><div className="spin"/></div>
-         :keys.length===0?<div className="rq-empty">No breaks in the last two weeks.</div>
-         :<table className="tbl"><thead><tr><th>Day</th><th>Breaks</th><th>Longest</th><th>Total</th><th style={{width:'32%'}}>Of the full-day allowance</th></tr></thead><tbody>
-          {keys.map(k=>{ const a=days[k], tot=sum(a), pct=allowSec>0?Math.min(100,tot/allowSec*100):0;
-            return(<React.Fragment key={k}>
-              <tr className="row" data-day={k} onClick={()=>setOpen(open===k?null:k)}>
-                <td>{fmtD(k+'T12:00:00Z')}{k===todayISO()?' · today':''}</td><td className="n">{a.length}</td><td className="n">{mm(a.reduce((m,l)=>Math.max(m,secOf(l,now)),0))}</td><td className="n">{mm(tot)}</td>
-                <td><div className="bk-bar"><i className={tot>allowSec+59?'over':''} style={{width:`${pct}%`}}/></div></td></tr>
-              {open===k&&<tr><td colSpan={5} style={{background:'var(--hover)'}}>{a.slice().reverse().map(l=><div key={l.id} style={{display:'flex',gap:14,padding:'4px 0',fontSize:14.5}}><span className="mut" style={{minWidth:120,color:'var(--mut)'}}>{hhmm(l.start_time)}{l.end_time?` – ${hhmm(l.end_time)}`:' – now'}</span><span>{l.break_type||bType(secOf(l,now))}</span><span style={{marginLeft:'auto'}}>{mm(secOf(l,now))}</span></div>)}</td></tr>}
-            </React.Fragment>); })}
-        </tbody></table>}
+    <div className="panel" id="tab-accounts">
+      <div className="tab-h"><h1>Accounts</h1><p>Create a login for a new agent or admin.</p></div>
+      {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
+      <div className="rq-grid">
+        <div className="card rq-form" id="acc-form">
+          <h2>New account</h2>
+          <label>Full name<input className="fi" value={f.name} onChange={e=>setF({...f,name:e.target.value})} placeholder="e.g. Sara Ahmed" aria-label="Full name" autoComplete="off"/></label>
+          <label>Email<input className="fi" type="email" value={f.email} onChange={e=>setF({...f,email:e.target.value})} placeholder="name@company.com" aria-label="Email" autoComplete="off"/></label>
+          <label>Password
+            <div className="acc-pw"><input className="fi" type={show?'text':'password'} value={f.pw} onChange={e=>setF({...f,pw:e.target.value})} placeholder="At least 6 characters" aria-label="Password" autoComplete="new-password"/>
+            <button type="button" className="bs" onClick={gen}>Generate</button></div>
+          </label>
+          <label>Role
+            <select className="fi" value={f.role} onChange={e=>setF({...f,role:e.target.value})} aria-label="Role"><option value="agent">Agent</option><option value="admin">Admin</option></select>
+          </label>
+          <button className="bp" onClick={submit} disabled={!valid||busy}>{busy?<span className="spin-sm"/>:<><Ic n="plus" size={15}/> Create account</>}</button>
+        </div>
+        <div className="rq-list" id="acc-list">
+          {made.length===0?<div className="card rq-empty">Accounts you create here show up with their login details so you can pass them on.</div>
+           :made.map((m,i)=>(
+            <div key={m.email+i} className="rq-card" data-acc={m.email}>
+              <div className="rq-top"><div className="rq-ico other"><Ic n="users" size={20}/></div>
+                <div><div className="rq-t">{m.name}</div><div className="rq-s">{m.email} · {m.role==='admin'?'Admin':'Agent'}</div></div></div>
+              <div className="rq-note">Password: <b>{m.pw}</b></div>
+              {!m.confirmed&&<div className="rq-dec">Supabase is set to confirm emails, so they must click the link in their email before the first sign-in. To skip that, turn off "Confirm email" under Authentication, Sign In / Providers, Email.</div>}
+              <div className="rq-acts"><button className="bs" onClick={()=>copy(m)}><Ic n="send" size={15}/> Copy login details</button></div>
+            </div>))}
+        </div>
       </div>
     </div>
   );
@@ -718,18 +740,18 @@ s = s[:cut_start] + """  const sideItems=[...main, {section:'Workflows'}, ...flo
 
   return (
     <div className="shell">
-      <Sidebar items={sideItems} active={tab} onGo={go} open={navOpen} onClose={()=>setNavOpen(false)} role="Admin"/>
+      <Sidebar items={sideItems} active={tab} onGo={go} open={navOpen} onClose={()=>setNavOpen(false)} role="Admin" onLogout={onLogout}/>
 
 """ + s[cut_end:]
-rep("    {id:'clocks',    n:'clock',    label:'Clock In/Out'},\n", "    {id:'clocks',    n:'clock',    label:'Clock In/Out'},\n    {id:'requests',  n:'inbox',    label:'Requests', badge:reqN},\n")
+rep("    {id:'clocks',    n:'clock',    label:'Clock In/Out'},\n", "    {id:'clocks',    n:'clock',    label:'Clock In/Out'},\n    {id:'requests',  n:'inbox',    label:'Requests', badge:reqN},\n    {id:'accounts',  n:'users',    label:'Accounts'},\n")
 rep("  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n", "  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n  const [reqN]=useReqBadge(user,true,false);\n  useRequestToasts(user,true);\n")
-rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'    &&<AClocks/>}\n          {tab==='requests'  &&<ARequests user={user} name={name}/>}\n")
+rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'    &&<AClocks/>}\n          {tab==='requests'  &&<ARequests user={user} name={name}/>}\n          {tab==='accounts'  &&<AAccounts/>}\n")
 
 # ═════════════════════════════ 5. agent shell: tabs ═════════════════════════════
 rep("  const cxs = useAgentCx(name);\n", "  const cxs = useAgentCx(name);\n  const [tab,setTab]=useState('home');\n  const [navOpen,setNavOpen]=useState(false);\n  const [reqN]=useReqBadge(user,false,tab==='requests');\n  useRequestToasts(user,false);\n")
 rep("  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n",
     "  const idleWord=!isClockedIn?(isClockedOut?'Shift ended':'Off shift'):breakHint?'Paused':'Ready';\n"
-    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'calls',n:'phone',label:'Calls'},{id:'breaks',n:'coffee',label:'Breaks'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
+    "  const agentNav=[{id:'home',n:'home',label:'Home'},{id:'calls',n:'phone',label:'Calls'},{id:'requests',n:'message',label:'Requests',badge:reqN}];\n"
     "  const goTab=id=>{ setTab(id); setNavOpen(false); window.scrollTo({top:0}); };\n")
 rep('''    <div className="main solo" style={{minHeight:'100vh'}}>
       <header className="top">
@@ -738,7 +760,7 @@ rep('''    <div className="main solo" style={{minHeight:'100vh'}}>
           <span className="wm-t">BreakTrack</span>
         </div>
         <div className="top-ic">''', '''    <div className="shell">
-      <Sidebar items={agentNav} active={tab} onGo={goTab} open={navOpen} onClose={()=>setNavOpen(false)} role={trainee?'Agent · Trainee':'Agent'}/>
+      <Sidebar items={agentNav} active={tab} onGo={goTab} open={navOpen} onClose={()=>setNavOpen(false)} role={trainee?'Agent · Trainee':'Agent'} onLogout={onLogout}/>
       <div className="main">
       <header className="top">
         <button className="icb top-menu" onClick={()=>setNavOpen(true)} aria-label="Menu"><Ic n="menu" size={20}/></button>
@@ -751,7 +773,6 @@ rep('''        <AgentCallStats st={cxs}/>
 
       {confirmOut&&(''', '''        </>)}
         {tab==='calls'    &&<AgentCalls st={cxs}/>}
-        {tab==='breaks'   &&<AgentBreaks user={user} team={team}/>}
         {tab==='requests' &&<AgentRequests user={user} name={name}/>}
       </div>
       </div>
@@ -763,7 +784,12 @@ rep('''    <div className="auth-bg">
       <div className="auth-card">''')
 
 i = s.rindex('</style>')
-s = s[:i] + "#tab-calls #agent-calls{margin-top:0!important}\n.top-title{font-size:15px;color:var(--mut)}\n" + s[i:]
+s = s[:i] + "#tab-calls #agent-calls{margin-top:0!important}\n.top-title{font-size:15px;color:var(--mut)}\n.acc-pw{display:flex;gap:8px}.acc-pw .fi{flex:1;min-width:0}.sb-out:hover{color:#ff8a9a}\n" + s[i:]
+
+s = s.replace('<div className="wm-icon"><Ic n="tower" size={16} col="#c9c9d2" sw={2}/></div>', '<div className="wm-icon"><Ic n="brand" size={17} col="#c9c9d2" sw={2}/></div>')
+FAV = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235266eb'/%3E%3Cstop offset='1' stop-color='%238e9cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='white' stroke-width='2.4'/%3E%3Cline x1='13.3' y1='12.5' x2='13.3' y2='19.5' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3Cline x1='18.7' y1='12.5' x2='18.7' y2='19.5' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"
+s, _n = re.subn(r'<link rel="icon"[^>]*/>', lambda m: '<link rel="icon" type="image/svg+xml" href="' + FAV + '"/>', s)
+assert _n == 1, _n
 
 open(out, 'w', newline='', encoding='utf-8').write(s.replace('\n', '\r\n') if crlf else s)
 print('written', out, len(s))
