@@ -291,9 +291,37 @@ function BrandMark({size=32}){
     </svg>);
 }
 
+/* Desktop (Windows) notifications need a click to switch on */
+function useNotifPerm(){
+  const get=()=>('Notification' in window)?Notification.permission:'unsupported';
+  const [perm,setPerm]=useState(get);
+  useEffect(()=>{ const f=()=>setPerm(get()); window.addEventListener('bt-notif-perm',f); window.addEventListener('focus',f); return()=>{ window.removeEventListener('bt-notif-perm',f); window.removeEventListener('focus',f); }; },[]);
+  const ask=useCallback(()=>{
+    if(!('Notification' in window)) return;
+    if(Notification.permission==='denied'){ fireNotification({title:'Notifications are blocked',body:'Click the padlock next to the address bar, set Notifications to Allow, then reload this page.',type:'warn',duration:14000}); return; }
+    const done=p=>{ window.dispatchEvent(new Event('bt-notif-perm')); if(p==='granted'){ try{ new Notification('Notifications are on',{body:'You will get lunch and message alerts here.'}); }catch(e){} } };
+    try{ const r=Notification.requestPermission(done); if(r&&r.then) r.then(done); }catch(e){}
+  },[]);
+  return [perm,ask];
+}
+function NotifBanner(){
+  const [perm,ask]=useNotifPerm();
+  if(perm==='granted'||perm==='unsupported') return null;
+  return(
+    <div className="notice hi" id="notif-banner">
+      <div className="acc-ic"><Ic n="bell" size={17}/></div>
+      <div className="notice-b">
+        <div className="notice-t">{perm==='denied'?'Desktop notifications are blocked':'Turn on desktop notifications'}</div>
+        <div className="notice-s">{perm==='denied'?'You will miss lunch reminders and messages from your supervisor. Allow notifications for this site in the browser, then reload.':'Get lunch reminders and messages from your supervisor even when this tab is in the background.'}</div>
+      </div>
+      <div className="notice-a"><button className="bp" onClick={ask}>{perm==='denied'?'How to fix':'Turn on'}</button></div>
+    </div>);
+}
+
 /* One sidebar for admin and agent: slides a highlight to the active item, collapses to icons, remembers its state. */
 function Sidebar({items,active,onGo,open,onClose,role,onLogout}){
   const [theme,toggleTheme]=useTheme();
+  const [nperm,askNotif]=useNotifPerm();
   const [col,setCol]=useState(()=>{ try{ return localStorage.getItem(SIDE_KEY)!=='0'; }catch(e){ return true; } });
   const refs=useRef({});
   const [ind,setInd]=useState({y:0,h:0,on:false});
@@ -318,6 +346,9 @@ function Sidebar({items,active,onGo,open,onClose,role,onLogout}){
       </nav>
       <div className="sb-ft">
         <div className="sb-meta"><ConnInstrument compact/><span>{role}</span></div>
+        {(nperm==='default'||nperm==='denied')&&<button className="sb-i sb-sm" onClick={askNotif} data-act="notif" title="Desktop notifications are off">
+          <span className="sb-ic"><Ic n="bell" size={20}/></span><span className="sb-lb">{nperm==='denied'?'Alerts blocked':'Turn on alerts'}</span>
+        </button>}
         <button className="sb-i sb-sm" onClick={toggleTheme} data-act="theme" title={theme==='light'?'Switch to dark mode':'Switch to light mode'}>
           <span className="sb-ic"><ThemeIcon/></span><span className="sb-lb">{theme==='light'?'Dark mode':'Light mode'}</span>
         </button>
@@ -778,6 +809,17 @@ s = s[:_a] + """  const main=[
 """ + s[_b:]
 rep("  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n", "  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n  const [reqN]=useReqBadge(user,true,false);\n  useRequestToasts(user,true);\n")
 rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'    &&<AClocks/>}\n          {tab==='requests'  &&<ARequests user={user} name={name}/>}\n          {tab==='accounts'  &&<AAccounts/>}\n")
+
+
+# ═════════════════════════════ notifications: reliable delivery ═════════════════════════════
+_i = s.index("function useAgentNotifListener(userId, lunchInfo) {")
+_j = s.index("/* ══════════════════════════════════════════════════════════════\n   LUNCH REMINDER HOOKS")
+s = s[:_i] + open(os.path.join(HERE, 'notif_listener.js'), encoding='utf-8').read() + s[_j:]
+rep("    const show = () => new Notification(title, { body, tag: type + '-' + appNow() });\n    if (Notification.permission === 'granted') show();\n    else if (Notification.permission !== 'denied') Notification.requestPermission().then(p => { if(p==='granted') show(); });\n",
+    "    try { if (Notification.permission === 'granted') new Notification(title, { body, tag: type + '-' + appNow(), requireInteraction: type === 'lunch' }); } catch (e) {}\n")
+_i = s.index("function useNotifPermission() {"); _j = s.index("/* ══", _i)
+s = s[:_i] + "function useNotifPermission() { /* switched on with a button now: browsers ignore permission requests that come without a click */ }\n\n" + s[_j:]
+rep('        {err&&<div className="aerr"><Ic n="alert" size={15}/> {err}</div>}\n', '        <NotifBanner/>\n        {err&&<div className="aerr"><Ic n="alert" size={15}/> {err}</div>}\n')
 
 # ═════════════════════════════ 5. agent shell: tabs ═════════════════════════════
 rep("  const cxs = useAgentCx(name);\n", "  const cxs = useAgentCx(name);\n  const [tab,setTab]=useState('home');\n  const [navOpen,setNavOpen]=useState(false);\n  const [reqN]=useReqBadge(user,false,tab==='requests');\n  useRequestToasts(user,false);\n")

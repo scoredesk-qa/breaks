@@ -237,6 +237,23 @@ const requests = () => [
   await p.click('#lunch-main button:has-text("Swap lunch")'); await p.waitForTimeout(400);
   check('LT3 which opens the existing swap window', /Sam Lee/.test(await p.locator('.modal, [role=dialog], .overlay').first().innerText().catch(() => '')) || (await flat(p)).includes('Sam Lee'));
   await p.context().close();
+  /* ───────────── notifications ───────────── */
+  const nDb = H.mkdb({ bt_lunch_schedule: [{ id: 1, date: TODAY, group_a: ['Jane Doe'], group_b: ['Sam Lee'] }] });
+  p = await open({ user: H.agent, db: nDb, now: TODAY + 'T11:00:00.000Z' }); await p.waitForSelector('.sb'); await p.waitForTimeout(1200);
+  const fire = pl => p.evaluate(x => window.__RT.filter(r => r.f && r.f.event === 'notif').forEach(r => r.cb({ payload: x })), pl);
+  check('NT1 the agent listens on the broadcast channel exactly once, even after the lunch group loads', await p.evaluate(() => window.__RT.filter(r => r.f && r.f.event === 'notif').length) === 1);
+  await fire({ title: 'Hello', body: 'Custom message', type: 'custom' }); await p.waitForTimeout(300);
+  check('NT2 a custom message from the admin shows one toast', await p.locator('.toast').count() === 1 && /Custom message/.test(await p.locator('.toast').innerText()));
+  await fire({ title: 'Lunch B', body: 'for B only', type: 'lunch', lunchGroup: 'B' }); await fire({ title: 'For someone else', body: 'x', type: 'custom', targetUserId: 'u9' }); await p.waitForTimeout(300);
+  check('NT3 a lunch alert for the other group, or for another person, is not shown', await p.locator('.toast').count() === 1);
+  await fire({ title: 'Lunch A', body: 'for A', type: 'lunch', lunchGroup: 'A' }); await p.waitForTimeout(300);
+  check('NT4 a lunch alert for the agent\'s own group is shown', await p.locator('.toast').count() === 2);
+  check('NT5 there is a visible "Turn on desktop notifications" prompt until permission is given', await p.locator('#notif-banner').count() === 1 && await p.locator('[data-act=notif]').count() === 1);
+  await p.context().close();
+  p = await open({ user: H.agent, db: nDb, now: TODAY + 'T12:56:00.000Z' }); await p.waitForSelector('.sb'); await p.waitForTimeout(1200);
+  check('NT6 the 5-minute lunch reminder shows its own toast', /Lunch in 4 min/.test(await p.locator('.toast').first().innerText()));
+  await p.context().close();
+
   await b.close(); fs.rmSync(work, { recursive: true, force: true });
   console.log(fails ? 'FAILED ' + fails : 'ALL PASSED'); process.exit(fails ? 1 : 0);
 })();
