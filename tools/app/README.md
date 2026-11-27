@@ -19,3 +19,9 @@ Run them with `node tools/app/test_app.js <index.html> <dir with node_modules>` 
 
 Both SQL files were also run on a throwaway Postgres: an agent can only see and create their own requests, cannot approve, change decision fields or post as admin,
 and other agents cannot read or write someone else's thread.
+
+## Updating the live page
+The page on `main` already contains everything built so far, plus the part-time project code. Do not rebuild it from an older base: take
+the current `index.html` from `main` and replace only the section you changed (for the bonus pages: from the
+`/* ═══ Bonus audit and Late & extra time (admin) ═══ */` comment up to `function App() {`, using `bonus.js` with `__BONUS_SQL__`
+replaced by `bonus_setup.sql`).

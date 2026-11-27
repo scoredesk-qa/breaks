@@ -28,6 +28,8 @@ away(...J, 1, '09:00:00', '09:05:00', 'Bathroom'); away(...J, 1, '11:00:00', '11
 away(...J, 5, '09:00:00', '09:06:00', 'Bathroom'); away(...J, 5, '11:00:00', '11:06:00', 'Bathroom'); away(...J, 5, '14:00:00', '14:06:00', 'Bathroom');   // 18 min together: over by 3
 away(...J, 7, '12:00:00', '12:59:30', 'Lunch');                     // lunch 59m30: fine
 workdays.forEach(d => { if (d !== 8 && d !== 9) day(...S, d); });   // Sam: two days absent
+const A = ['801', 'Ben, Ali'];
+day(...A, 14); away(...A, 14, '12:00:00', '13:00:50', 'Lunch'); away(...A, 14, '10:00:00', '10:15:50', 'Break'); away(...A, 14, '15:00:00', '15:15:50', 'Break'); away(...A, 14, '11:00:00', '11:15:50', 'Bathroom');   // each 50 s over its limit (not flagged alone), 108m20s in all
 workdays.forEach(d => day(...K, d));                                // Kay: perfect, 610 calls on the 1st, 10 ignored rings on the 2nd
 for (let i = 0; i < 610; i++) { const t0 = Date.parse(D(1, '08:30:00')) + i * 40000; call(...K, 1, new Date(t0 + 3000).toISOString().slice(11, 19), new Date(t0 + 33000).toISOString().slice(11, 19)); }
 for (let i = 0; i < 10; i++) { const t0 = Date.parse(D(2, '09:00:00')) + i * 120000; const f = ms => new Date(ms).toISOString(); sl.push({ id: id++, changed_at: f(t0), extension: K[0], agent: K[1], old_status: 'Available', new_status: 'Ringing' }, { id: id++, changed_at: f(t0 + 15000), extension: K[0], agent: K[1], old_status: 'Ringing', new_status: 'Available' }); }
@@ -45,6 +47,7 @@ sl.sort((a, b) => Date.parse(a.changed_at) - Date.parse(b.changed_at));
   check('B1 Kay: no absences, no events, 610 calls, ignored 1.6 %', await inVal('Kay Kim', 1) === '0' && /^0/.test(await cell('Kay Kim', 2)) && await cell('Kay Kim', 4) === '610' && /^1\.6%/.test(await cell('Kay Kim', 5)), [await inVal('Kay Kim', 1), await cell('Kay Kim', 2), await cell('Kay Kim', 4), await cell('Kay Kim', 5)].join(' / '));
   check('B2 Kay\'s bonus follows the sheet: attendance 200, QA (100 %) 150, productivity (600+ calls, 2 % or less ignored) 150 = 500', [6, 7, 8, 9].map(async i => 0) && (await cell('Kay Kim', 6)) === '200' && (await cell('Kay Kim', 7)) === '150' && (await cell('Kay Kim', 8)) === '150' && (await cell('Kay Kim', 9)) === '500', [6, 7, 8, 9].length ? await cell('Kay Kim', 9) : '');
   check('B3 Jane: 1 day absent (the 6th, nothing in 3CX); 4 punctuality events (late start, lunch +2, break +1, short breaks +3); a start 30 s late and a lunch of 59m30 do not count', await inVal('Jane Doe', 1) === '1' && /^4/.test(await cell('Jane Doe', 2)), await inVal('Jane Doe', 1) + ' / ' + await cell('Jane Doe', 2));
+  check('B3b Jane\'s total-over day (the 1st) is not counted a second time: still 4 events; Ali has 1 (total only)', /^4/.test(await cell('Jane Doe', 2)) && /^1/.test(await cell('Ali Ben', 2)), await cell('Ali Ben', 2));
   check('B4 three or more events means no bonus at all', (await cell('Jane Doe', 9)) === '0');
   check('B5 Sam: two days absent means no bonus', await inVal('Sam Lee', 1) === '2' && (await cell('Sam Lee', 9)) === '0');
   // type a QA rate
@@ -72,10 +75,11 @@ sl.sort((a, b) => Date.parse(a.changed_at) - Date.parse(b.changed_at));
   await p.click('[data-nav=late]'); await p.waitForSelector('#tab-late tr[data-ev]'); await p.waitForTimeout(500);
   const types = async () => (await p.locator('#tab-late tr[data-ev]').evaluateAll(r => r.map(x => x.dataset.ev + ':' + x.children[1].innerText))).sort();
   let t = await types();
-  const want = ['late_start:Jane Doe', 'stayed_late:Jane Doe', 'late_lunch:Jane Doe', 'late_break:Jane Doe', 'flex_over:Jane Doe'];
-  check('L1 this month: Jane\'s late start, 15 minutes extra, lunch, break and short-break overruns are listed; the on-time ones are not', want.every(x => t.includes(x)) && t.length === 5, t.join(' | '));
-  check('L2 late starters include nobody else (Sam and Kay were on time)', !t.some(x => /Sam|Kay/.test(x)));
-  check('L3 tiles: 1 late start, 3 break and lunch overruns, 15m on calls after 17:30 (the 40 s call does not count)', (await p.locator('#lt-k-start').innerText()) === '1' && (await p.locator('#lt-k-brk').innerText()) === '3' && (await p.locator('#lt-k-extra').innerText()) === '15m', [await p.locator('#lt-k-start').innerText(), await p.locator('#lt-k-brk').innerText(), await p.locator('#lt-k-extra').innerText()].join('/'));
+  const want = ['late_start:Jane Doe', 'stayed_late:Jane Doe', 'late_lunch:Jane Doe', 'late_break:Jane Doe', 'flex_over:Jane Doe', 'total_over:Jane Doe', 'total_over:Ali Ben'];
+  check('L1 this month: Jane\'s late start, 15 minutes extra, lunch, break and short-break overruns are listed; the on-time ones are not', want.every(x => t.includes(x)) && t.length === 7, t.join(' | '));
+  check('L1b the total-over event fires for Ali (every part within a minute of its limit, but 1h48m in all) and for Jane (106 minutes)', t.includes('total_over:Ali Ben') && t.includes('total_over:Jane Doe'));
+  check('L2 Sam and Kay (on time, normal breaks) have no events', !t.some(x => /Sam|Kay/.test(x)));
+  check('L3 tiles: 1 late start, 5 break and lunch overruns, 15m on calls after 17:30 (the 40 s call does not count)', (await p.locator('#lt-k-start').innerText()) === '1' && (await p.locator('#lt-k-brk').innerText()) === '5' && (await p.locator('#lt-k-extra').innerText()) === '15m', [await p.locator('#lt-k-start').innerText(), await p.locator('#lt-k-brk').innerText(), await p.locator('#lt-k-extra').innerText()].join('/'));
   await p.fill('#tab-late input[aria-label="From date"]', '2026-10-02'); await p.fill('#tab-late input[aria-label="To date"]', '2026-10-02'); await p.waitForTimeout(800);
   t = await types();
   check('L4 the date filter narrows it to one day: only the 2nd (late start and extra time)', t.join('|') === 'late_start:Jane Doe|stayed_late:Jane Doe', t.join('|'));
@@ -83,7 +87,7 @@ sl.sort((a, b) => Date.parse(a.changed_at) - Date.parse(b.changed_at));
   await p.click('#tab-late [data-type=stayed_late]'); await p.waitForTimeout(300);
   check('L5 the type chips filter the list', (await types()).join('|') === 'stayed_late:Jane Doe');
   await p.click('#tab-late button:has-text("Clear")'); await p.selectOption('#tab-late select[aria-label="Agent"]', 'Jane Doe'); await p.waitForTimeout(300);
-  check('L6 the agent filter works', (await types()).length === 5);
+  check('L6 the agent filter works', (await types()).length === 6);
   const csv2 = p.waitForEvent('download'); await p.click('#tab-late button:has-text("Export CSV")'); const d2 = await csv2;
   check('L7 the list exports to CSV', /late-and-extra-time-2026-10-01-to-2026-10-27\.csv/.test(d2.suggestedFilename()));
   check('L8 no page errors', errs.length === 0, errs.join(' | '));
