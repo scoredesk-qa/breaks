@@ -23,13 +23,15 @@ function dlCsv(name,head,rows){
 
 /* Everything here comes from the 3CX status log: when an agent came online, their break and lunch statuses, and their calls. */
 const hmOf=sec=>`${pad(Math.floor(sec/3600))}:${pad(Math.floor(sec%3600/60))}`;
-const CXR_CACHE={};   // status_log rows per date range, so going back and forth is quick
+const CXR_CACHE={}, CXR_OUT={}, BN_CACHE={};   // kept while the page stays open: rows read, results worked out, and the Bonus Audit page's own data
+const cxPeek=(f,l)=>CXR_OUT[f+'|'+l]||null;
 async function loadCxRange(first,last,setProg){
   const tz=clockOff(), today=todayISO();
   const lo=Date.parse(first+'T00:00:00Z')-tz*3600000-36*3600000, hi=Date.parse(isoAdd(last,1)+'T00:00:00Z')-tz*3600000;
-  const k=first+'|'+last, c=CXR_CACHE[k];
+  const k=first+'|'+last, c=CXR_CACHE[k], ttl=last<today?3600000:180000, o=CXR_OUT[k];
+  if(o&&Date.now()-o.at<ttl) return {days:o.days,error:null};   // worked out a moment ago: nothing to load
   let rows;
-  if(c&&Date.now()-c.at<(last<today?3600000:90000)) rows=c.rows;
+  if(c&&Date.now()-c.at<ttl) rows=c.rows;
   else{
     let n=0;
     const r=await fetchAllRows(()=>{ n++; setProg(`Reading the 3CX log, page ${n}`); return SB.from('status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',new Date(lo).toISOString()).lt('changed_at',new Date(hi).toISOString()).order('changed_at',{ascending:true}); });
@@ -63,6 +65,7 @@ async function loadCxRange(first,last,setProg){
     }catch(e){}
     await new Promise(r=>setTimeout(r,0));
   }
+  CXR_OUT[k]={at:Date.now(),days};
   return {days,error:null};
 }
 
@@ -84,8 +87,10 @@ function cxEvents(days){
       else add('extra_break',x.secs,`Third break ${span(x)} (${m(x)}); only two 15m breaks are allowed`);
     });
     // short breaks (bathroom, smoke, anything under 13m20s) have no limit of their own: only the day's total counts
-    const had=ev.slice(n0).some(e=>e.type!=='stayed_late'&&e.type!=='late_start');   // a break event of this agent today (n0 is after the start/late-call events)
-    if(totalSecs-BR.totalSec>=BR.graceSec){ add('total_over',totalSecs-BR.totalSec,`Breaks added up to ${fmtMin(Math.round(totalSecs/60))} in the day, 1h45m allowed`); if(had) ev[ev.length-1].dup=true; }   // shown, but not counted twice for the bonus
+    if(totalSecs-BR.totalSec>=BR.graceSec){   // over the day's total: one event for the total, with the parts that went over folded into its details (not mentioned twice)
+      const parts=ev.splice(n0).map(e=>e.detail.replace(/, (1h|15m) allowed$/,'').replace(/; only two 15m breaks are allowed$/,''));
+      add('total_over',totalSecs-BR.totalSec,`Breaks added up to ${fmtMin(Math.round(totalSecs/60))} in the day, 1h45m allowed`+(parts.length?` (${parts.join('; ')})`:''));
+    }
   }));
   return ev.sort((a,b)=>b.day.localeCompare(a.day)||a.agent.localeCompare(b.agent)||a.type.localeCompare(b.type));
 }
@@ -102,18 +107,22 @@ function bonusOf({abs,punct,qa,calls,ign}){
 function ABonus({go}){
   const cur=todayISO().slice(0,7);
   const [ym,setYm]=useState(cur);
-  const [data,setData]=useState(null);
-  const [cx,setCx]=useState(null);
+  const c0=BN_CACHE[cur];
+  const [data,setData]=useState(c0?c0.data:null);
+  const [cx,setCx]=useState(c0?c0.cx:null);
   const [prog,setProg]=useState('');
-  const [inp,setInp]=useState({});
-  const [off,setOff]=useState(false);
+  const [inp,setInp]=useState(c0?c0.inp:{});
+  const [off,setOff]=useState(c0?c0.off:false);
   const [err,setErr]=useState('');
   const [showSet,setShowSet]=useState(false);
   const first=ym+'-01', next=monthAdd(first,1);
   useEffect(()=>{
     let dead=false;
     (async()=>{
-      setData(null); setCx(null); setErr(''); setProg('Reading 3CX');
+      const ca=BN_CACHE[ym];
+      if(ca){ setData(ca.data); setCx(ca.cx); setInp(ca.inp); setOff(ca.off); setErr(''); if(Date.now()-ca.at<ca.ttl) return; }   // shown straight away; only refreshed (quietly) when it is getting old
+      else { setData(null); setCx(null); setErr(''); }
+      setProg('Reading 3CX');
       const [q,i]=await Promise.all([
         run(SB.from('bt_requests').select('*').eq('status','approved').in('kind',['pto','sick']).lte('start_date',isoAdd(next,-1)).gte('end_date',first)),
         run(SB.from('bt_bonus_inputs').select('*').eq('month',ym)),
@@ -127,6 +136,7 @@ function ABonus({go}){
       if(dead) return;
       if(r.error) setErr("Couldn't read the 3CX log: "+r.error);
       setCx(r); setProg('');
+      BN_CACHE[ym]={at:Date.now(),ttl:ym<todayISO().slice(0,7)?3600000:180000,data:{reqs:q.data||[]},cx:r,inp:m,off:missing};
     })();
     return()=>{ dead=true; };
   },[ym]);
@@ -135,7 +145,7 @@ function ABonus({go}){
   const save=async(name,patch)=>{
     const row={...(inp[name]||{}),month:ym,agent_name:name,...patch,updated_at:nowISO()};
     delete row.id;
-    setInp(p=>({...p,[name]:row}));
+    setInp(p=>{ const n={...p,[name]:row}; if(BN_CACHE[ym]) BN_CACHE[ym].inp=n; return n; });
     if(off) return;
     const {error}=await run(SB.from('bt_bonus_inputs').upsert({month:ym,agent_name:name,qa_rate:row.qa_rate??null,absent_override:row.absent_override??null,punct_adj:row.punct_adj??0,workdays:row.workdays??null,holidays:row.holidays??null,leave_counts:!!row.leave_counts,updated_at:row.updated_at},{onConflict:'month,agent_name'}));
     if(error){ if(/bt_bonus_inputs|schema cache/i.test(error.message||'')) setOff(true); else setErr('Save: '+error.message); }
@@ -150,7 +160,7 @@ function ABonus({go}){
       const t=tot[k]=tot[k]||{calls:0,answered:0,ignored:0}; t.calls+=a.calls; t.answered+=a.answered; t.ignored+=a.ignored;
       if(a.present) (worked[k]=worked[k]||new Set()).add(d);
     }));
-    const ev=cxEvents(cx.days).filter(e=>e.type!=='stayed_late'&&!e.dup);
+    const ev=cxEvents(cx.days).filter(e=>e.type!=='stayed_late');
     return Object.values(people).filter(p=>worked[p.key]&&worked[p.key].size>0||tot[p.key].calls>0).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
       const leave=new Set(); data.reqs.filter(r=>CX.nameKey(r.agent_name)===p.key).forEach(r=>{ for(let d=r.start_date;d<=(r.end_date||r.start_date);d=isoAdd(d,1)) leave.add(d); });
       const auto=days.filter(d=>!(worked[p.key]&&worked[p.key].has(d))&&(leaveCounts||!leave.has(d))).length;
@@ -227,7 +237,7 @@ function ALate(){
   const [to,setTo]=useState(today);
   const [agent,setAgent]=useState('');
   const [types,setTypes]=useState([]);       // empty = all
-  const [data,setData]=useState(null);
+  const [data,setData]=useState(()=>cxPeek(today.slice(0,8)+'01',today));
   const [err,setErr]=useState('');
   const [prog,setProg]=useState('');
   const seq=useRef(0);
@@ -240,7 +250,7 @@ function ALate(){
     if(r.error){ setErr("Couldn't read the 3CX log: "+r.error); return; }
     setErr(''); setData(r);
   },[from,to]);
-  useEffect(()=>{ setData(null); load(); },[load]);
+  useEffect(()=>{ setData(cxPeek(from,to)); load(); },[load]);   // what was loaded before shows at once, and is only re-read when it is old
   useAutoRefresh(load,60000);
   const all=useMemo(()=>data?cxEvents(data.days):[],[data]);
   const names=[...new Set(all.map(e=>e.agent))].sort((a,b)=>a.localeCompare(b));
