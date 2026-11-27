@@ -2356,7 +2356,7 @@ grant select, insert, update on public.bt_bonus_inputs to authenticated;
 notify pgrst, 'reload schema';
 `;
 const BR={start:'08:30',end:'17:30',graceSec:60,lunchSec:3600,brkSec:900,flexSec:900,lunchMin:3000,brkMin:800};
-const BEV={late_start:'Late start',late_lunch:'Lunch over',late_break:'Break over',flex_over:'Short breaks over',extra_break:'Extra break',stayed_late:'Stayed late'};
+const BEV={late_start:'Late start',late_lunch:'Lunch over',late_break:'Break over',flex_over:'Short breaks over',extra_break:'Extra break',stayed_late:'On a call after 17:30'};
 const hmSec=hm=>{ const [h,m]=hm.split(':').map(Number); return h*3600+m*60; };
 const ymd=t=>{ const w=wall(t); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; };
 const secInDay=t=>{ const w=wall(t); return w.getUTCHours()*3600+w.getUTCMinutes()*60+w.getUTCSeconds(); };
@@ -2376,41 +2376,71 @@ function dlCsv(name,head,rows){
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
 
-/* Every late event of the clock-in/out and break logs. A start, a break or a lunch counts as late from one full minute over; staying past the end of the shift counts from one minute too. */
-function punctEvents(clocks,logs,now){
-  const ev=[], today=todayISO();
-  const cd={};
-  (clocks||[]).forEach(c=>{ const k=c.agent_name+'|'+c.date; (cd[k]=cd[k]||{agent:c.agent_name,day:c.date,rows:[]}).rows.push(c); });
-  Object.values(cd).forEach(d=>{
-    const ins=d.rows.map(r=>r.clock_in).filter(Boolean).sort();
-    if(ins.length){
-      const over=secInDay(ins[0])-hmSec(BR.start);
-      if(over>=BR.graceSec) ev.push({day:d.day,agent:d.agent,type:'late_start',mins:Math.floor(over/60),detail:`Clocked in ${hhmm(ins[0])}, shift starts ${BR.start}`});
-    }
-    const open=d.rows.some(r=>r.clock_in&&!r.clock_out), outs=d.rows.map(r=>r.clock_out).filter(Boolean).sort();
-    let endT=null;
-    if(open){ if(d.day===today) endT=new Date(now).toISOString(); } else if(outs.length) endT=outs[outs.length-1];
-    if(endT){
-      const over=secInDay(endT)-hmSec(BR.end);
-      if(over>=BR.graceSec) ev.push({day:d.day,agent:d.agent,type:'stayed_late',mins:Math.floor(over/60),detail:open?`Still clocked in at ${hhmm(endT)}, shift ends ${BR.end}`:`Clocked out ${hhmm(endT)}, shift ends ${BR.end}`});
-    }
-  });
-  const bd={};
-  (logs||[]).forEach(l=>{ const day=ymd(l.start_time), k=l.agent_name+'|'+day; (bd[k]=bd[k]||{agent:l.agent_name,day,rows:[]}).rows.push(l); });
-  Object.values(bd).forEach(d=>{
-    const items=d.rows.filter(l=>l.end_time||d.day===today).map(l=>({l,s:secOf(l,now)})).sort((a,b)=>b.s-a.s);
-    const span=x=>`${hhmm(x.l.start_time)}–${x.l.end_time?hhmm(x.l.end_time):'now'}`;
-    const add=(type,secOver,detail)=>ev.push({day:d.day,agent:d.agent,type,mins:Math.floor(secOver/60),detail});
-    const li=items.findIndex(x=>x.s>=BR.lunchMin), lunch=li>=0?items.splice(li,1)[0]:null;
-    if(lunch&&lunch.s-BR.lunchSec>=BR.graceSec) add('late_lunch',lunch.s-BR.lunchSec,`Lunch ${span(lunch)} took ${fmtMin(Math.round(lunch.s/60))}, 1h allowed`);
-    const reg=items.filter(x=>x.s>=BR.brkMin), flex=items.filter(x=>x.s<BR.brkMin);
+/* Everything here comes from the 3CX status log: when an agent came online, their break and lunch statuses, and their calls. */
+const hmOf=sec=>`${pad(Math.floor(sec/3600))}:${pad(Math.floor(sec%3600/60))}`;
+const CXR_CACHE={};   // status_log rows per date range, so going back and forth is quick
+async function loadCxRange(first,last,setProg){
+  const tz=clockOff(), today=todayISO();
+  const lo=Date.parse(first+'T00:00:00Z')-tz*3600000-36*3600000, hi=Date.parse(isoAdd(last,1)+'T00:00:00Z')-tz*3600000;
+  const k=first+'|'+last, c=CXR_CACHE[k];
+  let rows;
+  if(c&&Date.now()-c.at<(last<today?3600000:90000)) rows=c.rows;
+  else{
+    let n=0;
+    const r=await fetchAllRows(()=>{ n++; setProg(`Reading the 3CX log, page ${n}`); return SB.from('status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',new Date(lo).toISOString()).lt('changed_at',new Date(hi).toISOString()).order('changed_at',{ascending:true}); });
+    if(r.error) return {error:r.error.message||String(r.error),days:{}};
+    rows=r.data.map(x=>({...x,ms:Date.parse(x.changed_at)})); CXR_CACHE[k]={at:Date.now(),rows};
+  }
+  const days={}, cfg=_cxCfg, now=appNow(), notWork=x=>['off','hol'].includes(cxCat(x));
+  for(let d=first;d<=last&&d<=today;d=isoAdd(d,1)){
+    const [from,to]=CX.dayRange(d,tz);
+    const part=rows.filter(x=>x.ms>=from-36*3600000&&x.ms<to);
+    if(!part.length) continue;
+    setProg(`Working out ${d}`);
+    try{
+      const R=CX.analyze(CX.rowsFromStatusLog(part),{day:d,now:Math.min(now,to),...cfg,tzOffsetHours:0,dayOffsetHours:tz});
+      const end=iv=>iv.end==null?R.now:iv.end, cutoff=from+hmSec(BR.end)*1000, rec={};
+      Object.values(R.agents).forEach(a=>{
+        const ivs=R.intervals.filter(iv=>iv.ext===a.ext);
+        const carried=ivs.find(iv=>iv.start<from&&end(iv)>from);
+        const inDayIvs=ivs.filter(iv=>iv.start>=from&&iv.start<to);
+        const firstIv=(!carried||notWork(carried.status))?inDayIvs.find(iv=>!notWork(iv.status)):null;
+        const brks=inDayIvs.filter(iv=>CX.isBreak(iv.status)&&(iv.end!=null||(d===today&&iv.end==null))).map(iv=>({start:iv.start,end:iv.end,secs:Math.round((end(iv)-iv.start)/1000),type:CX.breakType(iv.status,iv.detail)})).filter(x=>x.secs>=(cfg.minBreakSec||10));
+        let afterSecs=0, afterN=0;
+        R.calls.filter(cl=>cl.ext===a.ext&&cl.start<to).forEach(cl=>{ const ce=cl.end==null?R.now:cl.end; if(ce>cutoff){ afterSecs+=(Math.min(ce,to)-Math.max(cl.start,cutoff))/1000; afterN++; } });
+        const k2=CX.nameKey(a.agent);
+        rec[k2]={name:a.agent,calls:a.calls,answered:a.answered,ignored:a.ignored,
+          present:inDayIvs.some(iv=>!notWork(iv.status))||a.calls>0,
+          firstSec:firstIv&&!firstIv.partialStart?(firstIv.start-from)/1000:null,
+          breaks:brks,afterSecs:Math.round(afterSecs),afterN};
+      });
+      days[d]=rec;
+    }catch(e){}
+    await new Promise(r=>setTimeout(r,0));
+  }
+  return {days,error:null};
+}
+
+/* Every late event, from the per-day 3CX records. A start, a break or a lunch counts as late from one full minute over.
+   Staying past the end of the shift only counts as time spent on calls after it (the client pays for calls, not for being logged in). */
+function cxEvents(days){
+  const ev=[];
+  Object.entries(days).forEach(([day,rec])=>Object.values(rec).forEach(a=>{
+    const add=(type,secOver,detail)=>ev.push({day,agent:CX.displayName?CX.displayName(a.name):a.name,key:CX.nameKey(a.name),type,mins:Math.floor(secOver/60),detail});
+    if(a.firstSec!=null){ const over=a.firstSec-hmSec(BR.start); if(over>=BR.graceSec) add('late_start',over,`Came online at ${hmOf(a.firstSec)}, shift starts ${BR.start}`); }
+    if(a.afterSecs>=BR.graceSec) add('stayed_late',a.afterSecs,`On ${a.afterN} call${a.afterN===1?'':'s'} for ${fmtMin(Math.floor(a.afterSecs/60))} after ${BR.end}`);
+    const span=x=>`${hhmm(x.start)}–${x.end!=null?hhmm(x.end):'now'}`, m=x=>fmtMin(Math.round(x.secs/60));
+    const items=a.breaks.slice().sort((p,q)=>q.secs-p.secs);
+    const li=items.findIndex(x=>x.type==='Lunch Break'||x.secs>=BR.lunchMin), lunch=li>=0?items.splice(li,1)[0]:null;
+    if(lunch&&lunch.secs-BR.lunchSec>=BR.graceSec) add('late_lunch',lunch.secs-BR.lunchSec,`Lunch ${span(lunch)} took ${m(lunch)}, 1h allowed`);
+    const flex=items.filter(x=>x.type==='Bathroom Break'||(x.type!=='Lunch Break'&&x.secs<BR.brkMin)), reg=items.filter(x=>!flex.includes(x));
     reg.forEach((x,i)=>{
-      if(i<2){ if(x.s-BR.brkSec>=BR.graceSec) add('late_break',x.s-BR.brkSec,`Break ${span(x)} took ${fmtMin(Math.round(x.s/60))}, 15m allowed`); }
-      else add('extra_break',x.s,`Third break ${span(x)} (${fmtMin(Math.round(x.s/60))}); only two 15m breaks are allowed`);
+      if(i<2){ if(x.secs-BR.brkSec>=BR.graceSec) add('late_break',x.secs-BR.brkSec,`Break ${span(x)} took ${m(x)}, 15m allowed`); }
+      else add('extra_break',x.secs,`Third break ${span(x)} (${m(x)}); only two 15m breaks are allowed`);
     });
-    const ft=flex.reduce((t,x)=>t+x.s,0);
-    if(ft-BR.flexSec>=BR.graceSec) add('flex_over',ft-BR.flexSec,`${flex.length} short breaks added up to ${fmtMin(Math.round(ft/60))}, 15m allowed`);
-  });
+    const ft=flex.reduce((t,x)=>t+x.secs,0);
+    if(ft-BR.flexSec>=BR.graceSec) add('flex_over',ft-BR.flexSec,`${flex.length} short break${flex.length===1?'':'s'} added up to ${fmtMin(Math.round(ft/60))}, 15m allowed`);
+  }));
   return ev.sort((a,b)=>b.day.localeCompare(a.day)||a.agent.localeCompare(b.agent)||a.type.localeCompare(b.type));
 }
 
@@ -2421,36 +2451,6 @@ function bonusOf({abs,punct,qa,calls,ign}){
   const qaB=out?0:(qa>=1?150:qa>=0.9?75:0);
   const prod=out?0:((calls<600||ign>0.02)?0:(abs===1?75:150));
   return {att,qaB,prod,total:att+qaB+prod};
-}
-const BX_CACHE={};   // status_log rows per month, so going back and forth is quick
-async function loadCxMonth(ym,setProg){
-  const first=ym+'-01', next=monthAdd(first,1), tz=clockOff();
-  const lo=Date.parse(first+'T00:00:00Z')-tz*3600000-36*3600000, hi=Date.parse(next+'T00:00:00Z')-tz*3600000;
-  const k=ym, c=BX_CACHE[k];
-  let rows;
-  if(c&&Date.now()-c.at<(ym<todayISO().slice(0,7)?3600000:120000)) rows=c.rows;
-  else{
-    let n=0;
-    const r=await fetchAllRows(()=>{ n++; setProg(`Reading 3CX log, page ${n}`); return SB.from('status_log').select('changed_at,extension,agent,old_status,new_status,detail').gte('changed_at',new Date(lo).toISOString()).lt('changed_at',new Date(hi).toISOString()).order('changed_at',{ascending:true}); });
-    if(r.error) return {error:r.error.message||String(r.error),agents:{}};
-    rows=r.data.map(x=>({...x,ms:Date.parse(x.changed_at)})); BX_CACHE[k]={at:Date.now(),rows};
-  }
-  const agents={}, today=todayISO(), cfg=_cxCfg, now=appNow();
-  for(let d=first;d<next&&d<=today;d=isoAdd(d,1)){
-    const [from,to]=CX.dayRange(d,tz);
-    const part=rows.filter(x=>x.ms>=from-36*3600000&&x.ms<to);
-    if(!part.length) continue;
-    setProg(`Working out ${d}`);
-    try{
-      const R=CX.analyze(CX.rowsFromStatusLog(part),{day:d,now:Math.min(now,to),...cfg,tzOffsetHours:0,dayOffsetHours:tz});
-      Object.values(R.agents).forEach(a=>{
-        const key=CX.nameKey(a.agent), t=agents[key]=agents[key]||{name:a.agent,calls:0,answered:0,ignored:0};
-        t.calls+=a.calls; t.answered+=a.answered; t.ignored+=a.ignored;
-      });
-    }catch(e){}
-    await new Promise(r=>setTimeout(r,0));
-  }
-  return {agents,error:null};
 }
 
 function ABonus({go}){
@@ -2467,22 +2467,20 @@ function ABonus({go}){
   useEffect(()=>{
     let dead=false;
     (async()=>{
-      setData(null); setCx(null); setErr(''); setProg('Reading clock-ins and breaks');
-      const off0=clockOff()*3600000, s0=new Date(Date.parse(first+'T00:00:00Z')-off0).toISOString(), s1=new Date(Date.parse(next+'T00:00:00Z')-off0).toISOString();
-      const [c,l,q,i]=await Promise.all([
-        fetchAllRows(()=>SB.from('bt_clocklogs').select('*').gte('date',first).lt('date',next).order('date')),
-        fetchAllRows(()=>SB.from('bt_logs').select('*').gte('start_time',s0).lt('start_time',s1).order('start_time')),
+      setData(null); setCx(null); setErr(''); setProg('Reading 3CX');
+      const [q,i]=await Promise.all([
         run(SB.from('bt_requests').select('*').eq('status','approved').in('kind',['pto','sick']).lte('start_date',isoAdd(next,-1)).gte('end_date',first)),
         run(SB.from('bt_bonus_inputs').select('*').eq('month',ym)),
       ]);
       if(dead) return;
-      if(c.error||l.error){ setErr((c.error||l.error).message||'Could not read the logs'); }
       const missing=!!(i.error&&/bt_bonus_inputs|schema cache|does not exist/i.test(i.error.message||''));
       setOff(missing);
       const m={}; (i.data||[]).forEach(r=>{ m[r.agent_name]=r; }); setInp(m);
-      setData({clocks:c.data||[],logs:l.data||[],reqs:q.data||[]});
-      const r=await loadCxMonth(ym,t=>{ if(!dead) setProg(t); });
-      if(!dead){ setCx(r); setProg(''); }
+      setData({reqs:q.data||[]});
+      const r=await loadCxRange(first,isoAdd(next,-1),t=>{ if(!dead) setProg(t); });
+      if(dead) return;
+      if(r.error) setErr("Couldn't read the 3CX log: "+r.error);
+      setCx(r); setProg('');
     })();
     return()=>{ dead=true; };
   },[ym]);
@@ -2497,23 +2495,23 @@ function ABonus({go}){
     if(error){ if(/bt_bonus_inputs|schema cache/i.test(error.message||'')) setOff(true); else setErr('Save: '+error.message); }
   };
   const rowsOut=useMemo(()=>{
-    if(!data) return [];
-    const today=todayISO(), now=appNow();
+    if(!data||!cx) return [];
+    const today=todayISO();
     const days=[]; for(let d=first;d<next&&d<today;d=isoAdd(d,1)){ const wd=new Date(d+'T00:00:00Z').getUTCDay()||7; if(workdays.includes(String(wd))&&!holidays.has(d)) days.push(d); }
-    const people={};
-    const add=n=>{ const k=CX.nameKey(n); if(k&&!people[k]) people[k]={key:k,name:n}; return k; };
-    data.clocks.forEach(c=>add(c.agent_name)); data.logs.forEach(l=>add(l.agent_name));
-    const cxA=(cx&&cx.agents)||{};
-    Object.entries(cxA).forEach(([k,a])=>{ if(!people[k]&&a.calls>0) people[k]={key:k,name:CX.displayName?CX.displayName(a.name):a.name}; });
-    const ev=punctEvents(data.clocks,data.logs,now).filter(e=>e.type!=='stayed_late');
-    return Object.values(people).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
-      const mine=data.clocks.filter(c=>CX.nameKey(c.agent_name)===p.key), worked=new Set(mine.map(c=>c.date));
+    const people={}, tot={}, worked={};
+    Object.entries(cx.days).forEach(([d,rec])=>Object.entries(rec).forEach(([k,a])=>{
+      people[k]=people[k]||{key:k,name:CX.displayName?CX.displayName(a.name):a.name};
+      const t=tot[k]=tot[k]||{calls:0,answered:0,ignored:0}; t.calls+=a.calls; t.answered+=a.answered; t.ignored+=a.ignored;
+      if(a.present) (worked[k]=worked[k]||new Set()).add(d);
+    }));
+    const ev=cxEvents(cx.days).filter(e=>e.type!=='stayed_late');
+    return Object.values(people).filter(p=>worked[p.key]&&worked[p.key].size>0||tot[p.key].calls>0).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
       const leave=new Set(); data.reqs.filter(r=>CX.nameKey(r.agent_name)===p.key).forEach(r=>{ for(let d=r.start_date;d<=(r.end_date||r.start_date);d=isoAdd(d,1)) leave.add(d); });
-      const auto=days.filter(d=>!worked.has(d)&&(leaveCounts||!leave.has(d))).length;
+      const auto=days.filter(d=>!(worked[p.key]&&worked[p.key].has(d))&&(leaveCounts||!leave.has(d))).length;
       const i=inp[p.name]||inp[Object.keys(inp).find(n=>CX.nameKey(n)===p.key)]||{};
       const abs=i.absent_override!=null?i.absent_override:auto;
-      const n=ev.filter(e=>CX.nameKey(e.agent)===p.key).length, adj=i.punct_adj||0, punct=Math.max(0,n+adj);
-      const a=cxA[p.key]||{calls:0,answered:0,ignored:0}, tot=a.answered+a.ignored, ign=tot?a.ignored/tot:0;
+      const n=ev.filter(e=>e.key===p.key).length, adj=i.punct_adj||0, punct=Math.max(0,n+adj);
+      const a=tot[p.key], rings=a.answered+a.ignored, ign=rings?a.ignored/rings:0;
       const qa=i.qa_rate!=null?Number(i.qa_rate):0;
       return {...p,auto,abs,n,adj,punct,qa,qaSet:i.qa_rate!=null,calls:a.calls,ign,ignN:a.ignored,over:i.absent_override!=null,...bonusOf({abs,punct,qa,calls:a.calls,ign})};
     });
@@ -2529,7 +2527,7 @@ function ABonus({go}){
       onKeyDown={e=>{ if(e.key==='Enter') e.target.blur(); }} aria-label={`${field} for ${r.name}`}/>);
   return(
     <div className="panel" id="tab-bonus">
-      <div className="tab-h"><h1>Bonus audit</h1><p>Attendance, QA and productivity bonus for the month, from the clock-ins, breaks and 3CX calls.</p></div>
+      <div className="tab-h"><h1>Bonus audit</h1><p>Attendance, QA and productivity bonus for the month, all from the 3CX status log.</p></div>
       {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
       {off&&<div className="sblk" style={{marginBottom:18}}><h2 className="sh">One-time setup</h2><p className="sd">QA rates and corrections need a small table. Copy this SQL into the Supabase SQL Editor and run it, then reload. Until then what you type is kept only on this page.</p><CopySql sql={BONUS_SQL}/></div>}
       <div className="pf-nav">
@@ -2555,10 +2553,10 @@ function ABonus({go}){
         </div>
         <label style={{display:'flex',gap:10,alignItems:'center',cursor:'pointer'}}><input type="checkbox" checked={leaveCounts} onChange={e=>save('__month__',{leave_counts:e.target.checked})}/> Count approved time off as days absent</label>
       </div>}
-      {data===null?<div className="es"><div className="spin"/></div>:(
+      {(data===null||cx===null)?<div className="es"><div className="spin"/></div>:(
         <div className="card" style={{padding:'10px 18px 14px',overflowX:'auto'}}>
-          <table className="tbl bn-tbl"><thead><tr><th>Employee</th><th title="Working days with no clock-in. Type a number to replace it.">Days absent</th><th title="Late starts and break or lunch time passed by a minute or more. Add or remove events with the adjustment.">Punctuality events</th><th>QA pass rate</th><th>Handled calls</th><th title="Ignored rings out of the rings the agent was offered">Ignored calls</th><th>Attendance</th><th>QA</th><th>Productivity</th><th>Total (MAD)</th></tr></thead><tbody>
-            {rowsOut.length===0&&<tr><td colSpan={10} style={{color:'var(--mut)',padding:'22px 10px'}}>No agents with clock-ins or calls in {monthName}.</td></tr>}
+          <table className="tbl bn-tbl"><thead><tr><th>Employee</th><th title="Working days with no 3CX activity. Type a number to replace it.">Days absent</th><th title="Late starts and break or lunch time passed by a minute or more. Add or remove events with the adjustment.">Punctuality events</th><th>QA pass rate</th><th>Handled calls</th><th title="Ignored rings out of the rings the agent was offered">Ignored calls</th><th>Attendance</th><th>QA</th><th>Productivity</th><th>Total (MAD)</th></tr></thead><tbody>
+            {rowsOut.length===0&&<tr><td colSpan={10} style={{color:'var(--mut)',padding:'22px 10px'}}>No 3CX activity in {monthName}.</td></tr>}
             {rowsOut.map(r=>(
               <tr key={r.key} data-agent={r.name}>
                 <td>{r.name}</td>
@@ -2585,19 +2583,20 @@ function ALate(){
   const [types,setTypes]=useState([]);       // empty = all
   const [data,setData]=useState(null);
   const [err,setErr]=useState('');
+  const [prog,setProg]=useState('');
+  const seq=useRef(0);
   const load=useCallback(async()=>{
-    if(!from||!to||to<from){ return; }
-    const off0=clockOff()*3600000, s0=new Date(Date.parse(from+'T00:00:00Z')-off0).toISOString(), s1=new Date(Date.parse(isoAdd(to,1)+'T00:00:00Z')-off0).toISOString();
-    const [c,l]=await Promise.all([
-      fetchAllRows(()=>SB.from('bt_clocklogs').select('*').gte('date',from).lte('date',to).order('date')),
-      fetchAllRows(()=>SB.from('bt_logs').select('*').gte('start_time',s0).lt('start_time',s1).order('start_time')),
-    ]);
-    if(c.error||l.error){ setErr((c.error||l.error).message||'Could not read the logs'); return; }
-    setErr(''); setData({clocks:c.data,logs:l.data});
+    if(!from||!to||to<from) return;
+    const my=++seq.current;
+    const r=await loadCxRange(from,to,setProg);
+    if(my!==seq.current) return;   // a newer range was asked for meanwhile
+    setProg('');
+    if(r.error){ setErr("Couldn't read the 3CX log: "+r.error); return; }
+    setErr(''); setData(r);
   },[from,to]);
   useEffect(()=>{ setData(null); load(); },[load]);
   useAutoRefresh(load,60000);
-  const all=useMemo(()=>data?punctEvents(data.clocks,data.logs,appNow()):[],[data]);
+  const all=useMemo(()=>data?cxEvents(data.days):[],[data]);
   const names=[...new Set(all.map(e=>e.agent))].sort((a,b)=>a.localeCompare(b));
   const list=all.filter(e=>(!agent||e.agent===agent)&&(!types.length||types.includes(e.type)));
   const isLate=e=>e.type!=='stayed_late';
@@ -2608,7 +2607,7 @@ function ALate(){
   const exportCsv=()=>dlCsv(`late-and-extra-time-${from}-to-${to}.csv`,['Date','Agent','Type','Minutes over','Details'],list.map(e=>[e.day,e.agent,BEV[e.type],e.mins,e.detail]));
   return(
     <div className="panel" id="tab-late">
-      <div className="tab-h"><h1>Late &amp; extra time</h1><p>Late starts, break and lunch time passed by a minute or more, and staying past {BR.end}.</p></div>
+      <div className="tab-h"><h1>Late &amp; extra time</h1><p>From the 3CX log: late starts, break and lunch time passed by a minute or more, and time on calls after {BR.end}.</p></div>
       {err&&<div className="ebox"><Ic n="alert" size={14}/>{err}</div>}
       <div className="lt-filters">
         <label>From<input className="fi" type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)} aria-label="From date"/></label>
@@ -2621,10 +2620,10 @@ function ALate(){
       <div className="kpis">
         <div className="kpi"><div className="kpi-ic r"><Ic n="clock" size={20}/></div><b id="lt-k-start">{nStart}</b><span>Late starts</span></div>
         <div className="kpi"><div className="kpi-ic"><Ic n="coffee" size={20}/></div><b id="lt-k-brk">{nBrk}</b><span>Break and lunch overruns</span></div>
-        <div className="kpi"><div className="kpi-ic p"><Ic n="timer" size={20}/></div><b id="lt-k-extra">{fmtMin(extra)}</b><span>Extra time after {BR.end}</span></div>
+        <div className="kpi"><div className="kpi-ic p"><Ic n="timer" size={20}/></div><b id="lt-k-extra">{fmtMin(extra)}</b><span>Time on calls after {BR.end}</span></div>
         <div className="kpi"><div className="kpi-ic b"><Ic n="users" size={20}/></div><b>{new Set(list.map(e=>e.agent)).size}</b><span>Agents involved</span></div>
       </div>
-      {data===null?<div className="es"><div className="spin"/></div>:(
+      {data===null?<div className="es"><div className="spin"/>{prog&&<div className="rq-s" style={{marginTop:10}}>{prog}…</div>}</div>:(
         <div className="card" style={{padding:'10px 18px 14px',overflowX:'auto'}}>
           <table className="tbl"><thead><tr><th>Date</th><th>Agent</th><th>Type</th><th>Over by</th><th>Details</th></tr></thead><tbody>
             {list.length===0&&<tr><td colSpan={5} style={{color:'var(--mut)',padding:'22px 10px'}}>Nothing late or extra in this period.</td></tr>}
