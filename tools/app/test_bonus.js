@@ -11,29 +11,31 @@ const D = (d, hm) => `2026-10-${String(d).padStart(2, '0')}T${hm}Z`;
 const wd = d => new Date(Date.UTC(2026, 9, d)).getUTCDay();
 const workdays = []; for (let d = 1; d <= 26; d++) if (wd(d) >= 1 && wd(d) <= 5) workdays.push(d);   // 18 working days before "today" (27 Oct)
 
-let id = 1; const clocks = [], logs = [], sl = [];
-const clock = (name, d, i, o) => clocks.push({ id: id++, user_id: name, agent_name: name, clock_in: D(d, i), clock_out: o ? D(d, o) : null, date: `2026-10-${String(d).padStart(2, '0')}` });
-const brk = (name, d, a, b) => logs.push({ id: id++, user_id: name, agent_name: name, start_time: D(d, a), end_time: D(d, b), duration_secs: (Date.parse(D(d, b)) - Date.parse(D(d, a))) / 1000, break_type: 'Break' });
-// Jane: one day off (6th), late on the 2nd (exactly 60 s) and stays 15 min late; 30 s late on the 1st and 30 s past 17:30 on the 5th do NOT count
-workdays.forEach(d => { if (d === 6) return; if (d === 2) clock('Jane Doe', d, '08:31:00', '17:45:00'); else if (d === 1) clock('Jane Doe', d, '08:30:30', '17:00:00'); else if (d === 5) clock('Jane Doe', d, '08:20:00', '17:30:30'); else clock('Jane Doe', d, '08:25:00', '17:25:00'); });
-brk('Jane Doe', 1, '12:00:00', '13:02:00');                       // lunch 62 min: over by 2
-brk('Jane Doe', 1, '10:00:00', '10:16:00');                       // break 16 min: over by 1
-brk('Jane Doe', 1, '15:00:00', '15:14:00');                       // 14 min: fine
-brk('Jane Doe', 1, '09:00:00', '09:05:00'); brk('Jane Doe', 1, '11:00:00', '11:09:00');   // short ones: 14 min together: fine
-brk('Jane Doe', 5, '09:00:00', '09:06:00'); brk('Jane Doe', 5, '11:00:00', '11:06:00'); brk('Jane Doe', 5, '14:00:00', '14:06:00');   // short ones: 18 min together: over by 3
-brk('Jane Doe', 7, '12:00:00', '12:59:30');                       // lunch 59m30: fine
-// Sam: two days absent (8th, 9th)
-workdays.forEach(d => { if (d === 8 || d === 9) return; clock('Sam Lee', d, '08:25:00', '17:25:00'); });
-// Kay: perfect attendance, 610 calls on the 1st and 10 ignored rings on the 2nd
-workdays.forEach(d => clock('Kay Kim', d, '08:25:00', '17:25:00'));
-const row = (t, a, b, c) => sl.push({ id: id++, changed_at: t, extension: '701', agent: 'Kim, Kay', old_status: b, new_status: c });
-row(D(1, '07:00:00'), 0, null, 'Available');
-for (let i = 0; i < 610; i++) { const t0 = Date.parse(D(1, '08:00:00')) + i * 40000; const f = ms => new Date(ms).toISOString(); row(f(t0), 0, 'Available', 'Ringing'); row(f(t0 + 3000), 0, 'Ringing', 'On call'); row(f(t0 + 33000), 0, 'On call', 'Available'); }
-for (let i = 0; i < 10; i++) { const t0 = Date.parse(D(2, '09:00:00')) + i * 120000; const f = ms => new Date(ms).toISOString(); row(f(t0), 0, 'Available', 'Ringing'); row(f(t0 + 15000), 0, 'Ringing', 'Available'); }
+let id = 1; const sl = [];
+const r = (ext, agent, d, hm, from, to) => sl.push({ id: id++, changed_at: D(d, hm), extension: ext, agent, old_status: from, new_status: to });
+const day = (ext, agent, d, on = '08:25:00', off = '17:25:00') => { r(ext, agent, d, on, 'Offline', 'Available'); r(ext, agent, d, off, 'Available', 'Offline'); };
+const away = (ext, agent, d, a, b, status) => { r(ext, agent, d, a, 'Available', status); r(ext, agent, d, b, status, 'Available'); };
+const call = (ext, agent, d, a, b) => { const x = Date.parse(D(d, a)); const f = ms => new Date(ms).toISOString(); sl.push({ id: id++, changed_at: f(x - 3000), extension: ext, agent, old_status: 'Available', new_status: 'Ringing' }, { id: id++, changed_at: D(d, a), extension: ext, agent, old_status: 'Ringing', new_status: 'On call' }, { id: id++, changed_at: D(d, b), extension: ext, agent, old_status: 'On call', new_status: 'Available' }); };
+const J = ['601', 'Doe, Jane'], S = ['602', 'Lee, Sam'], K = ['701', 'Kim, Kay'];
+// Jane: one day off (6th); online 08:31:00 on the 2nd (exactly 60 s late) and on calls until 17:45; online 08:30:30 on the 1st does NOT count
+workdays.forEach(d => { if (d === 6) return; if (d === 2) day(...J, d, '08:31:00', '17:46:00'); else if (d === 1) day(...J, d, '08:30:30'); else day(...J, d); });
+call(...J, 2, '17:28:00', '17:45:00');                              // 15 minutes of it after 17:30
+call(...J, 5, '17:30:10', '17:30:50');                              // 40 s after 17:30: not enough to count
+away(...J, 1, '12:00:00', '13:02:00', 'Lunch');                     // lunch 62 min: over by 2
+away(...J, 1, '10:00:00', '10:16:00', 'Break');                     // break 16 min: over by 1
+away(...J, 1, '15:00:00', '15:14:00', 'Break');                     // 14 min: fine
+away(...J, 1, '09:00:00', '09:05:00', 'Bathroom'); away(...J, 1, '11:00:00', '11:09:00', 'Bathroom');   // 14 min together: fine
+away(...J, 5, '09:00:00', '09:06:00', 'Bathroom'); away(...J, 5, '11:00:00', '11:06:00', 'Bathroom'); away(...J, 5, '14:00:00', '14:06:00', 'Bathroom');   // 18 min together: over by 3
+away(...J, 7, '12:00:00', '12:59:30', 'Lunch');                     // lunch 59m30: fine
+workdays.forEach(d => { if (d !== 8 && d !== 9) day(...S, d); });   // Sam: two days absent
+workdays.forEach(d => day(...K, d));                                // Kay: perfect, 610 calls on the 1st, 10 ignored rings on the 2nd
+for (let i = 0; i < 610; i++) { const t0 = Date.parse(D(1, '08:30:00')) + i * 40000; call(...K, 1, new Date(t0 + 3000).toISOString().slice(11, 19), new Date(t0 + 33000).toISOString().slice(11, 19)); }
+for (let i = 0; i < 10; i++) { const t0 = Date.parse(D(2, '09:00:00')) + i * 120000; const f = ms => new Date(ms).toISOString(); sl.push({ id: id++, changed_at: f(t0), extension: K[0], agent: K[1], old_status: 'Available', new_status: 'Ringing' }, { id: id++, changed_at: f(t0 + 15000), extension: K[0], agent: K[1], old_status: 'Ringing', new_status: 'Available' }); }
+sl.sort((a, b) => Date.parse(a.changed_at) - Date.parse(b.changed_at));
 
 (async () => {
   const b = await H.launch(); const open = H.opener(b, page, errs);
-  const db = H.mkdb({ bt_clocklogs: clocks, bt_logs: logs, status_log: sl, bt_bonus_inputs: [{ month: '2026-10', agent_name: 'Kay Kim', qa_rate: 1, absent_override: null, punct_adj: 0 }] });
+  const db = H.mkdb({ status_log: sl, bt_bonus_inputs: [{ month: '2026-10', agent_name: 'Kay Kim', qa_rate: 1, absent_override: null, punct_adj: 0 }] });
   let p = await open({ user: H.admin, db, side: '0', w: 1700, h: 1000 }); await p.waitForSelector('.sb');
   const items = (await p.locator('.sb-nav .sb-i').allInnerTexts()).map(x => x.trim());
   check('B0 the sidebar has Bonus Audit and Late & Extra Time (under More)', items.includes('Bonus Audit') && items.includes('Late & Extra Time'), items.join('|'));
@@ -42,7 +44,7 @@ for (let i = 0; i < 10; i++) { const t0 = Date.parse(D(2, '09:00:00')) + i * 120
   const inVal = async (name, i) => p.locator(`tr[data-agent="${name}"] td`).nth(i).locator('input').inputValue();
   check('B1 Kay: no absences, no events, 610 calls, ignored 1.6 %', await inVal('Kay Kim', 1) === '0' && /^0/.test(await cell('Kay Kim', 2)) && await cell('Kay Kim', 4) === '610' && /^1\.6%/.test(await cell('Kay Kim', 5)), [await inVal('Kay Kim', 1), await cell('Kay Kim', 2), await cell('Kay Kim', 4), await cell('Kay Kim', 5)].join(' / '));
   check('B2 Kay\'s bonus follows the sheet: attendance 200, QA (100 %) 150, productivity (600+ calls, 2 % or less ignored) 150 = 500', [6, 7, 8, 9].map(async i => 0) && (await cell('Kay Kim', 6)) === '200' && (await cell('Kay Kim', 7)) === '150' && (await cell('Kay Kim', 8)) === '150' && (await cell('Kay Kim', 9)) === '500', [6, 7, 8, 9].length ? await cell('Kay Kim', 9) : '');
-  check('B3 Jane: 1 day absent (the 6th); 4 punctuality events (late start, lunch +2, break +1, short breaks +3); a start 30 s late and a lunch of 59m30 do not count', await inVal('Jane Doe', 1) === '1' && /^4/.test(await cell('Jane Doe', 2)), await inVal('Jane Doe', 1) + ' / ' + await cell('Jane Doe', 2));
+  check('B3 Jane: 1 day absent (the 6th, nothing in 3CX); 4 punctuality events (late start, lunch +2, break +1, short breaks +3); a start 30 s late and a lunch of 59m30 do not count', await inVal('Jane Doe', 1) === '1' && /^4/.test(await cell('Jane Doe', 2)), await inVal('Jane Doe', 1) + ' / ' + await cell('Jane Doe', 2));
   check('B4 three or more events means no bonus at all', (await cell('Jane Doe', 9)) === '0');
   check('B5 Sam: two days absent means no bonus', await inVal('Sam Lee', 1) === '2' && (await cell('Sam Lee', 9)) === '0');
   // type a QA rate
@@ -56,7 +58,7 @@ for (let i = 0; i < 10; i++) { const t0 = Date.parse(D(2, '09:00:00')) + i * 120
   const csv = p.waitForEvent('download'); await p.click('button:has-text("Export CSV")'); const dl = await csv;
   check('B9 the table exports to CSV', /bonus-audit-2026-10\.csv/.test(dl.suggestedFilename()));
   await p.click('button[aria-label="Previous month"]'); await p.waitForTimeout(1500);
-  check('B10 another month has nobody in it', /No agents/.test(await p.locator('#tab-bonus').innerText()));
+  check('B10 another month has nobody in it', /No 3CX activity/.test(await p.locator('#tab-bonus').innerText()));
   await p.context().close();
 
   // before the setup SQL is run
@@ -73,7 +75,7 @@ for (let i = 0; i < 10; i++) { const t0 = Date.parse(D(2, '09:00:00')) + i * 120
   const want = ['late_start:Jane Doe', 'stayed_late:Jane Doe', 'late_lunch:Jane Doe', 'late_break:Jane Doe', 'flex_over:Jane Doe'];
   check('L1 this month: Jane\'s late start, 15 minutes extra, lunch, break and short-break overruns are listed; the on-time ones are not', want.every(x => t.includes(x)) && t.length === 5, t.join(' | '));
   check('L2 late starters include nobody else (Sam and Kay were on time)', !t.some(x => /Sam|Kay/.test(x)));
-  check('L3 tiles: 1 late start, 3 break and lunch overruns, 15m extra time', (await p.locator('#lt-k-start').innerText()) === '1' && (await p.locator('#lt-k-brk').innerText()) === '3' && (await p.locator('#lt-k-extra').innerText()) === '15m', [await p.locator('#lt-k-start').innerText(), await p.locator('#lt-k-brk').innerText(), await p.locator('#lt-k-extra').innerText()].join('/'));
+  check('L3 tiles: 1 late start, 3 break and lunch overruns, 15m on calls after 17:30 (the 40 s call does not count)', (await p.locator('#lt-k-start').innerText()) === '1' && (await p.locator('#lt-k-brk').innerText()) === '3' && (await p.locator('#lt-k-extra').innerText()) === '15m', [await p.locator('#lt-k-start').innerText(), await p.locator('#lt-k-brk').innerText(), await p.locator('#lt-k-extra').innerText()].join('/'));
   await p.fill('#tab-late input[aria-label="From date"]', '2026-10-02'); await p.fill('#tab-late input[aria-label="To date"]', '2026-10-02'); await p.waitForTimeout(800);
   t = await types();
   check('L4 the date filter narrows it to one day: only the 2nd (late start and extra time)', t.join('|') === 'late_start:Jane Doe|stayed_late:Jane Doe', t.join('|'));
