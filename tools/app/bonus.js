@@ -1,7 +1,7 @@
 /* ═══ Bonus audit and Late & extra time (admin) ═══ */
 const BONUS_SQL=`__BONUS_SQL__`;
 const BR={start:'08:30',end:'17:30',graceSec:60,lunchSec:3600,brkSec:900,flexSec:900,totalSec:6300,lunchMin:3000,brkMin:800};
-const BEV={late_start:'Late start',late_lunch:'Lunch over',late_break:'Break over',flex_over:'Short breaks over',extra_break:'Extra break',total_over:'Total break time over',stayed_late:'On a call after 17:30'};
+const BEV={late_start:'Late start',late_lunch:'Lunch over',late_break:'Break over',extra_break:'Extra break',total_over:'Total break time over',stayed_late:'On a call after 17:30'};
 const hmSec=hm=>{ const [h,m]=hm.split(':').map(Number); return h*3600+m*60; };
 const ymd=t=>{ const w=wall(t); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; };
 const secInDay=t=>{ const w=wall(t); return w.getUTCHours()*3600+w.getUTCMinutes()*60+w.getUTCSeconds(); };
@@ -83,8 +83,7 @@ function cxEvents(days){
       if(i<2){ if(x.secs-BR.brkSec>=BR.graceSec) add('late_break',x.secs-BR.brkSec,`Break ${span(x)} took ${m(x)}, 15m allowed`); }
       else add('extra_break',x.secs,`Third break ${span(x)} (${m(x)}); only two 15m breaks are allowed`);
     });
-    const ft=flex.reduce((t,x)=>t+x.secs,0);
-    if(ft-BR.flexSec>=BR.graceSec) add('flex_over',ft-BR.flexSec,`${flex.length} short break${flex.length===1?'':'s'} added up to ${fmtMin(Math.round(ft/60))}, 15m allowed`);
+    // short breaks (bathroom, smoke, anything under 13m20s) have no limit of their own: only the day's total counts
     const had=ev.slice(n0).some(e=>e.type!=='stayed_late'&&e.type!=='late_start');   // a break event of this agent today (n0 is after the start/late-call events)
     if(totalSecs-BR.totalSec>=BR.graceSec){ add('total_over',totalSecs-BR.totalSec,`Breaks added up to ${fmtMin(Math.round(totalSecs/60))} in the day, 1h45m allowed`); if(had) ev[ev.length-1].dup=true; }   // shown, but not counted twice for the bonus
   }));
