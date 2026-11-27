@@ -2355,8 +2355,8 @@ grant select, insert, update on public.bt_bonus_inputs to authenticated;
 
 notify pgrst, 'reload schema';
 `;
-const BR={start:'08:30',end:'17:30',graceSec:60,lunchSec:3600,brkSec:900,flexSec:900,lunchMin:3000,brkMin:800};
-const BEV={late_start:'Late start',late_lunch:'Lunch over',late_break:'Break over',flex_over:'Short breaks over',extra_break:'Extra break',stayed_late:'On a call after 17:30'};
+const BR={start:'08:30',end:'17:30',graceSec:60,lunchSec:3600,brkSec:900,flexSec:900,totalSec:6300,lunchMin:3000,brkMin:800};
+const BEV={late_start:'Late start',late_lunch:'Lunch over',late_break:'Break over',extra_break:'Extra break',total_over:'Total break time over',stayed_late:'On a call after 17:30'};
 const hmSec=hm=>{ const [h,m]=hm.split(':').map(Number); return h*3600+m*60; };
 const ymd=t=>{ const w=wall(t); return `${w.getUTCFullYear()}-${pad(w.getUTCMonth()+1)}-${pad(w.getUTCDate())}`; };
 const secInDay=t=>{ const w=wall(t); return w.getUTCHours()*3600+w.getUTCMinutes()*60+w.getUTCSeconds(); };
@@ -2430,7 +2430,7 @@ function cxEvents(days){
     if(a.firstSec!=null){ const over=a.firstSec-hmSec(BR.start); if(over>=BR.graceSec) add('late_start',over,`Came online at ${hmOf(a.firstSec)}, shift starts ${BR.start}`); }
     if(a.afterSecs>=BR.graceSec) add('stayed_late',a.afterSecs,`On ${a.afterN} call${a.afterN===1?'':'s'} for ${fmtMin(Math.floor(a.afterSecs/60))} after ${BR.end}`);
     const span=x=>`${hhmm(x.start)}–${x.end!=null?hhmm(x.end):'now'}`, m=x=>fmtMin(Math.round(x.secs/60));
-    const items=a.breaks.slice().sort((p,q)=>q.secs-p.secs);
+    const items=a.breaks.slice().sort((p,q)=>q.secs-p.secs), totalSecs=items.reduce((s,x)=>s+x.secs,0), n0=ev.length;
     const li=items.findIndex(x=>x.type==='Lunch Break'||x.secs>=BR.lunchMin), lunch=li>=0?items.splice(li,1)[0]:null;
     if(lunch&&lunch.secs-BR.lunchSec>=BR.graceSec) add('late_lunch',lunch.secs-BR.lunchSec,`Lunch ${span(lunch)} took ${m(lunch)}, 1h allowed`);
     const flex=items.filter(x=>x.type==='Bathroom Break'||(x.type!=='Lunch Break'&&x.secs<BR.brkMin)), reg=items.filter(x=>!flex.includes(x));
@@ -2438,8 +2438,9 @@ function cxEvents(days){
       if(i<2){ if(x.secs-BR.brkSec>=BR.graceSec) add('late_break',x.secs-BR.brkSec,`Break ${span(x)} took ${m(x)}, 15m allowed`); }
       else add('extra_break',x.secs,`Third break ${span(x)} (${m(x)}); only two 15m breaks are allowed`);
     });
-    const ft=flex.reduce((t,x)=>t+x.secs,0);
-    if(ft-BR.flexSec>=BR.graceSec) add('flex_over',ft-BR.flexSec,`${flex.length} short break${flex.length===1?'':'s'} added up to ${fmtMin(Math.round(ft/60))}, 15m allowed`);
+    // short breaks (bathroom, smoke, anything under 13m20s) have no limit of their own: only the day's total counts
+    const had=ev.slice(n0).some(e=>e.type!=='stayed_late'&&e.type!=='late_start');   // a break event of this agent today (n0 is after the start/late-call events)
+    if(totalSecs-BR.totalSec>=BR.graceSec){ add('total_over',totalSecs-BR.totalSec,`Breaks added up to ${fmtMin(Math.round(totalSecs/60))} in the day, 1h45m allowed`); if(had) ev[ev.length-1].dup=true; }   // shown, but not counted twice for the bonus
   }));
   return ev.sort((a,b)=>b.day.localeCompare(a.day)||a.agent.localeCompare(b.agent)||a.type.localeCompare(b.type));
 }
@@ -2504,7 +2505,7 @@ function ABonus({go}){
       const t=tot[k]=tot[k]||{calls:0,answered:0,ignored:0}; t.calls+=a.calls; t.answered+=a.answered; t.ignored+=a.ignored;
       if(a.present) (worked[k]=worked[k]||new Set()).add(d);
     }));
-    const ev=cxEvents(cx.days).filter(e=>e.type!=='stayed_late');
+    const ev=cxEvents(cx.days).filter(e=>e.type!=='stayed_late'&&!e.dup);
     return Object.values(people).filter(p=>worked[p.key]&&worked[p.key].size>0||tot[p.key].calls>0).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
       const leave=new Set(); data.reqs.filter(r=>CX.nameKey(r.agent_name)===p.key).forEach(r=>{ for(let d=r.start_date;d<=(r.end_date||r.start_date);d=isoAdd(d,1)) leave.add(d); });
       const auto=days.filter(d=>!(worked[p.key]&&worked[p.key].has(d))&&(leaveCounts||!leave.has(d))).length;
