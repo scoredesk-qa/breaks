@@ -75,7 +75,7 @@ const requests = () => [
   check('S8b the top bar reaches the right edge of the screen', 1500 - (ti.x + ti.width) < 60, String(1500 - (ti.x + ti.width)));
   await p.click('[data-act=collapse]'); await p.waitForTimeout(700);
   const an2 = (await p.locator('.sb-nav .sb-i').allInnerTexts()).map(x => x.trim());
-  check('S8c expanded, every page is listed', ['Accounts', 'Analytics', 'All Logs', 'Trainees', 'Lunch Swaps', 'Notifications'].every(x => an2.includes(x)) && an2.length === 13, an2.join('|'));
+  check('S8c expanded, every page is listed', ['Accounts', 'Analytics', 'All Logs', 'Trainees', 'Lunch Swaps', 'Notifications', 'Bonus Audit', 'Late & Extra Time'].every(x => an2.includes(x)) && an2.length === 15, an2.join('|'));
   await p.click('[data-nav=accounts]'); await p.waitForSelector('#acc-form');
   const create = p.locator('#acc-form button.bp');
   check('S8b Accounts: the create button stays off until name, email and a 6+ character password are filled', await create.isDisabled());

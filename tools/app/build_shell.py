@@ -18,6 +18,9 @@ crlf = '\r\n' in raw
 s = raw.replace('\r\n', '\n')
 req_sql = open(os.path.join(HERE, 'requests_setup.sql'), encoding='utf-8').read()
 assert '`' not in req_sql and '${' not in req_sql
+bonus_sql = open(os.path.join(HERE, 'bonus_setup.sql'), encoding='utf-8').read()
+assert '`' not in bonus_sql and '${' not in bonus_sql
+BONUS_JS = open(os.path.join(HERE, 'bonus.js'), encoding='utf-8').read().replace('__BONUS_SQL__', bonus_sql)
 
 
 def rep(old, new, count=1):
@@ -257,6 +260,7 @@ rep("const PATHS = {", """const PATHS = {
   calendar: ["M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","M16 2v4","M8 2v4","M3 10h18"],
   message:  "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   inbox:    ["M22 12h-6l-2 3h-4l-2-3H2","M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"],
+  award:    ["M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12z","M8.2 13.9L7 22l5-3 5 3-1.2-8.1"],
   file:     ["M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z","M14 2v6h6","M8 13h8","M8 17h5"],
   palm:     ["M12 22V10","M12 10c-1-4-4-6-8-5 3 0 5 2 5.5 4","M12 10c1-4 4-6 8-5-3 0-5 2-5.5 4","M12 10c-3-3-6-3-8-1 3-.5 5 .5 6.5 2","M12 10c3-3 6-3 8-1-3-.5-5 .5-6.5 2"],""")
 
@@ -774,11 +778,11 @@ function AgentCalls({st}){
 }
 
 """.replace('__REQ_SQL__', req_sql)
-rep("function App() {", SHELL_JS + "function App() {")
+rep("function App() {", SHELL_JS + BONUS_JS + "function App() {")
 
 
 # ═════════════════════════════ 4. admin shell ═════════════════════════════
-rep("const { useState, useEffect, useRef, useCallback } = React;", "const { useState, useEffect, useRef, useCallback, useLayoutEffect } = React;")
+rep("const { useState, useEffect, useRef, useCallback } = React;", "const { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } = React;")
 cut_start = s.index("  const NavItem=({id,n,label,badge})=>(")
 cut_end = s.index("      <div className=\"main\">", cut_start)
 s = s[:cut_start] + """  const sideItems=[...main, {section:'More',more:true}, ...flows];
@@ -804,11 +808,13 @@ s = s[:_a] + """  const main=[
     {id:'logs',      n:'list',     label:'All Logs', more:true},
     {id:'trainees',  n:'users',    label:'Trainees', more:true},
     {id:'swaps',     n:'swap',     label:'Lunch Swaps', badge:counts.swaps, more:true},
+    {id:'bonus',     n:'award',    label:'Bonus Audit', more:true},
+    {id:'late',      n:'clock',    label:'Late & Extra Time', more:true},
     {id:'notifs',    n:'bell',     label:'Notifications', more:true},
   ];
 """ + s[_b:]
 rep("  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n", "  useAdminLunchBroadcast(5); // auto-broadcast 5 min before each group's lunch\n  const [reqN]=useReqBadge(user,true,false);\n  useRequestToasts(user,true);\n")
-rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'    &&<AClocks/>}\n          {tab==='requests'  &&<ARequests user={user} name={name}/>}\n          {tab==='accounts'  &&<AAccounts/>}\n")
+rep("          {tab==='clocks'    &&<AClocks/>}\n", "          {tab==='clocks'    &&<AClocks/>}\n          {tab==='requests'  &&<ARequests user={user} name={name}/>}\n          {tab==='accounts'  &&<AAccounts/>}\n          {tab==='bonus'     &&<ABonus go={go}/>}\n          {tab==='late'      &&<ALate/>}\n")
 
 
 # ═════════════════════════════ notifications: reliable delivery ═════════════════════════════
@@ -890,7 +896,7 @@ rep('''    <div className="auth-bg">
       <div className="auth-card">''')
 
 i = s.rindex('</style>')
-s = s[:i] + "#tab-calls #agent-calls{margin-top:0!important}\n.top-title{font-size:15px;color:var(--mut)}\n.top-ic{margin-left:auto}.bm-w{fill:#f4f5ff}[data-theme='light'] .wm-icon .bm-w{fill:#aab4ff;stroke:#aab4ff}\n.lg-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}.lg{background:var(--tile);border-radius:16px;padding:14px 16px}.lg.mine{outline:2px solid var(--sb-acc)}.lg-h{display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px}.lg-h span{color:var(--mut)}.lg-n{padding:4px 0;font-size:14.5px}.lg-n.me{font-weight:600}\n.pf-nav{display:flex;align-items:center;gap:12px;margin-bottom:20px;font-size:17px}.pf-nav b{min-width:150px;text-align:center;font-weight:500}\n.sb-logo{background:none!important;box-shadow:none!important;width:46px;height:46px}\n.acc-pw{display:flex;gap:8px}.acc-pw .fi{flex:1;min-width:0}.sb-out:hover{color:#ff8a9a}\n" + s[i:]
+s = s[:i] + "#tab-calls #agent-calls{margin-top:0!important}\n.top-title{font-size:15px;color:var(--mut)}\n.top-ic{margin-left:auto}.bm-w{fill:#f4f5ff}[data-theme='light'] .wm-icon .bm-w{fill:#aab4ff;stroke:#aab4ff}\n.lg-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}.lg{background:var(--tile);border-radius:16px;padding:14px 16px}.lg.mine{outline:2px solid var(--sb-acc)}.lg-h{display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px}.lg-h span{color:var(--mut)}.lg-n{padding:4px 0;font-size:14.5px}.lg-n.me{font-weight:600}\n.pf-nav{display:flex;align-items:center;gap:12px;margin-bottom:20px;font-size:17px}.pf-nav b{min-width:150px;text-align:center;font-weight:500}\n.sb-logo{background:none!important;box-shadow:none!important;width:46px;height:46px}\n.fchip{border:none;background:var(--card);color:var(--txt);border-radius:999px;padding:7px 15px;font-size:14px;cursor:pointer;font-family:inherit;transition:background .15s}.fchip:hover{background:var(--hover)}.fchip.on{background:var(--violet);color:#fff}\n.bn-in{width:84px;text-align:right;padding:8px 10px}.bn-pct{margin-left:4px;color:var(--mut)}.bn-flag{margin-left:6px;font-size:11px;color:var(--mut)}.bn-bad{color:var(--bad-txt)}.bn-tot td{font-weight:600;border-top:1px solid var(--bdr)}.bn-adj{margin-left:6px;border:none;background:var(--card);color:var(--mut);border-radius:8px;cursor:pointer;padding:2px 7px}.bn-tbl td.n,.bn-tbl th{white-space:nowrap}\n.lt-filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}.lt-filters label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--mut)}.lt-filters .fi{width:auto}.lt-pre,.lt-types{display:flex;gap:8px;flex-wrap:wrap}.lt-types{margin-bottom:18px}.lt-t{display:inline-block;padding:3px 11px;border-radius:999px;font-size:13px;background:var(--amber-d);color:var(--acc-txt)}.lt-t.late_start,.lt-t.late_lunch{background:var(--red-d);color:var(--bad-txt)}.lt-t.stayed_late{background:var(--indigo-d);color:var(--indigo)}\n.acc-pw{display:flex;gap:8px}.acc-pw .fi{flex:1;min-width:0}.sb-out:hover{color:#ff8a9a}\n" + s[i:]
 
 rep("  const [hide,setHide]=useState(false);\n", "  const hide=false;\n")
 rep("  useEffect(()=>{ document.body.classList.toggle('privacy',hide); return()=>document.body.classList.remove('privacy'); },[hide]);\n", "")
